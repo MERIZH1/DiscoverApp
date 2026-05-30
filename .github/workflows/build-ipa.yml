@@ -26,7 +26,7 @@ jobs:
             -target DiscoverApp \
             -configuration Release \
             -sdk iphoneos \
-            -derivedDataPath build \
+            SYMROOT="$PWD/build" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
@@ -35,7 +35,7 @@ jobs:
       - name: Package .ipa (unsigned)
         run: |
           set -eo pipefail
-          APP_PATH="build/Build/Products/Release-iphoneos/DiscoverApp.app"
+          APP_PATH="build/Release-iphoneos/DiscoverApp.app"
           if [ ! -d "$APP_PATH" ]; then
             echo "App nicht gefunden unter $APP_PATH"
             echo "--- Inhalt von build/Build/Products ---"
