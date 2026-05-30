@@ -18,31 +18,34 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Build (unsigned archive)
+      - name: Build app (unsigned)
         run: |
           set -eo pipefail
           xcodebuild \
             -project DiscoverApp.xcodeproj \
-            -scheme DiscoverApp \
+            -target DiscoverApp \
             -configuration Release \
             -sdk iphoneos \
-            -archivePath "$PWD/build/DiscoverApp.xcarchive" \
-            archive \
+            -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            | xcpretty || true
+            build
 
       - name: Package .ipa (unsigned)
         run: |
           set -eo pipefail
-          APP_PATH="$PWD/build/DiscoverApp.xcarchive/Products/Applications/DiscoverApp.app"
-          if [ ! -d "$APP_PATH" ]; then echo "App nicht gefunden: $APP_PATH"; ls -R "$PWD/build" || true; exit 1; fi
-          rm -rf "$PWD/build/Payload"
-          mkdir -p "$PWD/build/Payload"
-          cp -R "$APP_PATH" "$PWD/build/Payload/"
-          cd "$PWD/build"
-          zip -r -y "DiscoverApp-unsigned.ipa" "Payload" >/dev/null
+          APP_PATH="build/Build/Products/Release-iphoneos/DiscoverApp.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "App nicht gefunden unter $APP_PATH"
+            echo "--- Inhalt von build/Build/Products ---"
+            ls -R build/Build/Products || true
+            exit 1
+          fi
+          rm -rf Payload DiscoverApp-unsigned.ipa
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/
+          zip -r -y "DiscoverApp-unsigned.ipa" Payload >/dev/null
           echo "IPA gebaut:"
           ls -lh DiscoverApp-unsigned.ipa
 
@@ -50,5 +53,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: DiscoverApp-unsigned-ipa
-          path: build/DiscoverApp-unsigned.ipa
+          path: DiscoverApp-unsigned.ipa
           if-no-files-found: error
