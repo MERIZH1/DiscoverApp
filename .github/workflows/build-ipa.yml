@@ -18,26 +18,26 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Build app (unsigned)
+      - name: Archive app (unsigned)
         run: |
           set -eo pipefail
           xcodebuild \
             -project DiscoverApp.xcodeproj \
-            -target DiscoverApp \
+            -scheme DiscoverApp \
             -configuration Release \
             -sdk iphoneos \
-            SYMROOT="$PWD/build" \
+            -archivePath "$PWD/build/DiscoverApp.xcarchive" \
             MARKETING_VERSION=1.0 \
             CURRENT_PROJECT_VERSION=${{ github.run_number }} \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            build
+            archive
 
       - name: Package .ipa (unsigned)
         run: |
           set -eo pipefail
-          APP_PATH="build/Release-iphoneos/DiscoverApp.app"
+          APP_PATH="build/DiscoverApp.xcarchive/Products/Applications/DiscoverApp.app"
           if [ ! -d "$APP_PATH" ]; then
             echo "App nicht gefunden unter $APP_PATH"
             echo "--- Inhalt von build/Build/Products ---"

@@ -5,6 +5,16 @@ options:
     iOS: "15.0"
   createIntermediateGroups: true
 
+schemes:
+  DiscoverApp:
+    build:
+      targets:
+        DiscoverApp: all
+    run:
+      config: Release
+    archive:
+      config: Release
+
 targets:
   DiscoverApp:
     type: application
