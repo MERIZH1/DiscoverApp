@@ -1,0 +1,54 @@
+name: Build unsigned IPA
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:   # erlaubt manuelles Starten im GitHub-UI
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build (unsigned archive)
+        run: |
+          set -eo pipefail
+          xcodebuild \
+            -project DiscoverApp.xcodeproj \
+            -scheme DiscoverApp \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath "$PWD/build/DiscoverApp.xcarchive" \
+            archive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            | xcpretty || true
+
+      - name: Package .ipa (unsigned)
+        run: |
+          set -eo pipefail
+          APP_PATH="$PWD/build/DiscoverApp.xcarchive/Products/Applications/DiscoverApp.app"
+          if [ ! -d "$APP_PATH" ]; then echo "App nicht gefunden: $APP_PATH"; ls -R "$PWD/build" || true; exit 1; fi
+          rm -rf "$PWD/build/Payload"
+          mkdir -p "$PWD/build/Payload"
+          cp -R "$APP_PATH" "$PWD/build/Payload/"
+          cd "$PWD/build"
+          zip -r -y "DiscoverApp-unsigned.ipa" "Payload" >/dev/null
+          echo "IPA gebaut:"
+          ls -lh DiscoverApp-unsigned.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DiscoverApp-unsigned-ipa
+          path: build/DiscoverApp-unsigned.ipa
+          if-no-files-found: error

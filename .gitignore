@@ -1,0 +1,9 @@
+# XcodeGen-Output
+DiscoverApp.xcodeproj/
+# Build
+build/
+DerivedData/
+*.ipa
+*.xcarchive
+# macOS
+.DS_Store
