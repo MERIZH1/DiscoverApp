@@ -64,9 +64,9 @@ struct Pill: View {
     let tap: () -> Void
     var body: some View {
         Button(action: tap) {
-            Text(text).font(.system(size: 14, weight: .semibold))
+            Text(text).font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(active ? .black : Theme.text)
-                .padding(.horizontal, 16).padding(.vertical, 8)
+                .padding(.horizontal, 14).padding(.vertical, 7)
                 .background(active ? activeBg : Theme.input)
                 .clipShape(Capsule())
         }.buttonStyle(.plain)
@@ -112,7 +112,7 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 22) {
                     // Header
                     HStack(alignment: .center) {
-                        Text(greetingText).font(.system(size: 28, weight: .bold))
+                        Text(greetingText).font(.system(size: 28, weight: .heavy))
                             .foregroundStyle(Theme.text).lineLimit(2)
                         Spacer(minLength: 8)
                         Button { showAccount = true } label: {
@@ -136,15 +136,15 @@ struct HomeView: View {
                         LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                             ForEach(quick) { item in
                                 NavigationLink(value: item) {
-                                    HStack(spacing: 8) {
-                                        Artwork(url: item.image, size: 54, corner: 4)
-                                        Text(item.name).font(.system(size: 13, weight: .bold))
+                                    HStack(spacing: 12) {
+                                        Artwork(url: item.image, size: 56, corner: 0)
+                                        Text(item.name).font(.system(size: 14, weight: .bold))
                                             .foregroundStyle(Theme.text).lineLimit(2)
-                                            .multilineTextAlignment(.leading)
+                                            .multilineTextAlignment(.leading).padding(.trailing, 12)
                                         Spacer(minLength: 0)
                                     }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(Theme.card).clipShape(RoundedRectangle(cornerRadius: 6))
+                                    .frame(maxWidth: .infinity, minHeight: 56, maxHeight: 56, alignment: .leading)
+                                    .background(Color.white.opacity(0.07)).clipShape(RoundedRectangle(cornerRadius: 6))
                                 }.buttonStyle(.plain)
                             }
                         }.padding(.horizontal)
@@ -162,9 +162,13 @@ struct HomeView: View {
             }
             .scrollContentBackground(.hidden)
             .background(
-                LinearGradient(stops: [.init(color: Color(hex6: 0x1E2330), location: 0),
-                                       .init(color: Theme.bg, location: 0.4)],
-                               startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+                ZStack {
+                    Theme.bg
+                    LinearGradient(stops: [
+                        .init(color: Color(red: 70/255, green: 90/255, blue: 120/255).opacity(0.35), location: 0),
+                        .init(color: .clear, location: 0.33)],
+                        startPoint: .top, endPoint: .bottom)
+                }.ignoresSafeArea()
             )
             .navigationBarHidden(true)
             .navigationDestination(for: HomeItem.self) { item in
@@ -187,7 +191,7 @@ struct HomeRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text(title).font(.system(size: 21, weight: .bold)).foregroundStyle(Theme.text)
+                Text(title).font(.system(size: 22, weight: .heavy)).foregroundStyle(Theme.text)
                 Spacer()
                 Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.sub)
             }.padding(.horizontal)
@@ -211,8 +215,9 @@ struct BigCard: View {
     var body: some View {
         let circle = (item.type ?? "") == "artist"
         VStack(alignment: .leading, spacing: 6) {
-            Artwork(url: item.image, size: 150, corner: circle ? 75 : 8)
-            Text(item.name).font(.system(size: 14, weight: .semibold))
+            Artwork(url: item.image, size: 150, corner: circle ? 75 : 6)
+                .shadow(color: .black.opacity(0.35), radius: 8, y: 8)
+            Text(item.name).font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.text).lineLimit(1)
             if let sub = item.sub, !sub.isEmpty {
                 Text(sub).font(.system(size: 12)).foregroundStyle(Theme.sub).lineLimit(1)
@@ -541,11 +546,11 @@ struct TrackListView: View {
             VStack(spacing: 0) {
                 // Hero
                 VStack(spacing: 14) {
-                    Artwork(url: image, size: 210, corner: 8).shadow(color: .black.opacity(0.5), radius: 18, y: 8).padding(.top, 12)
-                    Text(title).font(.system(size: 24, weight: .bold)).foregroundStyle(Theme.text)
+                    Artwork(url: image, size: 210, corner: 6).shadow(color: .black.opacity(0.6), radius: 30, y: 8).padding(.top, 12)
+                    Text(title).font(.system(size: 26, weight: .black)).foregroundStyle(Theme.text)
                         .multilineTextAlignment(.center).padding(.horizontal)
                     Text("\(isAlbum ? "Album" : "Playlist") · \(tracks.count) Songs")
-                        .font(.system(size: 14)).foregroundStyle(Theme.sub)
+                        .font(.system(size: 13)).foregroundStyle(Theme.sub)
                     // Aktions-Reihe
                     HStack {
                         Image(systemName: "arrow.down.circle").font(.title2).foregroundStyle(Theme.sub)
@@ -563,9 +568,12 @@ struct TrackListView: View {
                 }
                 .padding(.bottom, 16)
                 .background(
-                    LinearGradient(stops: [.init(color: hero.opacity(0.75), location: 0),
-                                           .init(color: Theme.bg, location: 1)],
-                                   startPoint: .top, endPoint: .bottom)
+                    LinearGradient(stops: [
+                        .init(color: hero, location: 0),
+                        .init(color: hero, location: 0.30),
+                        .init(color: hero.opacity(0.35), location: 0.62),
+                        .init(color: Theme.bg, location: 0.95)],
+                        startPoint: .top, endPoint: .bottom)
                 )
                 // Tracks (nummeriert)
                 LazyVStack(spacing: 0) {
@@ -583,7 +591,8 @@ struct TrackListView: View {
         .overlay { if loading { ProgressView().tint(Theme.accent) } }
         .task {
             loading = true
-            if let c = await averageColor(image) { hero = c }
+            let absImg = image.flatMap { app.api.absoluteURL($0)?.absoluteString } ?? image
+            if let c = await averageColor(absImg) { hero = c }
             let resp = isAlbum ? try? await app.api.albumTracks(uri) : try? await app.api.playlistTracks(uri, check: true)
             tracks = resp?.tracks ?? []; loading = false
         }
@@ -595,11 +604,11 @@ struct NumberedTrackRow: View {
     var body: some View {
         Button(action: tap) {
             HStack(spacing: 12) {
-                Text("\(n)").font(.system(size: 15)).foregroundStyle(playing ? Theme.accent : Theme.mute)
-                    .frame(width: 22, alignment: .center)
-                Artwork(url: track.image, size: 44, corner: 4)
+                Text("\(n)").font(.system(size: 13).monospacedDigit()).foregroundStyle(playing ? Theme.accent : Theme.sub)
+                    .frame(width: 24, alignment: .trailing)
+                Artwork(url: track.image, size: 48, corner: 4)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(track.name).font(.system(size: 15, weight: .medium))
+                    Text(track.name).font(.system(size: 15, weight: .regular))
                         .foregroundStyle(playing ? Theme.accent : Theme.text).lineLimit(1)
                     Text(track.artist).font(.system(size: 13)).foregroundStyle(Theme.sub).lineLimit(1)
                 }
