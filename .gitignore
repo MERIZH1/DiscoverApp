@@ -7,3 +7,9 @@ DerivedData/
 *.xcarchive
 # macOS
 .DS_Store
+
+# Build-Artefakte
+*.ipa
+Payload/
+build/
+*.xcarchive
