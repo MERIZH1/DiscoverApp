@@ -39,6 +39,25 @@ final class AppState: ObservableObject {
         api.profileId = p.id
     }
 
+    /// Profil im laufenden Betrieb wechseln (Account-Menue).
+    func switchProfile(_ p: Profile) {
+        player.pause()
+        selectProfile(p)
+    }
+
+    /// Zurueck zur Profilauswahl.
+    func clearProfile() {
+        player.pause()
+        profile = nil
+    }
+
+    /// Server-Adresse aendern (zurueck zum Setup-Screen).
+    func changeServer() {
+        player.pause()
+        profile = nil
+        connected = false
+    }
+
     /// Beim Start: gespeicherten Server/Profil wiederherstellen.
     func restore() async {
         guard !serverURL.isEmpty else { return }

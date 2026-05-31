@@ -18,6 +18,21 @@ func configureAppearance() {
     UITabBar.appearance().scrollEdgeAppearance = tab
 }
 
+/// Durchschnittsfarbe eines Covers (fuer den Playlist-Hero-Verlauf wie in der PWA).
+func averageColor(_ urlStr: String?) async -> Color? {
+    guard let s = urlStr, let u = URL(string: s),
+          let (d, _) = try? await URLSession.shared.data(from: u),
+          let cg = UIImage(data: d)?.cgImage else { return nil }
+    var px = [UInt8](repeating: 0, count: 4)
+    let cs = CGColorSpaceCreateDeviceRGB()
+    guard let ctx = CGContext(data: &px, width: 1, height: 1, bitsPerComponent: 8,
+                              bytesPerRow: 4, space: cs,
+                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+    ctx.interpolationQuality = .low
+    ctx.draw(cg, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+    return Color(red: Double(px[0]) / 255, green: Double(px[1]) / 255, blue: Double(px[2]) / 255)
+}
+
 // MARK: - Main
 struct MainView: View {
     @EnvironmentObject var player: PlayerController
@@ -31,7 +46,7 @@ struct MainView: View {
                 LibraryView().tabItem { Label("Bibliothek", systemImage: "books.vertical.fill") }
                 RadioView().tabItem { Label("Radio", systemImage: "dot.radiowaves.left.and.right") }
             }
-            .tint(Theme.accent)
+            .tint(Theme.text)
             if player.hasContent {
                 NowPlayingBar(showPlayer: $showPlayer).padding(.horizontal, 8).padding(.bottom, 50)
             }
@@ -43,15 +58,33 @@ struct MainView: View {
 
 // MARK: - Pills
 struct Pill: View {
-    let text: String; let active: Bool; let tap: () -> Void
+    let text: String
+    let active: Bool
+    var activeBg: Color = .white
+    let tap: () -> Void
     var body: some View {
         Button(action: tap) {
-            Text(text).font(.system(size: 13, weight: .semibold))
+            Text(text).font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(active ? .black : Theme.text)
-                .padding(.horizontal, 14).padding(.vertical, 7)
-                .background(active ? Theme.accent : Theme.input)
+                .padding(.horizontal, 16).padding(.vertical, 8)
+                .background(active ? activeBg : Theme.input)
                 .clipShape(Capsule())
         }.buttonStyle(.plain)
+    }
+}
+
+// MARK: - Account-Avatar
+struct AvatarCircle: View {
+    let name: String
+    var size: CGFloat = 38
+    var body: some View {
+        let letter = String(name.prefix(1)).uppercased()
+        Circle()
+            .fill(LinearGradient(colors: [Color(hex6: 0xCBA552), Color(hex6: 0x7E6326)],
+                                 startPoint: .topLeading, endPoint: .bottomTrailing))
+            .frame(width: size, height: size)
+            .overlay(Text(letter.isEmpty ? "?" : letter)
+                .font(.system(size: size * 0.42, weight: .bold)).foregroundStyle(.white))
     }
 }
 
@@ -59,37 +92,197 @@ struct Pill: View {
 struct HomeView: View {
     @EnvironmentObject var app: AppState
     @State private var home: HomeResponse?
+    @State private var recents: [HomeItem] = []
+    @State private var filter = "all"
+    @State private var showAccount = false
+
+    private var greetingText: String {
+        let g = home?.greeting ?? "Hallo"
+        let n = home?.user_name ?? app.profile?.name ?? ""
+        return n.isEmpty ? g : "\(g) \(n)"
+    }
+    private var quick: [HomeItem] {
+        let q = home?.quick ?? []
+        return filter == "all" ? q : q.filter { ($0.type ?? "") == filter }
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                if let quick = home?.quick {
-                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                        ForEach(quick) { item in
-                            NavigationLink(value: item) {
-                                HStack(spacing: 8) {
-                                    Artwork(url: item.image, size: 52, corner: 4)
-                                    Text(item.name).font(.system(size: 13, weight: .bold))
-                                        .foregroundStyle(Theme.text).lineLimit(2)
-                                        .multilineTextAlignment(.leading)
-                                    Spacer(minLength: 0)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Theme.card).clipShape(RoundedRectangle(cornerRadius: 6))
-                            }.buttonStyle(.plain)
-                        }
-                    }.padding(.horizontal).padding(.top, 8).padding(.bottom, 130)
-                } else {
-                    ProgressView().tint(Theme.accent).padding(.top, 80)
-                }
+                VStack(alignment: .leading, spacing: 22) {
+                    // Header
+                    HStack(alignment: .center) {
+                        Text(greetingText).font(.system(size: 28, weight: .bold))
+                            .foregroundStyle(Theme.text).lineLimit(2)
+                        Spacer(minLength: 8)
+                        Button { showAccount = true } label: {
+                            AvatarCircle(name: app.profile?.name ?? "?")
+                        }.buttonStyle(.plain)
+                    }.padding(.horizontal).padding(.top, 8)
+
+                    // Filter-Pills
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach([("all","Alle"),("playlist","Playlists"),("artist","Künstler*innen"),("album","Alben")], id: \.0) { f in
+                                Pill(text: f.1, active: filter == f.0) { filter = f.0 }
+                            }
+                        }.padding(.horizontal)
+                    }
+
+                    // Quick-Grid (4x2)
+                    if home == nil {
+                        ProgressView().tint(Theme.accent).frame(maxWidth: .infinity).padding(.top, 60)
+                    } else {
+                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                            ForEach(quick) { item in
+                                NavigationLink(value: item) {
+                                    HStack(spacing: 8) {
+                                        Artwork(url: item.image, size: 54, corner: 4)
+                                        Text(item.name).font(.system(size: 13, weight: .bold))
+                                            .foregroundStyle(Theme.text).lineLimit(2)
+                                            .multilineTextAlignment(.leading)
+                                        Spacer(minLength: 0)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(Theme.card).clipShape(RoundedRectangle(cornerRadius: 6))
+                                }.buttonStyle(.plain)
+                            }
+                        }.padding(.horizontal)
+                    }
+
+                    // Zuletzt geoeffnet
+                    if !recents.isEmpty {
+                        HomeRow(title: "Zuletzt geoeffnet", subtitle: nil, items: recents)
+                    }
+                    // Spotify-Home-Sektionen (Fuer dich erstellt, Empfohlene Sender, …)
+                    ForEach(home?.sections ?? []) { sec in
+                        HomeRow(title: sec.title, subtitle: sec.subtitle, items: sec.items)
+                    }
+                }.padding(.bottom, 130)
             }
-            .scrollContentBackground(.hidden).background(Theme.bg)
-            .navigationTitle(home?.greeting ?? "Discover")
+            .scrollContentBackground(.hidden)
+            .background(
+                LinearGradient(stops: [.init(color: Color(hex6: 0x1E2330), location: 0),
+                                       .init(color: Theme.bg, location: 0.4)],
+                               startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+            )
+            .navigationBarHidden(true)
             .navigationDestination(for: HomeItem.self) { item in
                 TrackListView(uri: item.uri, title: item.name, image: item.image, isAlbum: item.type == "album")
             }
         }
-        .task { if home == nil { home = try? await app.api.home() } }
+        .sheet(isPresented: $showAccount) { AccountSheet() }
+        .task {
+            if home == nil { home = try? await app.api.home() }
+            if recents.isEmpty { recents = (try? await app.api.recents()) ?? [] }
+        }
+    }
+}
+
+/// Horizontale Reihe grosser Cover-Karten (Home-Sektion).
+struct HomeRow: View {
+    let title: String
+    let subtitle: String?
+    let items: [HomeItem]
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(title).font(.system(size: 21, weight: .bold)).foregroundStyle(Theme.text)
+                Spacer()
+                Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.sub)
+            }.padding(.horizontal)
+            if let s = subtitle, !s.isEmpty {
+                Text(s).font(.system(size: 13)).foregroundStyle(Theme.sub)
+                    .lineLimit(2).padding(.horizontal)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 14) {
+                    ForEach(items) { it in
+                        NavigationLink(value: it) { BigCard(item: it) }.buttonStyle(.plain)
+                    }
+                }.padding(.horizontal)
+            }
+        }
+    }
+}
+
+struct BigCard: View {
+    let item: HomeItem
+    var body: some View {
+        let circle = (item.type ?? "") == "artist"
+        VStack(alignment: .leading, spacing: 6) {
+            Artwork(url: item.image, size: 150, corner: circle ? 75 : 8)
+            Text(item.name).font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.text).lineLimit(1)
+            if let sub = item.sub, !sub.isEmpty {
+                Text(sub).font(.system(size: 12)).foregroundStyle(Theme.sub).lineLimit(1)
+            }
+        }.frame(width: 150, alignment: .leading)
+    }
+}
+
+// MARK: - Account
+struct AccountSheet: View {
+    @EnvironmentObject var app: AppState
+    @Environment(\.dismiss) private var dismiss
+    @State private var profiles: [Profile] = []
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 14) {
+                        AvatarCircle(name: app.profile?.name ?? "?", size: 56)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(app.profile?.name ?? "Profil").font(.title3.bold()).foregroundStyle(Theme.text)
+                            Text(app.serverURL).font(.caption).foregroundStyle(Theme.sub).lineLimit(1)
+                        }
+                    }.padding(.horizontal).padding(.top, 8).padding(.bottom, 6)
+
+                    Text("PROFIL WECHSELN").font(.caption2.bold()).foregroundStyle(Theme.mute)
+                        .padding(.horizontal).padding(.top, 8)
+                    ForEach(profiles) { p in
+                        Button { app.switchProfile(p); dismiss() } label: {
+                            HStack(spacing: 12) {
+                                AvatarCircle(name: p.name, size: 36)
+                                Text(p.name).font(.system(size: 16)).foregroundStyle(Theme.text)
+                                Spacer()
+                                if p.id == app.profile?.id {
+                                    Image(systemName: "checkmark").foregroundStyle(Theme.accent)
+                                }
+                            }.padding(.vertical, 8).padding(.horizontal).contentShape(Rectangle())
+                        }.buttonStyle(.plain)
+                    }
+
+                    Divider().background(Theme.input).padding(.vertical, 8)
+
+                    AccountAction(icon: "person.2.fill", label: "Profil abmelden") { app.clearProfile(); dismiss() }
+                    AccountAction(icon: "server.rack", label: "Server aendern") { app.changeServer(); dismiss() }
+
+                    Text("Discover · native iOS-App").font(.caption2).foregroundStyle(Theme.mute)
+                        .frame(maxWidth: .infinity).padding(.top, 24)
+                }.padding(.bottom, 30)
+            }
+            .scrollContentBackground(.hidden).background(Theme.bg)
+            .navigationTitle("Account").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) {
+                Button("Fertig") { dismiss() }.foregroundStyle(Theme.accent)
+            } }
+        }
+        .task { profiles = (try? await app.api.profiles()) ?? [] }
+    }
+}
+
+struct AccountAction: View {
+    let icon: String; let label: String; let tap: () -> Void
+    var body: some View {
+        Button(action: tap) {
+            HStack(spacing: 14) {
+                Image(systemName: icon).frame(width: 24).foregroundStyle(Theme.sub)
+                Text(label).font(.system(size: 16)).foregroundStyle(Theme.text)
+                Spacer()
+            }.padding(.vertical, 10).padding(.horizontal).contentShape(Rectangle())
+        }.buttonStyle(.plain)
     }
 }
 
@@ -104,28 +297,27 @@ struct SearchView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 10) {
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(Theme.mute)
-                    TextField("Songs, Künstler suchen…", text: $query)
-                        .foregroundStyle(Theme.text)
+            VStack(spacing: 12) {
+                HStack(spacing: 10) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(.black).font(.system(size: 18, weight: .semibold))
+                    TextField("", text: $query, prompt: Text("Songs, Künstler suchen…").foregroundColor(Color.black.opacity(0.55)))
+                        .foregroundStyle(.black).tint(.black)
                         .autocorrectionDisabled().textInputAutocapitalization(.never)
                         .onSubmit { runSearch() }
                     if !query.isEmpty {
-                        Button { query = ""; res = nil } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.mute) }
+                        Button { query = ""; res = nil } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.black.opacity(0.5)) }
                     }
                 }
-                .padding(10).background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8))
+                .padding(.horizontal, 14).padding(.vertical, 13)
+                .background(Color.white).clipShape(RoundedRectangle(cornerRadius: 10))
                 .padding(.horizontal)
 
-                if res != nil {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(["all","tracks","playlists","albums","artists"], id: \.self) { s in
-                                Pill(text: label(s), active: scope == s) { scope = s }
-                            }
-                        }.padding(.horizontal)
-                    }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(["all","tracks","playlists","albums","artists"], id: \.self) { s in
+                            Pill(text: label(s), active: scope == s) { scope = s }
+                        }
+                    }.padding(.horizontal)
                 }
 
                 ScrollView {
@@ -151,14 +343,19 @@ struct SearchView: View {
                             }
                         }.padding(.bottom, 130).padding(.top, 4)
                     } else {
-                        VStack(spacing: 8) {
-                            Image(systemName: "magnifyingglass").font(.largeTitle).foregroundStyle(Theme.mute)
-                            Text("Such nach einem Song").foregroundStyle(Theme.mute)
-                        }.padding(.top, 80)
+                        VStack(spacing: 10) {
+                            Circle().fill(Theme.input).frame(width: 84, height: 84)
+                                .overlay(Image(systemName: "magnifyingglass").font(.system(size: 32)).foregroundStyle(Theme.sub))
+                            Text("Such nach einem Song").font(.title3.bold()).foregroundStyle(Theme.text)
+                            Text("Songs, Playlists, Alben, Künstler — der Spotify-Katalog")
+                                .font(.system(size: 14)).foregroundStyle(Theme.mute)
+                                .multilineTextAlignment(.center).padding(.horizontal, 40)
+                        }.frame(maxWidth: .infinity).padding(.top, 70)
                     }
                 }
                 .scrollContentBackground(.hidden)
             }
+            .padding(.top, 6)
             .background(Theme.bg)
             .navigationTitle("Suchen")
             .navigationDestination(for: Card.self) { c in
@@ -199,40 +396,100 @@ struct CardRows: View {
 struct LibraryView: View {
     @EnvironmentObject var app: AppState
     @State private var playlists: [Playlist] = []
+    @State private var subs: Set<String> = []
+    @State private var subSync: [String: String] = [:]
     @State private var filter = ""
+    @State private var tab = "all"
 
     var shown: [Playlist] {
-        filter.isEmpty ? playlists : playlists.filter { $0.name.localizedCaseInsensitiveContains(filter) }
+        var list = playlists
+        if tab == "subs" { list = list.filter { subs.contains($0.uri) } }
+        if tab == "az" { list = list.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending } }
+        if !filter.isEmpty { list = list.filter { $0.name.localizedCaseInsensitiveContains(filter) } }
+        return list
     }
     var body: some View {
         NavigationStack {
             ScrollView {
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     Image(systemName: "magnifyingglass").foregroundStyle(Theme.mute)
                     TextField("In Bibliothek suchen", text: $filter).foregroundStyle(Theme.text)
-                }.padding(10).background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8))
-                    .padding(.horizontal).padding(.top, 4)
+                }.padding(.horizontal, 14).padding(.vertical, 12).background(Theme.input)
+                    .clipShape(RoundedRectangle(cornerRadius: 8)).padding(.horizontal).padding(.top, 4)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach([("all","Alle"),("subs","Abos"),("az","A–Z")], id: \.0) { f in
+                            Pill(text: f.1, active: tab == f.0, activeBg: Theme.accent) { tab = f.0 }
+                        }
+                    }.padding(.horizontal)
+                }.padding(.top, 10)
+
                 LazyVStack(spacing: 2) {
+                    // Liked Songs (Spezial)
+                    LikedSongsRow()
                     ForEach(shown) { pl in
                         NavigationLink(value: pl) {
                             HStack(spacing: 12) {
-                                Artwork(url: pl.image, size: 56, corner: 6)
-                                Text(pl.name).font(.system(size: 15, weight: .semibold))
-                                    .foregroundStyle(Theme.text).lineLimit(2)
+                                ZStack(alignment: .bottomLeading) {
+                                    Artwork(url: pl.image, size: 56, corner: 6)
+                                    if subs.contains(pl.uri) {
+                                        Image(systemName: "bell.fill").font(.system(size: 10)).foregroundStyle(.black)
+                                            .padding(5).background(Circle().fill(Theme.accent)).offset(x: -3, y: 3)
+                                    }
+                                }
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(pl.name).font(.system(size: 16, weight: .semibold))
+                                        .foregroundStyle(Theme.text).lineLimit(1)
+                                    HStack(spacing: 4) {
+                                        Text(subs.contains(pl.uri) ? "Abo" : "Playlist")
+                                            .font(.system(size: 13))
+                                            .foregroundStyle(subs.contains(pl.uri) ? Theme.accent : Theme.sub)
+                                        if let s = subSync[pl.uri] {
+                                            Text("· sync \(s)").font(.system(size: 13)).foregroundStyle(Theme.sub)
+                                        }
+                                    }
+                                }
                                 Spacer(minLength: 0)
                             }.padding(.vertical, 6).padding(.horizontal).contentShape(Rectangle())
                         }.buttonStyle(.plain)
                     }
-                }.padding(.top, 6).padding(.bottom, 130)
+                }.padding(.top, 10).padding(.bottom, 130)
             }
             .scrollContentBackground(.hidden).background(Theme.bg)
-            .navigationTitle("Bibliothek")
+            .navigationTitle("Meine Bibliothek")
             .navigationDestination(for: Playlist.self) { pl in
                 TrackListView(uri: pl.uri, title: pl.name, image: pl.image, isAlbum: false)
             }
-            .refreshable { playlists = (try? await app.api.playlists()) ?? playlists }
+            .refreshable { await load() }
         }
-        .task { if playlists.isEmpty { playlists = (try? await app.api.playlists()) ?? [] } }
+        .task { if playlists.isEmpty { await load() } }
+    }
+    private func load() async {
+        async let pls = app.api.playlists()
+        async let sub = app.api.subscriptions()
+        playlists = (try? await pls) ?? playlists
+        if let s = try? await sub {
+            subs = Set(s.map { $0.uri })
+            subSync = Dictionary(uniqueKeysWithValues: s.compactMap { i in i.last_sync.map { (i.uri, $0) } })
+        }
+    }
+}
+
+struct LikedSongsRow: View {
+    var body: some View {
+        HStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 6)
+                .fill(LinearGradient(colors: [Color(hex6: 0x8E8EE8), Color(hex6: 0x5050C0)],
+                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+                .frame(width: 56, height: 56)
+                .overlay(Image(systemName: "heart.fill").foregroundStyle(.white))
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Liked Songs").font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
+                Text("Playlist").font(.system(size: 13)).foregroundStyle(Theme.sub)
+            }
+            Spacer(minLength: 0)
+        }.padding(.vertical, 6).padding(.horizontal)
     }
 }
 
@@ -245,22 +502,22 @@ struct RadioView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(spacing: 2) {
+                LazyVStack(spacing: 4) {
                     ForEach(stations) { st in
                         Button { player.playRadio(st) } label: {
                             HStack(spacing: 12) {
                                 Artwork(url: st.favicon, size: 50, corner: 8)
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(st.name).font(.system(size: 15, weight: .semibold))
-                                        .foregroundStyle(Theme.text).lineLimit(1)
-                                    Text(st.country ?? "Live-Radio").font(.caption).foregroundStyle(Theme.sub)
+                                    Text(st.name).font(.system(size: 16, weight: .semibold))
+                                        .foregroundStyle(player.isRadio && player.displayTitle == st.name ? Theme.accent : Theme.text).lineLimit(1)
+                                    Text(st.country ?? "Live-Radio").font(.system(size: 13)).foregroundStyle(Theme.sub)
                                 }
                                 Spacer()
-                                Image(systemName: "dot.radiowaves.left.and.right").foregroundStyle(Theme.accent)
+                                Image(systemName: "star.fill").foregroundStyle(Theme.accent)
                             }.padding(.vertical, 7).padding(.horizontal).contentShape(Rectangle())
                         }.buttonStyle(.plain)
                     }
-                }.padding(.top, 6).padding(.bottom, 130)
+                }.padding(.top, 8).padding(.bottom, 130)
             }
             .scrollContentBackground(.hidden).background(Theme.bg)
             .navigationTitle("Live-Radio")
@@ -270,47 +527,90 @@ struct RadioView: View {
     }
 }
 
-// MARK: - Track-Liste
+// MARK: - Track-Liste (Playlist/Album-Detail)
 struct TrackListView: View {
     @EnvironmentObject var app: AppState
     @EnvironmentObject var player: PlayerController
     let uri: String; let title: String; let image: String?; let isAlbum: Bool
     @State private var tracks: [Track] = []
     @State private var loading = true
+    @State private var hero: Color = Theme.elev
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
-                Artwork(url: image, size: 200, corner: 8).shadow(radius: 16).padding(.top, 8)
-                Text(title).font(.title3.bold()).foregroundStyle(Theme.text)
-                    .multilineTextAlignment(.center).padding(.horizontal)
-                HStack(spacing: 16) {
-                    Button { player.shuffle = true; if !tracks.isEmpty { player.play(tracks: tracks.shuffled()) } } label: {
-                        Image(systemName: "shuffle").font(.title3).foregroundStyle(Theme.text)
-                    }
-                    Button { if !tracks.isEmpty { player.shuffle = false; player.play(tracks: tracks, startAt: 0) } } label: {
-                        Label("Abspielen", systemImage: "play.fill").font(.headline).foregroundStyle(.black)
-                            .padding(.horizontal, 40).padding(.vertical, 12)
-                            .background(Theme.accent).clipShape(Capsule())
-                    }
+            VStack(spacing: 0) {
+                // Hero
+                VStack(spacing: 14) {
+                    Artwork(url: image, size: 210, corner: 8).shadow(color: .black.opacity(0.5), radius: 18, y: 8).padding(.top, 12)
+                    Text(title).font(.system(size: 24, weight: .bold)).foregroundStyle(Theme.text)
+                        .multilineTextAlignment(.center).padding(.horizontal)
+                    Text("\(isAlbum ? "Album" : "Playlist") · \(tracks.count) Songs")
+                        .font(.system(size: 14)).foregroundStyle(Theme.sub)
+                    // Aktions-Reihe
+                    HStack {
+                        Image(systemName: "arrow.down.circle").font(.title2).foregroundStyle(Theme.sub)
+                        Image(systemName: "ellipsis").font(.title3).foregroundStyle(Theme.sub).padding(.leading, 14)
+                        Spacer()
+                        Button { if !tracks.isEmpty { player.shuffle = true; player.play(tracks: tracks.shuffled()) } } label: {
+                            Image(systemName: "shuffle").font(.title2).foregroundStyle(Theme.text)
+                        }.padding(.trailing, 18)
+                        Button { if !tracks.isEmpty { player.shuffle = false; player.play(tracks: tracks, startAt: 0) } } label: {
+                            Image(systemName: "play.fill").font(.system(size: 22)).foregroundStyle(.black)
+                                .frame(width: 56, height: 56).background(Theme.accent).clipShape(Circle())
+                                .shadow(color: Theme.accent.opacity(0.4), radius: 10)
+                        }
+                    }.padding(.horizontal).padding(.top, 8)
                 }
+                .padding(.bottom, 16)
+                .background(
+                    LinearGradient(stops: [.init(color: hero.opacity(0.75), location: 0),
+                                           .init(color: Theme.bg, location: 1)],
+                                   startPoint: .top, endPoint: .bottom)
+                )
+                // Tracks (nummeriert)
                 LazyVStack(spacing: 0) {
                     ForEach(Array(tracks.enumerated()), id: \.element.id) { idx, t in
-                        TrackRow(track: t, playing: player.current?.id == t.id) {
-                            player.play(tracks: tracks, startAt: idx)
+                        NumberedTrackRow(n: idx + 1, track: t, playing: player.current?.id == t.id) {
+                            player.shuffle = false; player.play(tracks: tracks, startAt: idx)
                         }
                     }
-                }.padding(.bottom, 130)
+                }.padding(.bottom, 130).padding(.top, 6)
             }
         }
         .scrollContentBackground(.hidden).background(Theme.bg)
         .navigationTitle(title).navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .overlay { if loading { ProgressView().tint(Theme.accent) } }
         .task {
             loading = true
+            if let c = await averageColor(image) { hero = c }
             let resp = isAlbum ? try? await app.api.albumTracks(uri) : try? await app.api.playlistTracks(uri, check: true)
             tracks = resp?.tracks ?? []; loading = false
         }
+    }
+}
+
+struct NumberedTrackRow: View {
+    let n: Int; let track: Track; let playing: Bool; let tap: () -> Void
+    var body: some View {
+        Button(action: tap) {
+            HStack(spacing: 12) {
+                Text("\(n)").font(.system(size: 15)).foregroundStyle(playing ? Theme.accent : Theme.mute)
+                    .frame(width: 22, alignment: .center)
+                Artwork(url: track.image, size: 44, corner: 4)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(track.name).font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(playing ? Theme.accent : Theme.text).lineLimit(1)
+                    Text(track.artist).font(.system(size: 13)).foregroundStyle(Theme.sub).lineLimit(1)
+                }
+                Spacer()
+                if track.downloaded == true {
+                    Image(systemName: "checkmark").font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.accent)
+                }
+                Image(systemName: "ellipsis").font(.system(size: 15)).foregroundStyle(Theme.mute).padding(.leading, 6)
+            }.padding(.vertical, 7).padding(.horizontal).contentShape(Rectangle())
+                .background(playing ? Theme.accent.opacity(0.08) : .clear)
+        }.buttonStyle(.plain)
     }
 }
 
@@ -348,22 +648,19 @@ struct NowPlayingBar: View {
     var body: some View {
         if player.hasContent {
             HStack(spacing: 12) {
-                Artwork(url: player.displayImage, size: 42, corner: 5)
+                Artwork(url: player.displayImage, size: 44, corner: 5)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(player.displayTitle).font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.text).lineLimit(1)
                     Text(player.displayArtist).font(.caption).foregroundStyle(Theme.sub).lineLimit(1)
                 }
                 Spacer()
                 Button { player.toggle() } label: {
-                    Image(systemName: player.isPlaying ? "pause.fill" : "play.fill").font(.title3).foregroundStyle(Theme.text)
-                }
-                if !player.isRadio {
-                    Button { player.next() } label: { Image(systemName: "forward.fill").font(.title3).foregroundStyle(Theme.text) }
-                        .padding(.trailing, 4)
+                    Image(systemName: player.isPlaying ? "pause.fill" : "play.fill").font(.title3).foregroundStyle(.black)
+                        .frame(width: 38, height: 38).background(.white).clipShape(Circle())
                 }
             }
             .padding(.horizontal, 10).padding(.vertical, 8)
-            .background(Theme.card).clipShape(RoundedRectangle(cornerRadius: 10))
+            .background(Color(hex6: 0x2A2A2A)).clipShape(RoundedRectangle(cornerRadius: 10))
             .onTapGesture { showPlayer = true }
         }
     }
@@ -376,11 +673,12 @@ struct PlayerView: View {
     @State private var scrubbing = false
     @State private var showQueue = false
     @State private var showLyrics = false
+    @State private var hero: Color = Theme.elev
 
     var body: some View {
         let p = player
         ZStack {
-            LinearGradient(colors: [Theme.elev, Theme.bg], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+            LinearGradient(colors: [hero.opacity(0.85), Theme.bg], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
             VStack(spacing: 22) {
                 Capsule().fill(Theme.mute).frame(width: 38, height: 5).padding(.top, 8)
                 Spacer()
@@ -438,6 +736,7 @@ struct PlayerView: View {
         .presentationDragIndicator(.hidden)
         .sheet(isPresented: $showQueue) { QueueSheet() }
         .sheet(isPresented: $showLyrics) { LyricsSheet() }
+        .task(id: player.displayImage) { if let c = await averageColor(player.displayImage) { hero = c } }
     }
     private func fmt(_ s: Double) -> String {
         guard s.isFinite, s >= 0 else { return "0:00" }

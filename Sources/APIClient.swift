@@ -120,4 +120,17 @@ final class APIClient: ObservableObject {
     func settings() async throws -> UserSettings {
         try await get("/api/me/settings")
     }
+
+    /// "Zuletzt geoeffnet" (Recents-Feed) — Container (Album/Artist/Playlist/Podcast).
+    func recents(limit: Int = 20) async throws -> [HomeItem] {
+        struct R: Codable { let items: [HomeItem] }
+        let r: R = try await get("/api/recents?limit=\(limit)")
+        return r.items
+    }
+
+    /// Abonnierte Playlists (fuer "Abo"-Markierung in der Bibliothek).
+    func subscriptions() async throws -> [SubItem] {
+        let r: SubsResponse = try await get("/api/subscriptions")
+        return r.subs
+    }
 }

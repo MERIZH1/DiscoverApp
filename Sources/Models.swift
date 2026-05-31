@@ -28,11 +28,29 @@ struct HomeItem: Codable, Identifiable, Hashable {
     let sub: String?
     let type: String?   // "playlist" | "album" | "artist"
 }
+struct HomeSection: Codable, Identifiable, Hashable {
+    var id: String { title + (uri ?? "") }
+    let title: String
+    let subtitle: String?
+    let uri: String?
+    let items: [HomeItem]
+}
 struct HomeResponse: Codable {
     let greeting: String?
+    let user_name: String?
     let country: String?
     let quick: [HomeItem]?
+    let sections: [HomeSection]?
 }
+
+// MARK: - Abos
+struct SubItem: Codable, Identifiable, Hashable {
+    var id: String { uri }
+    let uri: String
+    let name: String
+    let last_sync: String?
+}
+struct SubsResponse: Codable { let subs: [SubItem] }
 
 /// Generische Karte fuer Suche (Playlist/Album/Artist).
 struct Card: Codable, Identifiable, Hashable {
