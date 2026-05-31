@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - Haupt-Tab-View mit Now-Playing-Bar
 struct MainView: View {
     @EnvironmentObject var app: AppState
+    @EnvironmentObject var player: PlayerController
     @State private var showPlayer = false
 
     var body: some View {
@@ -12,7 +13,7 @@ struct MainView: View {
                 LibraryView().tabItem { Label("Bibliothek", systemImage: "music.note.list") }
                 SearchView().tabItem { Label("Suche", systemImage: "magnifyingglass") }
             }
-            if app.player.current != nil {
+            if player.current != nil {
                 NowPlayingBar(showPlayer: $showPlayer)
                     .padding(.bottom, 49) // ueber der Tab-Bar
             }
@@ -90,6 +91,7 @@ struct LibraryView: View {
 // MARK: - Track-Liste (Playlist oder Album)
 struct TrackListView: View {
     @EnvironmentObject var app: AppState
+    @EnvironmentObject var player: PlayerController
     let uri: String
     let title: String
     let isAlbum: Bool
@@ -99,12 +101,12 @@ struct TrackListView: View {
     var body: some View {
         List {
             ForEach(Array(tracks.enumerated()), id: \.element.id) { idx, t in
-                Button { app.player.play(tracks: tracks, startAt: idx) } label: {
+                Button { player.play(tracks: tracks, startAt: idx) } label: {
                     HStack(spacing: 12) {
                         Artwork(url: t.image, size: 46, corner: 4)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(t.name).lineLimit(1)
-                                .foregroundStyle(app.player.current?.id == t.id ? Color.green : .primary)
+                                .foregroundStyle(player.current?.id == t.id ? Color.green : .primary)
                             Text(t.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                         }
                         Spacer()
@@ -143,11 +145,11 @@ struct SearchView: View {
 
 // MARK: - Now-Playing-Bar
 struct NowPlayingBar: View {
-    @EnvironmentObject var app: AppState
+    @EnvironmentObject var player: PlayerController
     @Binding var showPlayer: Bool
 
     var body: some View {
-        if let t = app.player.current {
+        if let t = player.current {
             HStack(spacing: 12) {
                 Artwork(url: t.image, size: 42, corner: 5)
                 VStack(alignment: .leading, spacing: 1) {
@@ -155,10 +157,10 @@ struct NowPlayingBar: View {
                     Text(t.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
                 Spacer()
-                Button { app.player.toggle() } label: {
-                    Image(systemName: app.player.isPlaying ? "pause.fill" : "play.fill").font(.title3)
+                Button { player.toggle() } label: {
+                    Image(systemName: player.isPlaying ? "pause.fill" : "play.fill").font(.title3)
                 }
-                Button { app.player.next() } label: {
+                Button { player.next() } label: {
                     Image(systemName: "forward.fill").font(.title3)
                 }.padding(.trailing, 4)
             }
@@ -173,13 +175,13 @@ struct NowPlayingBar: View {
 
 // MARK: - Vollbild-Player
 struct PlayerView: View {
-    @EnvironmentObject var app: AppState
+    @EnvironmentObject var player: PlayerController
     @Environment(\.dismiss) var dismiss
     @State private var scrub: Double = 0
     @State private var scrubbing = false
 
     var body: some View {
-        let p = app.player
+        let p = player
         VStack(spacing: 28) {
             Capsule().fill(.secondary).frame(width: 40, height: 5).padding(.top, 8)
             Spacer()

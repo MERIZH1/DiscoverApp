@@ -14,6 +14,7 @@ struct ContentView: View {
             }
         }
         .environmentObject(app)
+        .environmentObject(app.player)
         .task { await app.restore() }
         .preferredColorScheme(.dark)
     }
