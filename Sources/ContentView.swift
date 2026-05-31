@@ -61,6 +61,7 @@ struct ServerSetupView: View {
             .disabled(input.isEmpty || busy)
             .padding(.horizontal)
             Spacer()
+            Text(AppInfo.version).font(.caption2).foregroundStyle(.secondary).padding(.bottom, 8)
         }
         .onAppear { if input.isEmpty { input = app.serverURL } }
     }
@@ -95,6 +96,9 @@ struct ProfilePickerView: View {
             Button("Anderer Server") { app.connected = false }
                 .font(.footnote).foregroundStyle(.secondary)
             Spacer()
+            Text("\(app.serverURL) · \(AppInfo.version)")
+                .font(.caption2).foregroundStyle(.secondary)
+                .lineLimit(1).padding(.horizontal).padding(.bottom, 8)
         }
         .task {
             do { profiles = try await app.api.profiles() }

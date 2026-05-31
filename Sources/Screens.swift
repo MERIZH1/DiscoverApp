@@ -8,6 +8,14 @@ func configureAppearance() {
     nav.backgroundColor = .black; nav.shadowColor = .clear
     nav.titleTextAttributes = [.foregroundColor: UIColor.white]
     nav.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
+    // Zurueck-Button: nur Pfeil, kein Text (wie PWA)
+    let back = UIBarButtonItemAppearance(style: .plain)
+    back.normal.titleTextAttributes = [.foregroundColor: UIColor.clear]
+    back.highlighted.titleTextAttributes = [.foregroundColor: UIColor.clear]
+    back.focused.titleTextAttributes = [.foregroundColor: UIColor.clear]
+    back.disabled.titleTextAttributes = [.foregroundColor: UIColor.clear]
+    nav.backButtonAppearance = back
+    UINavigationBar.appearance().tintColor = .white
     UINavigationBar.appearance().standardAppearance = nav
     UINavigationBar.appearance().scrollEdgeAppearance = nav
     UINavigationBar.appearance().compactAppearance = nav
@@ -255,6 +263,9 @@ struct AccountSheet: View {
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
     @State private var profiles: [Profile] = []
+    @State private var showSettings = false
+
+    private var isAdmin: Bool { app.profile?.is_admin == true }
 
     var body: some View {
         NavigationStack {
@@ -264,31 +275,50 @@ struct AccountSheet: View {
                         AvatarCircle(name: app.profile?.name ?? "?", size: 56)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(app.profile?.name ?? "Profil").font(.title3.bold()).foregroundStyle(Theme.text)
-                            Text(app.serverURL).font(.caption).foregroundStyle(Theme.sub).lineLimit(1)
+                            Text(isAdmin ? "Admin" : "User").font(.caption).foregroundStyle(Theme.accent)
                         }
                     }.padding(.horizontal).padding(.top, 8).padding(.bottom, 6)
 
-                    Text("PROFIL WECHSELN").font(.caption2.bold()).foregroundStyle(Theme.mute)
-                        .padding(.horizontal).padding(.top, 8)
-                    ForEach(profiles) { p in
-                        Button { app.switchProfile(p); dismiss() } label: {
-                            HStack(spacing: 12) {
-                                AvatarCircle(name: p.name, size: 36)
-                                Text(p.name).font(.system(size: 16)).foregroundStyle(Theme.text)
-                                Spacer()
-                                if p.id == app.profile?.id {
-                                    Image(systemName: "checkmark").foregroundStyle(Theme.accent)
-                                }
-                            }.padding(.vertical, 8).padding(.horizontal).contentShape(Rectangle())
-                        }.buttonStyle(.plain)
+                    if profiles.count > 1 {
+                        AccountHeader("PROFIL WECHSELN")
+                        ForEach(profiles) { p in
+                            Button { app.switchProfile(p); dismiss() } label: {
+                                HStack(spacing: 12) {
+                                    AvatarCircle(name: p.name, size: 36)
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(p.name).font(.system(size: 16)).foregroundStyle(Theme.text)
+                                        Text(p.is_admin == true ? "Admin" : "User").font(.caption2).foregroundStyle(Theme.mute)
+                                    }
+                                    Spacer()
+                                    if p.id == app.profile?.id {
+                                        Image(systemName: "checkmark").foregroundStyle(Theme.accent)
+                                    }
+                                }.padding(.vertical, 8).padding(.horizontal).contentShape(Rectangle())
+                            }.buttonStyle(.plain)
+                        }
                     }
 
                     Divider().background(Theme.input).padding(.vertical, 8)
-
+                    AccountAction(icon: "gearshape.fill", label: "Einstellungen") { showSettings = true }
                     AccountAction(icon: "person.2.fill", label: "Profil abmelden") { app.clearProfile(); dismiss() }
                     AccountAction(icon: "server.rack", label: "Server aendern") { app.changeServer(); dismiss() }
 
-                    Text("Discover · native iOS-App").font(.caption2).foregroundStyle(Theme.mute)
+                    if isAdmin {
+                        Divider().background(Theme.input).padding(.vertical, 8)
+                        AccountHeader("ADMIN — PROFILE")
+                        ForEach(profiles) { p in
+                            HStack(spacing: 12) {
+                                AvatarCircle(name: p.name, size: 32)
+                                Text(p.name).font(.system(size: 15)).foregroundStyle(Theme.text)
+                                Spacer()
+                                Text(p.is_admin == true ? "Admin" : "User").font(.caption2).foregroundStyle(Theme.mute)
+                                Image(systemName: p.has_spotify_cookie == true ? "checkmark.seal.fill" : "xmark.seal")
+                                    .font(.caption).foregroundStyle(p.has_spotify_cookie == true ? Theme.accent : Theme.mute)
+                            }.padding(.vertical, 6).padding(.horizontal)
+                        }
+                    }
+
+                    Text("Discover · \(AppInfo.version)").font(.caption2).foregroundStyle(Theme.mute)
                         .frame(maxWidth: .infinity).padding(.top, 24)
                 }.padding(.bottom, 30)
             }
@@ -298,7 +328,134 @@ struct AccountSheet: View {
                 Button("Fertig") { dismiss() }.foregroundStyle(Theme.accent)
             } }
         }
+        .sheet(isPresented: $showSettings) { SettingsView() }
         .task { profiles = (try? await app.api.profiles()) ?? [] }
+    }
+}
+
+struct AccountHeader: View {
+    let t: String; init(_ t: String) { self.t = t }
+    var body: some View {
+        Text(t).font(.caption2.bold()).foregroundStyle(Theme.mute)
+            .padding(.horizontal).padding(.top, 8)
+    }
+}
+
+// MARK: - Einstellungen
+struct SettingsView: View {
+    @EnvironmentObject var app: AppState
+    @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
+    @State private var country = ""
+    @State private var hideForeign = false
+    @State private var prebuffer = 5
+    @State private var normalize = false
+    @State private var bgKeepalive = false
+    @State private var loaded = false
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    // Profil
+                    SettingsGroup("PROFIL") {
+                        SettingsField(label: "Name", text: $name) { saveProfile() }
+                        SettingsField(label: "Land", text: $country, autoCaps: true) { saveProfile() }
+                        Toggle(isOn: $hideForeign) {
+                            Text("Fremdsprachige Playlists ausblenden").font(.system(size: 15)).foregroundStyle(Theme.text)
+                        }.tint(Theme.accent).onChange(of: hideForeign) { _ in if loaded { saveProfile() } }
+                    }
+                    // Wiedergabe
+                    SettingsGroup("WIEDERGABE") {
+                        HStack {
+                            Text("Vorpuffer (Songs)").font(.system(size: 15)).foregroundStyle(Theme.text)
+                            Spacer()
+                            Stepper(value: $prebuffer, in: 0...50) { Text("\(prebuffer)").foregroundStyle(Theme.sub) }
+                                .labelsHidden().fixedSize()
+                                .onChange(of: prebuffer) { _ in if loaded { saveSettings() } }
+                        }
+                        Toggle(isOn: $normalize) {
+                            Text("Lautstaerke normalisieren").font(.system(size: 15)).foregroundStyle(Theme.text)
+                        }.tint(Theme.accent).onChange(of: normalize) { _ in if loaded { saveSettings() } }
+                        Toggle(isOn: $bgKeepalive) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Hintergrund-Wiedergabe").font(.system(size: 15)).foregroundStyle(Theme.text)
+                                Text("Bei der nativen App nicht noetig — Audio laeuft nativ weiter.")
+                                    .font(.caption2).foregroundStyle(Theme.mute)
+                            }
+                        }.tint(Theme.accent).onChange(of: bgKeepalive) { _ in if loaded { saveSettings() } }
+                    }
+                    Text("Synchronisiert mit deinem Profil (gleiche Werte wie in der PWA).")
+                        .font(.caption2).foregroundStyle(Theme.mute).padding(.horizontal)
+                }.padding(.vertical, 16)
+            }
+            .scrollContentBackground(.hidden).background(Theme.bg)
+            .navigationTitle("Einstellungen").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) {
+                Button("Fertig") { dismiss() }.foregroundStyle(Theme.accent)
+            } }
+        }
+        .task {
+            name = app.profile?.name ?? ""
+            country = app.profile?.country ?? "DE"
+            hideForeign = app.profile?.hide_foreign_lang_playlists ?? false
+            if let s = try? await app.api.settings() {
+                prebuffer = s.prebuffer_count ?? 5
+                normalize = s.normalize_volume ?? false
+                bgKeepalive = s.bg_keepalive ?? false
+            }
+            loaded = true
+        }
+    }
+
+    private func saveProfile() {
+        guard loaded, let id = app.profile?.id else { return }
+        let fields: [String: Any] = [
+            "name": name, "country": country.uppercased(),
+            "hide_foreign_lang_playlists": hideForeign,
+        ]
+        Task {
+            if let p = try? await app.api.updateProfile(id, fields: fields) { app.profile = p }
+        }
+    }
+    private func saveSettings() {
+        Task {
+            await app.api.saveSettings([
+                "prebuffer_count": prebuffer,
+                "normalize_volume": normalize,
+                "bg_keepalive": bgKeepalive,
+            ])
+        }
+    }
+}
+
+struct SettingsGroup<Content: View>: View {
+    let title: String; @ViewBuilder let content: Content
+    init(_ title: String, @ViewBuilder content: () -> Content) { self.title = title; self.content = content() }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(title).font(.caption2.bold()).foregroundStyle(Theme.mute)
+            content
+        }
+        .padding(16)
+        .background(Theme.elev).clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal)
+    }
+}
+
+struct SettingsField: View {
+    let label: String; @Binding var text: String; var autoCaps = false; let commit: () -> Void
+    var body: some View {
+        HStack {
+            Text(label).font(.system(size: 15)).foregroundStyle(Theme.text)
+            Spacer()
+            TextField("", text: $text)
+                .multilineTextAlignment(.trailing).foregroundStyle(Theme.sub)
+                .textInputAutocapitalization(autoCaps ? .characters : .words)
+                .autocorrectionDisabled()
+                .onSubmit(commit)
+                .frame(maxWidth: 180)
+        }
     }
 }
 

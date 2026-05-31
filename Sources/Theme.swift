@@ -12,6 +12,15 @@ enum Theme {
     static let accent = Color(hex6: 0x1ED760)
 }
 
+/// App-Version aus dem Bundle (fuer Server-/Account-Menue).
+enum AppInfo {
+    static var version: String {
+        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+        return "Version \(v) (Build \(b))"
+    }
+}
+
 extension Color {
     init(hex6: UInt) {
         self = Color(

@@ -121,6 +121,18 @@ final class APIClient: ObservableObject {
         try await get("/api/me/settings")
     }
 
+    /// Wiedergabe-Einstellungen speichern (prebuffer/normalize/bg_keepalive).
+    func saveSettings(_ fields: [String: Any]) async {
+        _ = try? await data("/api/me/settings", method: "POST", json: fields)
+    }
+
+    /// Profil-Metadaten aendern (Name/Land/Filter). Self oder Admin.
+    @discardableResult
+    func updateProfile(_ id: String, fields: [String: Any]) async throws -> Profile {
+        let d = try await data("/api/profiles/\(id)", method: "PUT", json: fields)
+        return try JSONDecoder().decode(Profile.self, from: d)
+    }
+
     /// "Zuletzt geoeffnet" (Recents-Feed) — Container (Album/Artist/Playlist/Podcast).
     func recents(limit: Int = 20) async throws -> [HomeItem] {
         struct R: Codable { let items: [HomeItem] }
