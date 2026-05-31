@@ -98,6 +98,25 @@ final class PlayerController: ObservableObject {
         if !hasContent || isRadio { play(tracks: [t]); return }
         queue.append(t)
     }
+    /// Kommende Tracks (nach dem aktuellen) per Drag umsortieren.
+    func moveUpNext(from source: IndexSet, to destination: Int) {
+        let base = index + 1
+        guard base <= queue.count else { return }
+        var up = Array(queue[base...])
+        up.move(fromOffsets: source, toOffset: destination)
+        queue.replaceSubrange(base..., with: up)
+    }
+    /// Einen kommenden Track entfernen (Offset relativ zu upNext).
+    func removeUpNext(at offset: Int) {
+        let real = index + 1 + offset
+        guard queue.indices.contains(real) else { return }
+        queue.remove(at: real)
+    }
+    /// Alle kommenden Tracks leeren (aktueller bleibt).
+    func clearUpNext() {
+        guard hasContent, !isRadio, index + 1 < queue.count else { return }
+        queue.removeSubrange((index + 1)...)
+    }
 
     private func loadCurrent(autoplay: Bool) {
         guard let track = current else { return }

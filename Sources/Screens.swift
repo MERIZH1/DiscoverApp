@@ -1,6 +1,13 @@
 import SwiftUI
 import UIKit
 
+// MARK: - Haptik
+enum Haptics {
+    static func tap(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .light) {
+        UIImpactFeedbackGenerator(style: style).impactOccurred()
+    }
+}
+
 // MARK: - Appearance
 func configureAppearance() {
     let nav = UINavigationBarAppearance()
@@ -301,7 +308,19 @@ struct AccountSheet: View {
                     Divider().background(Theme.input).padding(.vertical, 8)
                     AccountAction(icon: "gearshape.fill", label: "Einstellungen") { showSettings = true }
                     AccountAction(icon: "person.2.fill", label: "Profil abmelden") { app.clearProfile(); dismiss() }
-                    AccountAction(icon: "server.rack", label: "Server aendern") { app.changeServer(); dismiss() }
+
+                    AccountHeader("SERVER")
+                    ForEach(app.savedServers, id: \.self) { s in
+                        Button { Task { await app.switchServer(s); dismiss() } } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "server.rack").frame(width: 24).foregroundStyle(Theme.sub)
+                                Text(s).font(.system(size: 14)).foregroundStyle(Theme.text).lineLimit(1)
+                                Spacer()
+                                if s == app.serverURL { Image(systemName: "checkmark").foregroundStyle(Theme.accent) }
+                            }.padding(.vertical, 8).padding(.horizontal).contentShape(Rectangle())
+                        }.buttonStyle(.plain)
+                    }
+                    AccountAction(icon: "plus.circle", label: "Server hinzufuegen / aendern") { app.changeServer(); dismiss() }
 
                     if isAdmin {
                         Divider().background(Theme.input).padding(.vertical, 8)
@@ -351,6 +370,8 @@ struct SettingsView: View {
     @State private var prebuffer = 5
     @State private var normalize = false
     @State private var bgKeepalive = false
+    @State private var cookie = ""
+    @State private var cookieMsg = ""
     @State private var loaded = false
 
     var body: some View {
@@ -385,6 +406,31 @@ struct SettingsView: View {
                             }
                         }.tint(Theme.accent).onChange(of: bgKeepalive) { _ in if loaded { saveSettings() } }
                     }
+                    // Spotify-Cookie
+                    SettingsGroup("SPOTIFY-COOKIE (sp_dc)") {
+                        Text("Cookie-Status: \(app.profile?.has_spotify_cookie == true ? "✓ gesetzt" : "fehlt / abgelaufen")")
+                            .font(.system(size: 14)).foregroundStyle(app.profile?.has_spotify_cookie == true ? Theme.accent : Theme.sub)
+                        TextField("sp_dc-Wert einfuegen", text: $cookie)
+                            .autocorrectionDisabled().textInputAutocapitalization(.never)
+                            .foregroundStyle(Theme.text).padding(10)
+                            .background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8))
+                        Button {
+                            guard let id = app.profile?.id, !cookie.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+                            Task {
+                                let ok = await app.api.setSpotifyCookie(id, sp_dc: cookie.trimmingCharacters(in: .whitespaces))
+                                cookieMsg = ok ? "Gespeichert ✓ — Spotify neu verbunden" : "Fehler beim Speichern"
+                                if ok { cookie = ""; if let p = try? await app.api.profiles().first(where: { $0.id == id }) { app.profile = p } }
+                            }
+                        } label: {
+                            Text("Cookie speichern").font(.system(size: 15, weight: .semibold)).foregroundStyle(.black)
+                                .frame(maxWidth: .infinity).padding(.vertical, 10)
+                                .background(Theme.accent).clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        if !cookieMsg.isEmpty { Text(cookieMsg).font(.caption).foregroundStyle(Theme.sub) }
+                        Text("sp_dc holst du im Browser: open.spotify.com → eingeloggt → Entwicklertools → Application → Cookies → sp_dc.")
+                            .font(.caption2).foregroundStyle(Theme.mute)
+                    }
+
                     Text("Synchronisiert mit deinem Profil (gleiche Werte wie in der PWA).")
                         .font(.caption2).foregroundStyle(Theme.mute).padding(.horizontal)
                 }.padding(.vertical, 16)
@@ -590,18 +636,19 @@ struct LibraryView: View {
     @State private var filter = ""
     @State private var tab = "all"
 
-    private let tabs: [(String, String, String?)] = [
-        ("all", "Alle", nil), ("subs", "Abos", "bell.fill"),
-        ("alpha", "A–Z", "textformat"), ("radios", "Radios", "dot.radiowaves.left.and.right"),
-        ("history", "Verlauf", "clock.arrow.circlepath"),
+    @State private var loaded = false
+    private let tabs: [(String, String)] = [
+        ("all", "Alle"), ("subs", "Abos"), ("alpha", "A–Z"),
+        ("radios", "📻 Radios"), ("history", "📜 Verlauf"),
     ]
 
     private var shown: [Playlist] {
         var list = playlists
         if tab == "subs" { list = list.filter { subs.contains($0.uri) } }
-        if tab == "alpha" { list = list.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending } }
         if !filter.isEmpty { list = list.filter { $0.name.localizedCaseInsensitiveContains(filter) } }
-        return list
+        if tab == "alpha" { list.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending } }
+        // Abo-Playlists immer oben
+        return list.filter { subs.contains($0.uri) } + list.filter { !subs.contains($0.uri) }
     }
 
     var body: some View {
@@ -616,7 +663,7 @@ struct LibraryView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(tabs, id: \.0) { f in
-                            Pill(text: f.1, active: tab == f.0, activeBg: Theme.accent, icon: f.2) { tab = f.0 }
+                            Pill(text: f.1, active: tab == f.0, activeBg: Theme.accent) { tab = f.0 }
                         }
                     }.padding(.horizontal)
                 }.padding(.top, 10)
@@ -640,6 +687,7 @@ struct LibraryView: View {
                 }.padding(.top, 10).padding(.bottom, 130)
             }
             .scrollContentBackground(.hidden).background(Theme.bg)
+            .overlay { if !loaded && playlists.isEmpty { ProgressView().tint(Theme.accent) } }
             .navigationTitle("Meine Bibliothek")
             .navigationDestination(for: Playlist.self) { pl in
                 TrackListView(uri: pl.uri, title: pl.name, image: pl.image, isAlbum: false)
@@ -649,7 +697,7 @@ struct LibraryView: View {
             }
             .refreshable { await load() }
         }
-        .task { if playlists.isEmpty { await load() } }
+        .task(id: app.profile?.id) { await load() }
         .task(id: tab) {
             if tab == "radios", radios.isEmpty { radios = (try? await app.api.radioFavorites()) ?? [] }
             if tab == "history", history.isEmpty { history = (try? await app.api.recents()) ?? [] }
@@ -658,11 +706,12 @@ struct LibraryView: View {
     private func load() async {
         async let pls = app.api.playlists()
         async let sub = app.api.subscriptions()
-        playlists = (try? await pls) ?? playlists
+        if let p = try? await pls { playlists = p }
         if let s = try? await sub {
             subs = Set(s.map { $0.uri })
             subSync = Dictionary(s.compactMap { i in i.last_sync.map { (i.uri, $0) } }) { a, _ in a }
         }
+        loaded = true
     }
 }
 
@@ -825,25 +874,25 @@ struct NumberedTrackRow: View {
     var body: some View {
         Button(action: tap) {
             HStack(spacing: 12) {
-                Text("\(n)").font(.system(size: 13).monospacedDigit()).foregroundStyle(playing ? Theme.accent : Theme.sub)
+                Text("\(n)").font(.system(size: 14).monospacedDigit()).foregroundStyle(playing ? Theme.accent : Theme.sub)
                     .frame(width: 24, alignment: .trailing)
-                if showCover { Artwork(url: track.image, size: 48, corner: 4) }
+                if showCover { Artwork(url: track.image, size: 50, corner: 4) }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(track.name).font(.system(size: 15, weight: .regular))
+                    Text(track.name).font(.system(size: 16, weight: .regular))
                         .foregroundStyle(playing ? Theme.accent : Theme.text).lineLimit(1)
-                    Text(track.artist).font(.system(size: 13)).foregroundStyle(Theme.sub).lineLimit(1)
+                    Text(track.artist).font(.system(size: 14)).foregroundStyle(Theme.sub).lineLimit(1)
                 }
                 Spacer()
                 if track.downloaded == true {
-                    Image(systemName: "checkmark").font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.accent)
+                    Image(systemName: "checkmark").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.accent)
                 }
                 Menu {
                     TrackMenu(track: track)
                 } label: {
-                    Image(systemName: "ellipsis").font(.system(size: 15)).foregroundStyle(Theme.mute)
-                        .frame(width: 32, height: 32).contentShape(Rectangle())
+                    Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
+                        .frame(width: 34, height: 34).contentShape(Rectangle())
                 }
-            }.padding(.vertical, 7).padding(.horizontal).contentShape(Rectangle())
+            }.padding(.vertical, 9).padding(.horizontal).contentShape(Rectangle())
                 .background(playing ? Theme.accent.opacity(0.08) : .clear)
         }.buttonStyle(.plain)
         .contextMenu { TrackMenu(track: track) }
@@ -855,23 +904,23 @@ struct TrackRow: View {
     var body: some View {
         Button(action: tap) {
             HStack(spacing: 12) {
-                Artwork(url: track.image, size: 46, corner: 4)
+                Artwork(url: track.image, size: 52, corner: 4)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(track.name).font(.system(size: 15))
+                    Text(track.name).font(.system(size: 16))
                         .foregroundStyle(playing ? Theme.accent : Theme.text).lineLimit(1)
-                    Text(track.artist).font(.caption).foregroundStyle(Theme.sub).lineLimit(1)
+                    Text(track.artist).font(.system(size: 14)).foregroundStyle(Theme.sub).lineLimit(1)
                 }
                 Spacer()
                 if track.downloaded == true {
-                    Image(systemName: "arrow.down.circle.fill").font(.caption).foregroundStyle(Theme.accent.opacity(0.7))
+                    Image(systemName: "arrow.down.circle.fill").font(.system(size: 15)).foregroundStyle(Theme.accent.opacity(0.7))
                 }
                 Menu {
                     TrackMenu(track: track)
                 } label: {
-                    Image(systemName: "ellipsis").font(.system(size: 15)).foregroundStyle(Theme.mute)
-                        .frame(width: 32, height: 32).contentShape(Rectangle())
+                    Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
+                        .frame(width: 34, height: 34).contentShape(Rectangle())
                 }
-            }.padding(.vertical, 7).padding(.horizontal).contentShape(Rectangle())
+            }.padding(.vertical, 9).padding(.horizontal).contentShape(Rectangle())
         }.buttonStyle(.plain)
         .contextMenu { TrackMenu(track: track) }
     }
@@ -918,7 +967,7 @@ struct PlayerView: View {
     @EnvironmentObject var player: PlayerController
     @State private var scrub: Double = 0
     @State private var scrubbing = false
-    @State private var showQueue = false
+    @State private var page = 0
     @State private var showLyrics = false
     @State private var hero: Color = Theme.elev
 
@@ -926,7 +975,8 @@ struct PlayerView: View {
         let p = player
         ZStack {
             LinearGradient(colors: [hero.opacity(0.85), Theme.bg], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
-            VStack(spacing: 22) {
+            TabView(selection: $page) {
+              VStack(spacing: 22) {
                 Capsule().fill(Theme.mute).frame(width: 38, height: 5).padding(.top, 8)
                 Spacer()
                 Artwork(url: p.displayImage, size: 300, corner: 12).shadow(radius: 24)
@@ -964,8 +1014,8 @@ struct PlayerView: View {
                         }
                     }.foregroundStyle(Theme.text).padding(.horizontal, 8)
                     HStack(spacing: 50) {
-                        Button { showLyrics = true } label: { Label("Songtext", systemImage: "quote.bubble").font(.subheadline) }
-                        Button { showQueue = true } label: { Label("Warteschlange", systemImage: "list.bullet").font(.subheadline) }
+                        Button { showLyrics = true } label: { Label("Songtext", systemImage: "quote.bubble").font(.system(size: 15, weight: .semibold)) }
+                        Button { withAnimation { page = 1 } } label: { Label("Warteschlange", systemImage: "list.bullet").font(.system(size: 15, weight: .semibold)) }
                     }.foregroundStyle(Theme.sub).padding(.top, 4)
                 } else {
                     HStack(spacing: 10) {
@@ -978,10 +1028,12 @@ struct PlayerView: View {
                     }
                 }
                 Spacer()
-            }.padding()
+              }.padding().tag(0)
+              QueuePage(page: $page).tag(1)
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
         }
         .presentationDragIndicator(.hidden)
-        .sheet(isPresented: $showQueue) { QueueSheet() }
         .sheet(isPresented: $showLyrics) { LyricsSheet() }
         .task(id: player.displayImage) { if let c = await averageColor(player.displayImage) { hero = c } }
     }
@@ -991,22 +1043,70 @@ struct PlayerView: View {
     }
 }
 
-// MARK: - Warteschlange
-struct QueueSheet: View {
+// MARK: - Warteschlange (seitliche Player-Seite)
+struct QueuePage: View {
     @EnvironmentObject var player: PlayerController
+    @Binding var page: Int
     var body: some View {
-        ZStack {
-            Theme.bg.ignoresSafeArea()
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    Text("Warteschlange").font(.title3.bold()).foregroundStyle(Theme.text).padding()
-                    ForEach(Array(player.queue.enumerated()), id: \.element.id) { i, t in
-                        TrackRow(track: t, playing: i == player.index) { player.playAt(i) }
-                    }
-                }.padding(.bottom, 40)
-            }.scrollContentBackground(.hidden)
+        VStack(spacing: 0) {
+            HStack {
+                Button { withAnimation { page = 0 } } label: {
+                    Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
+                }
+                Spacer()
+                Text("Warteschlange").font(.system(size: 17, weight: .bold)).foregroundStyle(Theme.text)
+                Spacer()
+                Button { player.clearUpNext(); Haptics.tap() } label: {
+                    Text("Leeren").font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.accent)
+                }.opacity(player.upNext.isEmpty ? 0.4 : 1).disabled(player.upNext.isEmpty)
+            }.padding(.horizontal).padding(.top, 16).padding(.bottom, 8)
+
+            List {
+                if let c = player.current {
+                    Section {
+                        QueueRow(track: c, playing: true)
+                            .listRowBackground(Color.clear).listRowSeparator(.hidden)
+                    } header: { QueueHeader("Jetzt laeuft") }
+                }
+                if !player.upNext.isEmpty {
+                    Section {
+                        ForEach(Array(player.upNext.enumerated()), id: \.element.id) { i, t in
+                            QueueRow(track: t, playing: false)
+                                .listRowBackground(Color.clear).listRowSeparator(.hidden)
+                                .contentShape(Rectangle())
+                                .onTapGesture { player.playAt(player.index + 1 + i) }
+                        }
+                        .onMove { src, dst in player.moveUpNext(from: src, to: dst); Haptics.tap(.medium) }
+                        .onDelete { idx in idx.forEach { player.removeUpNext(at: $0) } }
+                    } header: { QueueHeader("Als Naechstes") }
+                }
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
         }
-        .presentationDetents([.medium, .large])
+    }
+}
+
+struct QueueHeader: View {
+    let t: String; init(_ t: String) { self.t = t }
+    var body: some View {
+        Text(t).font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.sub)
+            .textCase(nil).padding(.vertical, 4)
+    }
+}
+
+struct QueueRow: View {
+    let track: Track; let playing: Bool
+    var body: some View {
+        HStack(spacing: 12) {
+            Artwork(url: track.image, size: 48, corner: 4)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(track.name).font(.system(size: 16)).foregroundStyle(playing ? Theme.accent : Theme.text).lineLimit(1)
+                Text(track.artist).font(.system(size: 14)).foregroundStyle(Theme.sub).lineLimit(1)
+            }
+            Spacer()
+            Image(systemName: "line.3.horizontal").font(.system(size: 16)).foregroundStyle(Theme.mute)
+        }.padding(.vertical, 4)
     }
 }
 

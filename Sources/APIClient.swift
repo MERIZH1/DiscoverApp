@@ -133,6 +133,12 @@ final class APIClient: ObservableObject {
         return try JSONDecoder().decode(Profile.self, from: d)
     }
 
+    /// Frischen sp_dc-Spotify-Cookie fuers Profil setzen.
+    func setSpotifyCookie(_ id: String, sp_dc: String) async -> Bool {
+        let d = try? await data("/api/profiles/\(id)/cookie/spotify", method: "POST", json: ["sp_dc": sp_dc])
+        return d != nil
+    }
+
     /// "Zuletzt geoeffnet" (Recents-Feed) — Container (Album/Artist/Playlist/Podcast).
     func recents(limit: Int = 20) async throws -> [HomeItem] {
         struct R: Codable { let items: [HomeItem] }

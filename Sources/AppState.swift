@@ -6,6 +6,17 @@ import SwiftUI
 final class AppState: ObservableObject {
     @AppStorage("serverURL") var serverURL: String = ""
     @AppStorage("profileId") var profileId: String = ""
+    @AppStorage("savedServers") private var savedServersRaw: String = ""
+
+    /// Gespeicherte Server-Adressen (Mehr-Server-Verwaltung).
+    var savedServers: [String] {
+        savedServersRaw.split(separator: "\n").map(String.init).filter { !$0.isEmpty }
+    }
+    private func rememberServer(_ url: String) {
+        var list = savedServers.filter { $0 != url }
+        list.insert(url, at: 0)
+        savedServersRaw = list.prefix(8).joined(separator: "\n")
+    }
 
     @Published var api: APIClient
     @Published var player: PlayerController
@@ -25,12 +36,20 @@ final class AppState: ObservableObject {
         do {
             _ = try await api.profiles()
             serverURL = url
+            rememberServer(url)
             connected = true
             return nil
         } catch {
             connected = false
             return error.localizedDescription
         }
+    }
+
+    /// Auf einen gespeicherten Server wechseln (lädt neu, Profil neu waehlen).
+    func switchServer(_ url: String) async {
+        player.pause()
+        profile = nil
+        _ = await connect(server: url)
     }
 
     func selectProfile(_ p: Profile) {
