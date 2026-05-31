@@ -4,13 +4,16 @@ struct ContentView: View {
     @StateObject private var app = AppState()
 
     var body: some View {
-        Group {
-            if !app.connected {
-                ServerSetupView()
-            } else if app.profile == nil {
-                ProfilePickerView()
-            } else {
-                MainView()
+        ZStack {
+            Color.black.ignoresSafeArea()
+            Group {
+                if !app.connected {
+                    ServerSetupView()
+                } else if app.profile == nil {
+                    ProfilePickerView()
+                } else {
+                    MainView()
+                }
             }
         }
         .environmentObject(app)

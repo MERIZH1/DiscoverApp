@@ -88,6 +88,17 @@ final class PlayerController: ObservableObject {
     func toggleShuffle() { shuffle.toggle() }
     func cycleRepeat() { repeatMode = repeatMode == .off ? .all : (repeatMode == .all ? .one : .off) }
 
+    /// Song direkt hinter dem aktuellen einreihen ("Als Naechstes spielen").
+    func playNext(_ t: Track) {
+        if !hasContent || isRadio { play(tracks: [t]); return }
+        queue.insert(t, at: min(index + 1, queue.count))
+    }
+    /// Song ans Ende der Warteschlange.
+    func addToQueue(_ t: Track) {
+        if !hasContent || isRadio { play(tracks: [t]); return }
+        queue.append(t)
+    }
+
     private func loadCurrent(autoplay: Bool) {
         guard let track = current else { return }
         loading = true; currentTime = 0; duration = track.durationSec

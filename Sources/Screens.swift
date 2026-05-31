@@ -61,15 +61,39 @@ struct Pill: View {
     let text: String
     let active: Bool
     var activeBg: Color = .white
+    var icon: String? = nil
     let tap: () -> Void
     var body: some View {
         Button(action: tap) {
-            Text(text).font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(active ? .black : Theme.text)
-                .padding(.horizontal, 14).padding(.vertical, 7)
-                .background(active ? activeBg : Theme.input)
-                .clipShape(Capsule())
+            HStack(spacing: 5) {
+                if let icon { Image(systemName: icon).font(.system(size: 12, weight: .semibold)) }
+                Text(text).font(.system(size: 13, weight: .semibold))
+            }
+            .foregroundStyle(active ? .black : Theme.text)
+            .padding(.horizontal, 14).padding(.vertical, 7)
+            .background(active ? activeBg : Theme.input)
+            .clipShape(Capsule())
         }.buttonStyle(.plain)
+    }
+}
+
+// MARK: - Track-Kontextmenue (Long-Press + "…")
+struct TrackMenu: View {
+    @EnvironmentObject var player: PlayerController
+    @EnvironmentObject var app: AppState
+    let track: Track
+    var body: some View {
+        Button { player.playNext(track) } label: { Label("Als Naechstes spielen", systemImage: "text.line.first.and.arrowtriangle.forward") }
+        Button { player.addToQueue(track) } label: { Label("Zur Warteschlange", systemImage: "text.badge.plus") }
+        Button { startRadio() } label: { Label("Song-Radio starten", systemImage: "dot.radiowaves.left.and.right") }
+    }
+    private func startRadio() {
+        Task {
+            guard let r = try? await app.api.startRadio(track: track), r.ok,
+                  let puri = r.playlist_uri,
+                  let resp = try? await app.api.playlistTracks(puri) else { return }
+            player.play(tracks: resp.tracks)
+        }
     }
 }
 
@@ -400,19 +424,29 @@ struct CardRows: View {
 // MARK: - Bibliothek
 struct LibraryView: View {
     @EnvironmentObject var app: AppState
+    @EnvironmentObject var player: PlayerController
     @State private var playlists: [Playlist] = []
     @State private var subs: Set<String> = []
     @State private var subSync: [String: String] = [:]
+    @State private var radios: [RadioStation] = []
+    @State private var history: [HomeItem] = []
     @State private var filter = ""
     @State private var tab = "all"
 
-    var shown: [Playlist] {
+    private let tabs: [(String, String, String?)] = [
+        ("all", "Alle", nil), ("subs", "Abos", "bell.fill"),
+        ("alpha", "A–Z", "textformat"), ("radios", "Radios", "dot.radiowaves.left.and.right"),
+        ("history", "Verlauf", "clock.arrow.circlepath"),
+    ]
+
+    private var shown: [Playlist] {
         var list = playlists
         if tab == "subs" { list = list.filter { subs.contains($0.uri) } }
-        if tab == "az" { list = list.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending } }
+        if tab == "alpha" { list = list.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending } }
         if !filter.isEmpty { list = list.filter { $0.name.localizedCaseInsensitiveContains(filter) } }
         return list
     }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -424,40 +458,27 @@ struct LibraryView: View {
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach([("all","Alle"),("subs","Abos"),("az","A–Z")], id: \.0) { f in
-                            Pill(text: f.1, active: tab == f.0, activeBg: Theme.accent) { tab = f.0 }
+                        ForEach(tabs, id: \.0) { f in
+                            Pill(text: f.1, active: tab == f.0, activeBg: Theme.accent, icon: f.2) { tab = f.0 }
                         }
                     }.padding(.horizontal)
                 }.padding(.top, 10)
 
                 LazyVStack(spacing: 2) {
-                    // Liked Songs (Spezial)
-                    LikedSongsRow()
-                    ForEach(shown) { pl in
-                        NavigationLink(value: pl) {
-                            HStack(spacing: 12) {
-                                ZStack(alignment: .bottomLeading) {
-                                    Artwork(url: pl.image, size: 56, corner: 6)
-                                    if subs.contains(pl.uri) {
-                                        Image(systemName: "bell.fill").font(.system(size: 10)).foregroundStyle(.black)
-                                            .padding(5).background(Circle().fill(Theme.accent)).offset(x: -3, y: 3)
-                                    }
-                                }
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(pl.name).font(.system(size: 16, weight: .semibold))
-                                        .foregroundStyle(Theme.text).lineLimit(1)
-                                    HStack(spacing: 4) {
-                                        Text(subs.contains(pl.uri) ? "Abo" : "Playlist")
-                                            .font(.system(size: 13))
-                                            .foregroundStyle(subs.contains(pl.uri) ? Theme.accent : Theme.sub)
-                                        if let s = subSync[pl.uri] {
-                                            Text("· sync \(s)").font(.system(size: 13)).foregroundStyle(Theme.sub)
-                                        }
-                                    }
-                                }
-                                Spacer(minLength: 0)
-                            }.padding(.vertical, 6).padding(.horizontal).contentShape(Rectangle())
-                        }.buttonStyle(.plain)
+                    if tab == "radios" {
+                        ForEach(radios) { st in
+                            Button { player.playRadio(st) } label: { RadioRow(station: st) }.buttonStyle(.plain)
+                        }
+                    } else if tab == "history" {
+                        ForEach(history) { it in
+                            NavigationLink(value: it) { HistoryRow(item: it) }.buttonStyle(.plain)
+                        }
+                    } else {
+                        ForEach(shown) { pl in
+                            NavigationLink(value: pl) {
+                                LibraryRow(pl: pl, subscribed: subs.contains(pl.uri), sync: subSync[pl.uri])
+                            }.buttonStyle(.plain)
+                        }
                     }
                 }.padding(.top, 10).padding(.bottom, 130)
             }
@@ -466,9 +487,16 @@ struct LibraryView: View {
             .navigationDestination(for: Playlist.self) { pl in
                 TrackListView(uri: pl.uri, title: pl.name, image: pl.image, isAlbum: false)
             }
+            .navigationDestination(for: HomeItem.self) { it in
+                TrackListView(uri: it.uri, title: it.name, image: it.image, isAlbum: it.type == "album")
+            }
             .refreshable { await load() }
         }
         .task { if playlists.isEmpty { await load() } }
+        .task(id: tab) {
+            if tab == "radios", radios.isEmpty { radios = (try? await app.api.radioFavorites()) ?? [] }
+            if tab == "history", history.isEmpty { history = (try? await app.api.recents()) ?? [] }
+        }
     }
     private func load() async {
         async let pls = app.api.playlists()
@@ -476,25 +504,61 @@ struct LibraryView: View {
         playlists = (try? await pls) ?? playlists
         if let s = try? await sub {
             subs = Set(s.map { $0.uri })
-            subSync = Dictionary(uniqueKeysWithValues: s.compactMap { i in i.last_sync.map { (i.uri, $0) } })
+            subSync = Dictionary(s.compactMap { i in i.last_sync.map { (i.uri, $0) } }) { a, _ in a }
         }
     }
 }
 
-struct LikedSongsRow: View {
+struct LibraryRow: View {
+    let pl: Playlist; let subscribed: Bool; let sync: String?
     var body: some View {
         HStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 6)
-                .fill(LinearGradient(colors: [Color(hex6: 0x8E8EE8), Color(hex6: 0x5050C0)],
-                                     startPoint: .topLeading, endPoint: .bottomTrailing))
-                .frame(width: 56, height: 56)
-                .overlay(Image(systemName: "heart.fill").foregroundStyle(.white))
+            ZStack(alignment: .bottomLeading) {
+                Artwork(url: pl.image, size: 56, corner: 6)
+                if subscribed {
+                    Image(systemName: "bell.fill").font(.system(size: 10)).foregroundStyle(.black)
+                        .padding(5).background(Circle().fill(Theme.accent)).offset(x: -3, y: 3)
+                }
+            }
             VStack(alignment: .leading, spacing: 3) {
-                Text("Liked Songs").font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
-                Text("Playlist").font(.system(size: 13)).foregroundStyle(Theme.sub)
+                Text(pl.name).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(subscribed ? "Abo" : "Playlist").font(.system(size: 13))
+                        .foregroundStyle(subscribed ? Theme.accent : Theme.sub)
+                    if let s = sync { Text("· sync \(s)").font(.system(size: 13)).foregroundStyle(Theme.sub) }
+                }
             }
             Spacer(minLength: 0)
-        }.padding(.vertical, 6).padding(.horizontal)
+        }.padding(.vertical, 6).padding(.horizontal).contentShape(Rectangle())
+    }
+}
+
+struct HistoryRow: View {
+    let item: HomeItem
+    var body: some View {
+        HStack(spacing: 12) {
+            Artwork(url: item.image, size: 56, corner: (item.type ?? "") == "artist" ? 28 : 6)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(item.name).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
+                Text(item.sub ?? (item.type ?? "").capitalized).font(.system(size: 13)).foregroundStyle(Theme.sub).lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }.padding(.vertical, 6).padding(.horizontal).contentShape(Rectangle())
+    }
+}
+
+struct RadioRow: View {
+    let station: RadioStation
+    var body: some View {
+        HStack(spacing: 12) {
+            Artwork(url: station.favicon, size: 50, corner: 8)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(station.name).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
+                Text(station.country ?? "Live-Radio").font(.system(size: 13)).foregroundStyle(Theme.sub)
+            }
+            Spacer()
+            Image(systemName: "star.fill").foregroundStyle(Theme.accent)
+        }.padding(.vertical, 7).padding(.horizontal).contentShape(Rectangle())
     }
 }
 
@@ -509,18 +573,7 @@ struct RadioView: View {
             ScrollView {
                 LazyVStack(spacing: 4) {
                     ForEach(stations) { st in
-                        Button { player.playRadio(st) } label: {
-                            HStack(spacing: 12) {
-                                Artwork(url: st.favicon, size: 50, corner: 8)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(st.name).font(.system(size: 16, weight: .semibold))
-                                        .foregroundStyle(player.isRadio && player.displayTitle == st.name ? Theme.accent : Theme.text).lineLimit(1)
-                                    Text(st.country ?? "Live-Radio").font(.system(size: 13)).foregroundStyle(Theme.sub)
-                                }
-                                Spacer()
-                                Image(systemName: "star.fill").foregroundStyle(Theme.accent)
-                            }.padding(.vertical, 7).padding(.horizontal).contentShape(Rectangle())
-                        }.buttonStyle(.plain)
+                        Button { player.playRadio(st) } label: { RadioRow(station: st) }.buttonStyle(.plain)
                     }
                 }.padding(.top, 8).padding(.bottom, 130)
             }
@@ -541,6 +594,17 @@ struct TrackListView: View {
     @State private var loading = true
     @State private var hero: Color = Theme.elev
 
+    private var metaText: String {
+        if isAlbum { return "Album · \(tracks.count) Songs" }
+        let total = tracks.reduce(0) { $0 + Int($1.durationSec) }
+        var s = "Playlist · \(tracks.count) Songs"
+        if total > 0 {
+            let h = total / 3600, m = (total % 3600) / 60
+            s += " · " + (h > 0 ? "\(h)h \(m)min" : "\(m)min")
+        }
+        return s
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
@@ -549,7 +613,7 @@ struct TrackListView: View {
                     Artwork(url: image, size: 210, corner: 6).shadow(color: .black.opacity(0.6), radius: 30, y: 8).padding(.top, 12)
                     Text(title).font(.system(size: 26, weight: .black)).foregroundStyle(Theme.text)
                         .multilineTextAlignment(.center).padding(.horizontal)
-                    Text("\(isAlbum ? "Album" : "Playlist") · \(tracks.count) Songs")
+                    Text(metaText)
                         .font(.system(size: 13)).foregroundStyle(Theme.sub)
                     // Aktions-Reihe
                     HStack {
@@ -578,7 +642,7 @@ struct TrackListView: View {
                 // Tracks (nummeriert)
                 LazyVStack(spacing: 0) {
                     ForEach(Array(tracks.enumerated()), id: \.element.id) { idx, t in
-                        NumberedTrackRow(n: idx + 1, track: t, playing: player.current?.id == t.id) {
+                        NumberedTrackRow(n: idx + 1, track: t, showCover: !isAlbum, playing: player.current?.id == t.id) {
                             player.shuffle = false; player.play(tracks: tracks, startAt: idx)
                         }
                     }
@@ -586,7 +650,7 @@ struct TrackListView: View {
             }
         }
         .scrollContentBackground(.hidden).background(Theme.bg)
-        .navigationTitle(title).navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("").navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
         .overlay { if loading { ProgressView().tint(Theme.accent) } }
         .task {
@@ -600,13 +664,13 @@ struct TrackListView: View {
 }
 
 struct NumberedTrackRow: View {
-    let n: Int; let track: Track; let playing: Bool; let tap: () -> Void
+    let n: Int; let track: Track; var showCover: Bool = true; let playing: Bool; let tap: () -> Void
     var body: some View {
         Button(action: tap) {
             HStack(spacing: 12) {
                 Text("\(n)").font(.system(size: 13).monospacedDigit()).foregroundStyle(playing ? Theme.accent : Theme.sub)
                     .frame(width: 24, alignment: .trailing)
-                Artwork(url: track.image, size: 48, corner: 4)
+                if showCover { Artwork(url: track.image, size: 48, corner: 4) }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(track.name).font(.system(size: 15, weight: .regular))
                         .foregroundStyle(playing ? Theme.accent : Theme.text).lineLimit(1)
@@ -616,10 +680,16 @@ struct NumberedTrackRow: View {
                 if track.downloaded == true {
                     Image(systemName: "checkmark").font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.accent)
                 }
-                Image(systemName: "ellipsis").font(.system(size: 15)).foregroundStyle(Theme.mute).padding(.leading, 6)
+                Menu {
+                    TrackMenu(track: track)
+                } label: {
+                    Image(systemName: "ellipsis").font(.system(size: 15)).foregroundStyle(Theme.mute)
+                        .frame(width: 32, height: 32).contentShape(Rectangle())
+                }
             }.padding(.vertical, 7).padding(.horizontal).contentShape(Rectangle())
                 .background(playing ? Theme.accent.opacity(0.08) : .clear)
         }.buttonStyle(.plain)
+        .contextMenu { TrackMenu(track: track) }
     }
 }
 
@@ -638,8 +708,15 @@ struct TrackRow: View {
                 if track.downloaded == true {
                     Image(systemName: "arrow.down.circle.fill").font(.caption).foregroundStyle(Theme.accent.opacity(0.7))
                 }
+                Menu {
+                    TrackMenu(track: track)
+                } label: {
+                    Image(systemName: "ellipsis").font(.system(size: 15)).foregroundStyle(Theme.mute)
+                        .frame(width: 32, height: 32).contentShape(Rectangle())
+                }
             }.padding(.vertical, 7).padding(.horizontal).contentShape(Rectangle())
         }.buttonStyle(.plain)
+        .contextMenu { TrackMenu(track: track) }
     }
 }
 
@@ -669,7 +746,11 @@ struct NowPlayingBar: View {
                 }
             }
             .padding(.horizontal, 10).padding(.vertical, 8)
-            .background(Color(hex6: 0x2A2A2A)).clipShape(RoundedRectangle(cornerRadius: 10))
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color(hex6: 0x282828))
+                    .shadow(color: .black.opacity(0.5), radius: 12, y: 4)
+            )
             .onTapGesture { showPlayer = true }
         }
     }

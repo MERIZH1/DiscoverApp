@@ -133,4 +133,29 @@ final class APIClient: ObservableObject {
         let r: SubsResponse = try await get("/api/subscriptions")
         return r.subs
     }
+
+    /// Song-Radio: erstellt serverseitig eine Radio-Playlist (30 Songs) und gibt deren URI zurueck.
+    func startRadio(track: Track) async throws -> RadioResponse {
+        let seed: [String: Any] = [
+            "uri": track.uri, "name": track.name, "artist": track.artist,
+            "image": track.image ?? "", "album": track.album ?? "",
+            "duration_ms": track.duration_ms ?? 0,
+        ]
+        let body: [String: Any] = [
+            "type": "track", "uri": track.uri,
+            "name": "\(track.artist) — \(track.name)",
+            "artist_uri": track.artists?.first?.uri ?? "",
+            "seed_track": seed,
+        ]
+        let d = try await data("/api/radio", method: "POST", json: body)
+        return try JSONDecoder().decode(RadioResponse.self, from: d)
+    }
+}
+
+struct RadioResponse: Codable {
+    let ok: Bool
+    let playlist_uri: String?
+    let name: String?
+    let image: String?
+    let error: String?
 }
