@@ -1,9 +1,12 @@
-name: Build unsigned IPA
+name: Build IPA + SideStore Source
 
 on:
   push:
     branches: [ main, master ]
-  workflow_dispatch:   # erlaubt manuelles Starten im GitHub-UI
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -18,6 +21,13 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
+      - name: Set version
+        run: |
+          VER="1.0.${{ github.run_number }}"
+          plutil -replace CFBundleShortVersionString -string "$VER" Sources/Info.plist
+          plutil -replace CFBundleVersion -string "${{ github.run_number }}" Sources/Info.plist
+          echo "VER=$VER" >> "$GITHUB_ENV"
+
       - name: Archive app (unsigned)
         run: |
           set -eo pipefail
@@ -27,34 +37,63 @@ jobs:
             -configuration Release \
             -sdk iphoneos \
             -archivePath "$PWD/build/DiscoverApp.xcarchive" \
-            MARKETING_VERSION=1.0 \
-            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
-            ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=YES \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             archive
 
-      - name: Package .ipa (unsigned)
+      - name: Package .ipa
         run: |
           set -eo pipefail
-          APP_PATH="build/DiscoverApp.xcarchive/Products/Applications/DiscoverApp.app"
-          if [ ! -d "$APP_PATH" ]; then
-            echo "App nicht gefunden unter $APP_PATH"
-            echo "--- Inhalt von build/Build/Products ---"
-            ls -R build/Build/Products || true
-            exit 1
-          fi
-          rm -rf Payload DiscoverApp-unsigned.ipa
+          APP="build/DiscoverApp.xcarchive/Products/Applications/DiscoverApp.app"
+          if [ ! -d "$APP" ]; then echo "App nicht gefunden: $APP"; exit 1; fi
+          rm -rf Payload DiscoverApp.ipa
           mkdir -p Payload
-          cp -R "$APP_PATH" Payload/
-          zip -r -y "DiscoverApp-unsigned.ipa" Payload >/dev/null
-          echo "IPA gebaut:"
-          ls -lh DiscoverApp-unsigned.ipa
+          cp -R "$APP" Payload/
+          zip -r -y DiscoverApp.ipa Payload >/dev/null
+          echo "SIZE=$(stat -f%z DiscoverApp.ipa)" >> "$GITHUB_ENV"
+          ls -lh DiscoverApp.ipa
 
-      - name: Upload IPA artifact
+      - name: Generate apps.json (SideStore-Quelle)
+        env:
+          REPO: ${{ github.repository }}
+          RUN: ${{ github.run_number }}
+        run: |
+          export DATE=$(date +%Y-%m-%d)
+          python3 - <<'PY'
+          import json, os
+          data = {
+            "name": "Discover (privat)",
+            "identifier": "com.discover.source",
+            "apps": [{
+              "name": "Discover",
+              "bundleIdentifier": "com.discover.app",
+              "developerName": "Maximilian",
+              "version": os.environ["VER"],
+              "versionDate": os.environ["DATE"],
+              "versionDescription": "Build " + os.environ["RUN"],
+              "downloadURL": "https://github.com/%s/releases/latest/download/DiscoverApp.ipa" % os.environ["REPO"],
+              "localizedDescription": "Native Discover-App — eigener Player, Lockscreen-Audio.",
+              "iconURL": "https://raw.githubusercontent.com/%s/main/Sources/Assets.xcassets/AppIcon.appiconset/icon-1024.png" % os.environ["REPO"],
+              "tintColor": "1DB954",
+              "size": int(os.environ["SIZE"]),
+            }]
+          }
+          open("apps.json", "w").write(json.dumps(data, indent=2))
+          print(open("apps.json").read())
+          PY
+
+      - name: Publish Release (latest)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Discover Build ${{ github.run_number }}
+          files: |
+            DiscoverApp.ipa
+            apps.json
+
+      - name: Upload artifact (Fallback)
         uses: actions/upload-artifact@v4
         with:
-          name: DiscoverApp-unsigned-ipa
-          path: DiscoverApp-unsigned.ipa
-          if-no-files-found: error
+          name: DiscoverApp-ipa
+          path: DiscoverApp.ipa
