@@ -3,9 +3,10 @@ import AVFoundation
 import MediaPlayer
 import UIKit
 
-/// Nativer Player: Queue + AVPlayer + Lock-Screen. Loest Stream-URLs ueber das
-/// Discover-Backend auf. Komplett nativ (kein WebView/JS-Shim) -> Lock-Screen +
-/// Next-Track funktionieren sauber, auch im Hintergrund.
+enum RepeatMode { case off, all, one }
+
+/// Nativer Player: Queue + AVPlayer + Lock-Screen. Spielt Tracks (ueber das
+/// Backend aufgeloest) und Live-Radio (direkte Stream-URL). Komplett nativ.
 @MainActor
 final class PlayerController: ObservableObject {
     @Published private(set) var queue: [Track] = []
@@ -14,8 +15,18 @@ final class PlayerController: ObservableObject {
     @Published private(set) var currentTime: Double = 0
     @Published private(set) var duration: Double = 0
     @Published private(set) var loading = false
+    @Published var shuffle = false
+    @Published var repeatMode: RepeatMode = .off
+    @Published private(set) var isRadio = false
+    private var radioTitle = ""
+    private var radioFavicon: String?
 
     var current: Track? { queue.indices.contains(index) ? queue[index] : nil }
+    var hasContent: Bool { current != nil || isRadio }
+    var displayTitle: String { isRadio ? radioTitle : (current?.name ?? "") }
+    var displayArtist: String { isRadio ? "Live-Radio" : (current?.artist ?? "") }
+    var displayImage: String? { isRadio ? radioFavicon : current?.image }
+    var upNext: [Track] { index + 1 < queue.count ? Array(queue[(index+1)...]) : [] }
 
     private let player = AVPlayer()
     private var timeObserver: Any?
@@ -25,20 +36,17 @@ final class PlayerController: ObservableObject {
 
     init(api: APIClient) {
         self.api = api
-        configureSession()
+        let s = AVAudioSession.sharedInstance()
+        try? s.setCategory(.playback, mode: .default)
+        try? s.setActive(true)
         setupRemoteCommands()
         addTimeObserver()
     }
 
-    func configureSession() {
-        let s = AVAudioSession.sharedInstance()
-        try? s.setCategory(.playback, mode: .default)
-        try? s.setActive(true)
-    }
-
-    // MARK: - Steuerung
+    // MARK: - Tracks
     func play(tracks: [Track], startAt i: Int = 0) {
         guard !tracks.isEmpty else { return }
+        isRadio = false
         queue = tracks
         index = max(0, min(i, tracks.count - 1))
         loadCurrent(autoplay: true)
@@ -48,44 +56,69 @@ final class PlayerController: ObservableObject {
     func resume() { player.play(); isPlaying = true; updateRate() }
     func pause() { player.pause(); isPlaying = false; updateRate() }
 
-    func next() {
-        guard index + 1 < queue.count else { return }
-        index += 1; loadCurrent(autoplay: true)
+    func next(auto: Bool = false) {
+        if isRadio { return }
+        guard !queue.isEmpty else { return }
+        if auto && repeatMode == .one { seek(0); resume(); return }
+        if shuffle && queue.count > 1 {
+            var n = Int.random(in: 0..<queue.count)
+            while n == index { n = Int.random(in: 0..<queue.count) }
+            index = n
+        } else if index + 1 < queue.count {
+            index += 1
+        } else if repeatMode != .off {
+            index = 0
+        } else { return }
+        loadCurrent(autoplay: true)
     }
     func prev() {
+        if isRadio { return }
         if currentTime > 3 || index == 0 { seek(0); return }
         index -= 1; loadCurrent(autoplay: true)
+    }
+    func playAt(_ i: Int) {
+        guard queue.indices.contains(i) else { return }
+        index = i; loadCurrent(autoplay: true)
     }
     func seek(_ t: Double) {
         player.seek(to: CMTime(seconds: t, preferredTimescale: 600)) { [weak self] _ in
             Task { @MainActor in self?.currentTime = t; self?.updateElapsed() }
         }
     }
+    func toggleShuffle() { shuffle.toggle() }
+    func cycleRepeat() { repeatMode = repeatMode == .off ? .all : (repeatMode == .all ? .one : .off) }
 
     private func loadCurrent(autoplay: Bool) {
         guard let track = current else { return }
-        loading = true
-        currentTime = 0
-        duration = track.durationSec
-        updateNowPlaying(track: track)
+        loading = true; currentTime = 0; duration = track.durationSec
+        updateNowPlaying(title: track.name, artist: track.artist, album: track.album,
+                         dur: track.durationSec, art: track.image, live: false)
         let myIndex = index
         Task {
             do {
                 let r = try await api.streamURL(for: track)
-                // Falls zwischenzeitlich weitergesprungen -> verwerfen
-                guard myIndex == index else { return }
-                guard r.ok, let rel = r.url, let url = api.absoluteURL(rel) else {
-                    loading = false; return
-                }
+                guard myIndex == index, !isRadio else { return }
+                guard r.ok, let rel = r.url, let url = api.absoluteURL(rel) else { loading = false; return }
                 let item = AVPlayerItem(url: url)
                 attachItemObservers(item)
                 player.replaceCurrentItem(with: item)
                 if autoplay { resume() }
                 loading = false
-            } catch {
-                loading = false
-            }
+            } catch { loading = false }
         }
+    }
+
+    // MARK: - Radio
+    func playRadio(_ s: RadioStation) {
+        guard let url = URL(string: s.url) else { return }
+        isRadio = true; queue = []; index = 0
+        radioTitle = s.name; radioFavicon = s.favicon
+        currentTime = 0; duration = 0; loading = true
+        let item = AVPlayerItem(url: url)
+        attachItemObservers(item)
+        player.replaceCurrentItem(with: item)
+        updateNowPlaying(title: s.name, artist: "Live-Radio", album: nil, dur: 0, art: s.favicon, live: true)
+        resume(); loading = false
     }
 
     // MARK: - Beobachter
@@ -103,10 +136,9 @@ final class PlayerController: ObservableObject {
         if let e = endObs { NotificationCenter.default.removeObserver(e) }
         endObs = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { [weak self] _ in
-            Task { @MainActor in self?.next() }
+            Task { @MainActor in self?.next(auto: true) }
         }
     }
-
     private func addTimeObserver() {
         timeObserver = player.addPeriodicTimeObserver(
             forInterval: CMTime(seconds: 0.5, preferredTimescale: 600), queue: .main) { [weak self] t in
@@ -118,18 +150,16 @@ final class PlayerController: ObservableObject {
         }
     }
 
-    // MARK: - Lock-Screen / Now Playing
-    private func updateNowPlaying(track: Track) {
-        var info: [String: Any] = [
-            MPMediaItemPropertyTitle: track.name,
-            MPMediaItemPropertyArtist: track.artist,
-        ]
-        if let al = track.album { info[MPMediaItemPropertyAlbumTitle] = al }
-        if track.durationSec > 0 { info[MPMediaItemPropertyPlaybackDuration] = track.durationSec }
+    // MARK: - Lock-Screen
+    private func updateNowPlaying(title: String, artist: String, album: String?, dur: Double, art: String?, live: Bool) {
+        var info: [String: Any] = [MPMediaItemPropertyTitle: title, MPMediaItemPropertyArtist: artist]
+        if let al = album { info[MPMediaItemPropertyAlbumTitle] = al }
+        if dur > 0 { info[MPMediaItemPropertyPlaybackDuration] = dur }
         info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = 0.0
         info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
+        info[MPNowPlayingInfoPropertyIsLiveStream] = live
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
-        if let img = track.image, let u = URL(string: img) {
+        if let a = art, let u = URL(string: a) {
             URLSession.shared.dataTask(with: u) { d, _, _ in
                 guard let d, let image = UIImage(data: d) else { return }
                 let art = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
@@ -153,7 +183,6 @@ final class PlayerController: ObservableObject {
         i[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
         MPNowPlayingInfoCenter.default().nowPlayingInfo = i
     }
-
     private func setupRemoteCommands() {
         let c = MPRemoteCommandCenter.shared()
         c.playCommand.addTarget { [weak self] _ in Task { @MainActor in self?.resume() }; return .success }
@@ -163,8 +192,7 @@ final class PlayerController: ObservableObject {
         c.previousTrackCommand.addTarget { [weak self] _ in Task { @MainActor in self?.prev() }; return .success }
         c.changePlaybackPositionCommand.addTarget { [weak self] e in
             guard let e = e as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
-            Task { @MainActor in self?.seek(e.positionTime) }
-            return .success
+            Task { @MainActor in self?.seek(e.positionTime) }; return .success
         }
     }
 }

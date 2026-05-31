@@ -91,9 +91,17 @@ final class APIClient: ObservableObject {
         try await get("/api/album/\(enc(uri))")
     }
 
-    func search(_ query: String) async throws -> Data {
-        // Roh zurueck — Suche hat ein gemischtes Schema, parsen wir spaeter gezielt
-        try await data("/api/search?q=\(enc(query))")
+    func search(_ query: String) async throws -> SearchResponse {
+        try await get("/api/search?q=\(enc(query))")
+    }
+
+    func lyrics(title: String, artist: String, duration: Int) async throws -> Lyrics {
+        try await get("/api/lyrics?title=\(enc(title))&artist=\(enc(artist))&duration=\(duration)")
+    }
+
+    func radioFavorites() async throws -> [RadioStation] {
+        let r: RadioFavoritesResponse = try await get("/api/radio-livestream/favorites")
+        return r.items
     }
 
     /// Liefert die spielbare (server-relative) URL fuer einen Track.
