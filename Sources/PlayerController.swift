@@ -5,6 +5,9 @@ import UIKit
 
 enum RepeatMode { case off, all, one }
 
+/// Gesamter Player-Zustand fuer Session-Persistenz (ganze Queue + Position).
+struct PlayerSnapshot: Codable { let tracks: [Track]; let index: Int }
+
 /// Nativer Player: Queue + AVPlayer + Lock-Screen. Spielt Tracks (ueber das
 /// Backend aufgeloest) und Live-Radio (direkte Stream-URL). Komplett nativ.
 @MainActor
@@ -74,26 +77,31 @@ final class PlayerController: ObservableObject {
     }
     func pause() { player.pause(); isPlaying = false; updateRate() }
 
-    /// Letzten Song wiederherstellen (Mini-Player sofort da, aber noch nicht gestreamt).
-    func prime(_ t: Track) {
-        guard !hasContent else { return }
-        isRadio = false; queue = [t]; index = 0
+    /// Gesamten Player wiederherstellen (ganze Queue, Mini-Player sofort da).
+    func restoreLast() {
+        restoreMode()
+        guard !hasContent,
+              let d = UserDefaults.standard.data(forKey: "playerSnap_\(profileScope)"),
+              let snap = try? JSONDecoder().decode(PlayerSnapshot.self, from: d),
+              !snap.tracks.isEmpty else { return }
+        isRadio = false
+        queue = snap.tracks
+        index = min(max(0, snap.index), snap.tracks.count - 1)
+        let t = queue[index]
         currentTime = 0; duration = t.durationSec; source = ""; isPlaying = false
         primedNotLoaded = true
         updateNowPlaying(title: t.name, artist: t.artist, album: t.album, dur: t.durationSec, art: t.image, live: false)
-    }
-    func restoreLast() {
-        guard !hasContent,
-              let d = UserDefaults.standard.data(forKey: "lastTrack_\(profileScope)"),
-              let t = try? JSONDecoder().decode(Track.self, from: d) else { return }
-        prime(t)
         source = UserDefaults.standard.string(forKey: "lastSource_\(profileScope)") ?? ""
     }
-    private func persistLast(_ t: Track) {
-        if let d = try? JSONEncoder().encode(t) {
-            UserDefaults.standard.set(d, forKey: "lastTrack_\(profileScope)")
+    private func persistSnapshot() {
+        guard !isRadio, !queue.isEmpty else { return }
+        if let d = try? JSONEncoder().encode(PlayerSnapshot(tracks: queue, index: index)) {
+            UserDefaults.standard.set(d, forKey: "playerSnap_\(profileScope)")
         }
     }
+    // Play-Modi (Shuffle/Repeat) serverseitig sichern/laden — wie PWA
+    private func saveMode() { Task { await api.savePlaymode(shuffle: shuffle, mode: repeatMode) } }
+    func restoreMode() { Task { let m = await api.playmode(); shuffle = m.shuffle; repeatMode = m.mode } }
 
     // MARK: - Sleep-Timer
     func setSleep(minutes: Int) {
@@ -141,8 +149,8 @@ final class PlayerController: ObservableObject {
             Task { @MainActor in self?.currentTime = t; self?.updateElapsed() }
         }
     }
-    func toggleShuffle() { shuffle.toggle() }
-    func cycleRepeat() { repeatMode = repeatMode == .off ? .all : (repeatMode == .all ? .one : .off) }
+    func toggleShuffle() { shuffle.toggle(); saveMode() }
+    func cycleRepeat() { repeatMode = repeatMode == .off ? .all : (repeatMode == .all ? .one : .off); saveMode() }
 
     /// Relativ vor/zurueck springen (Podcast ±10s).
     func skip(_ delta: Double) {
@@ -185,7 +193,7 @@ final class PlayerController: ObservableObject {
     private func loadCurrent(autoplay: Bool) {
         guard let track = current else { return }
         primedNotLoaded = false
-        persistLast(track)
+        persistSnapshot()
         updateRemoteForContent()
         loading = true; currentTime = 0; duration = track.durationSec; source = ""
         updateNowPlaying(title: track.name, artist: track.artist, album: track.album,

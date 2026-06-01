@@ -177,6 +177,20 @@ final class APIClient: ObservableObject {
         try await get("/api/me/settings")
     }
 
+    /// Play-Modi (Shuffle/Repeat) — serverseitig pro Profil, wie PWA.
+    func playmode() async -> (shuffle: Bool, mode: RepeatMode) {
+        guard let d = try? await data("/api/me/playmode"),
+              let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return (false, .off) }
+        let sh = (obj["shuffle"] as? String) ?? "off"
+        let rp = (obj["repeat"] as? String) ?? "off"
+        let mode: RepeatMode = rp == "one" ? .one : (rp == "all" ? .all : .off)
+        return (sh != "off", mode)
+    }
+    func savePlaymode(shuffle: Bool, mode: RepeatMode) async {
+        let rp = mode == .one ? "one" : (mode == .all ? "all" : "off")
+        _ = try? await data("/api/me/playmode", method: "POST", json: ["shuffle": shuffle ? "on" : "off", "repeat": rp])
+    }
+
     /// Wiedergabe-Einstellungen speichern (prebuffer/normalize/bg_keepalive).
     func saveSettings(_ fields: [String: Any]) async {
         _ = try? await data("/api/me/settings", method: "POST", json: fields)
