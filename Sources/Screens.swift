@@ -1684,6 +1684,7 @@ struct NowPlayingBar: View {
             .padding(.horizontal, 10).padding(.vertical, 8)
             .glassSurface(glass, shape: RoundedRectangle(cornerRadius: 8), fallback: Color(hex6: 0x282828))
             .shadow(color: .black.opacity(0.5), radius: 12, y: 4)
+            .contentShape(Rectangle())   // ganze Leiste tippbar (auch ohne Songtext / mit Glas)
             .onTapGesture { showPlayer = true }
         }
     }

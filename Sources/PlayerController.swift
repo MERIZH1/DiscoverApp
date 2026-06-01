@@ -24,14 +24,27 @@ final class ICYMetadataReader: NSObject, AVPlayerItemMetadataOutputPushDelegate 
     nonisolated func metadataOutput(_ output: AVPlayerItemMetadataOutput,
                                     didOutputTimedMetadataGroups groups: [AVTimedMetadataGroup],
                                     from track: AVPlayerItemTrack?) {
+        // Viele Sender schicken mehrere Felder (Songtitel + Sender-Motto/Werbung).
+        // Gezielt den Songtitel waehlen: StreamTitle / commonKey title; Artist ggf. davor.
+        var title: String?, artist: String?, fallback: String?
         for group in groups {
             for item in group.items {
-                if let s = item.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty {
-                    onTitle?(s)
-                    return
+                guard let s = item.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty else { continue }
+                let id = (item.identifier?.rawValue ?? "").lowercased()
+                let common = (item.commonKey?.rawValue ?? "").lowercased()
+                if common == "title" || id.contains("streamtitle") || id.hasSuffix("/title") || id.contains("songtitle") {
+                    title = s
+                } else if common == "artist" || id.contains("artist") {
+                    artist = s
+                } else if fallback == nil {
+                    fallback = s
                 }
             }
         }
+        let result: String?
+        if let t = title { result = artist.map { "\($0) – \(t)" } ?? t }
+        else { result = fallback }
+        if let r = result, !r.isEmpty { onTitle?(r) }
     }
 }
 
