@@ -1085,6 +1085,7 @@ struct TrackListView: View {
     @State private var reload = 0
     @State private var moreLoading = false
     @State private var isSubscribed = false
+    @State private var addedRecs: Set<String> = []
 
     private var metaText: String {
         if isAlbum { return "Album · \(tracks.count) Songs" }
@@ -1101,6 +1102,26 @@ struct TrackListView: View {
         let was = isSubscribed
         isSubscribed.toggle(); Haptics.tap()
         Task { was ? await app.api.unsubscribe(uri: uri) : await app.api.subscribe(uri: uri, name: title) }
+    }
+
+    private func startPlaylistRadio() {
+        Task {
+            guard let r = await app.api.startPlaylistRadio(uri: uri, name: title), r.ok,
+                  let puri = r.playlist_uri,
+                  let resp = try? await app.api.playlistTracks(puri) else { return }
+            player.play(tracks: resp.tracks, contextName: r.name ?? "Radio", contextURI: puri)
+        }
+    }
+
+    /// "+" auf einer Empfehlung -> Song in die Playlist (wie PWA: /api/add-track).
+    private func addRec(_ t: Track) {
+        if isAlbum { player.addToQueue(t); Haptics.tap(); return }
+        Task {
+            if await app.api.addTrack(playlistURI: uri, track: t, playlistName: title) {
+                addedRecs.insert(t.uri); Haptics.tap()
+                if !tracks.contains(where: { $0.uri == t.uri }) { tracks.insert(t, at: 0) }
+            }
+        }
     }
 
     private func loadMoreRecs() {
@@ -1139,7 +1160,18 @@ struct TrackListView: View {
                             Image(systemName: all ? "arrow.down.circle.fill" : "arrow.down.circle")
                                 .font(.title2).foregroundStyle(all ? Theme.accent : Theme.sub)
                         }
-                        Image(systemName: "ellipsis").font(.title3).foregroundStyle(Theme.sub).padding(.leading, 14)
+                        Menu {
+                            Button { Task { for t in tracks { await downloads.download(t) } } } label: {
+                                Label("Alle herunterladen", systemImage: "arrow.down.circle")
+                            }
+                            if !isAlbum {
+                                Button { startPlaylistRadio() } label: {
+                                    Label("Playlist-Radio starten", systemImage: "dot.radiowaves.left.and.right")
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis").font(.title3).foregroundStyle(Theme.sub)
+                        }.padding(.leading, 14)
                         Spacer()
                         Button { if !tracks.isEmpty { player.shuffle = true; player.play(tracks: tracks.shuffled(), contextName: title, contextURI: uri) } } label: {
                             Image(systemName: "shuffle").font(.title2).foregroundStyle(Theme.text)
@@ -1201,7 +1233,8 @@ struct TrackListView: View {
                             .padding(.horizontal).padding(.bottom, 4)
                         ForEach(Array(recs.enumerated()), id: \.offset) { i, t in
                             RecRow(track: t, playing: player.current?.id == t.id,
-                                   add: { player.addToQueue(t); Haptics.tap() },
+                                   added: addedRecs.contains(t.uri),
+                                   add: { addRec(t) },
                                    play: { player.shuffle = false; player.play(tracks: recs, startAt: i, contextName: "Empfehlungen", contextURI: uri) })
                         }
                     }.padding(.top, 14)
@@ -1369,7 +1402,7 @@ struct NumberedTrackRow: View {
 }
 
 struct RecRow: View {
-    let track: Track; let playing: Bool; let add: () -> Void; let play: () -> Void
+    let track: Track; let playing: Bool; let added: Bool; let add: () -> Void; let play: () -> Void
     var body: some View {
         HStack(spacing: 12) {
             Artwork(url: track.image, size: 50, corner: 4)
@@ -1379,9 +1412,10 @@ struct RecRow: View {
             }
             Spacer()
             Button(action: add) {
-                Image(systemName: "plus.circle").font(.system(size: 24)).foregroundStyle(Theme.text)
+                Image(systemName: added ? "checkmark.circle.fill" : "plus.circle")
+                    .font(.system(size: 24)).foregroundStyle(added ? Theme.accent : Theme.text)
                     .frame(width: 42, height: 42).contentShape(Rectangle())
-            }.buttonStyle(.plain)
+            }.buttonStyle(.plain).disabled(added)
         }
         .padding(.vertical, 8).padding(.horizontal).contentShape(Rectangle())
         .onTapGesture(perform: play)

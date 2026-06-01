@@ -90,11 +90,12 @@ struct Track: Codable, Identifiable, Hashable {
     let image: String?
     let duration_ms: Int?
     var downloaded: Bool?
+    let deezer_link: String?    // fuer /api/add-track (Empfehlungen)
 
     var durationSec: Double { Double(duration_ms ?? 0) / 1000.0 }
 
     enum CodingKeys: String, CodingKey {
-        case uri, name, artist, artists, album, album_uri, image, duration_ms, downloaded
+        case uri, name, artist, artists, album, album_uri, image, duration_ms, downloaded, deezer_link
     }
     private enum ExtraKeys: String, CodingKey { case deezer_cover, spotify_uri }
     init(from d: Decoder) throws {
@@ -113,11 +114,13 @@ struct Track: Codable, Identifiable, Hashable {
                       ?? (extra.flatMap { try? $0.decode(String.self, forKey: .deezer_cover) })
         duration_ms = try? c.decode(Int.self, forKey: .duration_ms)
         downloaded  = try? c.decode(Bool.self, forKey: .downloaded)
+        deezer_link = try? c.decode(String.self, forKey: .deezer_link)
     }
     init(uri: String, name: String, artist: String, image: String?) {
         self.uri = uri; self.name = name; self.artist = artist
         self.image = image; self.artists = nil; self.album = nil
         self.album_uri = nil; self.duration_ms = nil; self.downloaded = nil
+        self.deezer_link = nil
     }
 }
 struct PlaylistTracksResponse: Codable {

@@ -114,6 +114,20 @@ final class APIClient: ObservableObject {
         try await get("/api/podcast/\(enc(showURI))")
     }
 
+    /// Empfehlung in die Playlist hinzufuegen (Spotify-Playlist + paralleler Deemix-Download).
+    func addTrack(playlistURI: String, track: Track, playlistName: String) async -> Bool {
+        let body: [String: Any] = [
+            "playlist_uri": playlistURI,
+            "track_uri": track.uri,
+            "deezer_link": track.deezer_link ?? "",
+            "playlist_name": playlistName,
+            "title": track.name, "artist": track.artist,
+        ]
+        guard let d = try? await data("/api/add-track", method: "POST", json: body),
+              let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return false }
+        return (obj["ok"] as? Bool) ?? false
+    }
+
     func search(_ query: String) async throws -> SearchResponse {
         try await get("/api/search?q=\(enc(query))")
     }
@@ -203,6 +217,13 @@ final class APIClient: ObservableObject {
     }
     func unsubscribe(uri: String) async {
         _ = try? await data("/api/subscriptions/\(enc(uri))", method: "DELETE")
+    }
+
+    /// Playlist-Radio: 30 aehnliche Songs als neue Radio-Playlist.
+    func startPlaylistRadio(uri: String, name: String) async -> RadioResponse? {
+        let body: [String: Any] = ["type": "playlist", "uri": uri, "name": name]
+        guard let d = try? await data("/api/radio", method: "POST", json: body) else { return nil }
+        return try? JSONDecoder().decode(RadioResponse.self, from: d)
     }
 
     /// Song-Radio: erstellt serverseitig eine Radio-Playlist (30 Songs) und gibt deren URI zurueck.
