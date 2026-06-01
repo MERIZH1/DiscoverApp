@@ -1501,7 +1501,7 @@ struct PlayerView: View {
     @State private var scrub: Double = 0
     @State private var scrubbing = false
     @State private var page = 0
-    @State private var showLyrics = false
+    @State private var scrollToLyrics = false
     @State private var hero: Color = Theme.elev
 
     var body: some View {
@@ -1509,7 +1509,11 @@ struct PlayerView: View {
         ZStack {
             LinearGradient(colors: [hero.opacity(0.85), Theme.bg], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
             TabView(selection: $page) {
-              VStack(spacing: 22) {
+             GeometryReader { geo in
+              ScrollViewReader { proxy in
+               ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 0) {
+                 VStack(spacing: 22) {
                 // Obere Leiste: runter / WIEDERGABE+Titel / Menue
                 HStack {
                     Button { dismiss() } label: {
@@ -1609,7 +1613,7 @@ struct PlayerView: View {
                         }.foregroundStyle(Theme.text).padding(.horizontal, 8)
                     }
                     HStack(spacing: 30) {
-                        Button { withAnimation(.easeInOut(duration: 0.28)) { showLyrics = true } } label: { Label("Songtext", systemImage: "quote.bubble").font(.system(size: 15, weight: .semibold)) }
+                        Button { scrollToLyrics = true } label: { Label("Songtext", systemImage: "quote.bubble").font(.system(size: 15, weight: .semibold)) }
                         AirPlayButton().frame(width: 30, height: 30)
                         Button { withAnimation { page = 1 } } label: { Label("Warteschlange", systemImage: "list.bullet").font(.system(size: 15, weight: .semibold)) }
                     }.foregroundStyle(Theme.sub).padding(.top, 4)
@@ -1624,23 +1628,21 @@ struct PlayerView: View {
                     }
                 }
                 Spacer()
-              }.padding().tag(0)
-              QueuePage(page: $page).tag(1)
+                 }.padding().frame(height: geo.size.height).id("player")
+                 LyricsView().frame(minHeight: geo.size.height, alignment: .top)
+                    .background(Theme.bg).id("lyrics")
+                }
+               }
+               .onChange(of: scrollToLyrics) { go in
+                   if go { withAnimation(.easeInOut(duration: 0.35)) { proxy.scrollTo("lyrics", anchor: .top) }; scrollToLyrics = false }
+               }
+              }
+             }.tag(0)
+             QueuePage(page: $page).tag(1)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
-            if showLyrics {
-                LyricsView(onClose: { withAnimation(.easeInOut(duration: 0.25)) { showLyrics = false } })
-                    .zIndex(10).transition(.move(edge: .bottom))
-            }
         }
         .presentationDragIndicator(.hidden)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 25).onEnded { v in
-                if page == 0 && !showLyrics && v.translation.height < -55 && abs(v.translation.width) < 90 {
-                    withAnimation(.easeInOut(duration: 0.28)) { showLyrics = true }
-                }
-            }
-        )
         .task(id: player.displayImage) { if let c = await averageColor(player.displayImage) { hero = c } }
     }
     private func fmt(_ s: Double) -> String {
@@ -1717,31 +1719,19 @@ struct QueueRow: View {
 }
 
 // MARK: - Songtext
-/// Songtext eingebunden im Player (von unten hochwischen).
+/// Songtext als Scroll-Sektion unter dem Player (hochwischen scrollt hin).
 struct LyricsView: View {
     @EnvironmentObject var app: AppState
     @EnvironmentObject var player: PlayerController
-    let onClose: () -> Void
     @State private var text = "Lade Songtext…"
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Button { onClose() } label: {
-                    Image(systemName: "chevron.down").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
-                }
-                Spacer()
-                Text("Songtext").font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.text)
-                Spacer()
-                Color.clear.frame(width: 24, height: 1)
-            }.padding(.horizontal).padding(.top, 16).padding(.bottom, 8)
-            ScrollView {
-                Text(text).font(.system(size: 18, weight: .medium)).foregroundStyle(Theme.text)
-                    .frame(maxWidth: .infinity, alignment: .leading).padding()
-            }
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Songtext").font(.system(size: 20, weight: .bold)).foregroundStyle(Theme.text)
+            Text(text).font(.system(size: 18, weight: .medium)).foregroundStyle(Theme.text)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.bg.opacity(0.98).ignoresSafeArea())
-        .gesture(DragGesture(minimumDistance: 30).onEnded { v in if v.translation.height > 60 { onClose() } })
+        .padding(24).padding(.bottom, 60)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .task(id: player.current?.id) {
             guard let t = player.current else { text = "Kein Song"; return }
             if let ly = try? await app.api.lyrics(title: t.name, artist: t.artist, duration: Int(t.durationSec)) {
