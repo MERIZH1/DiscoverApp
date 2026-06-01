@@ -257,6 +257,8 @@ struct HomeView: View {
             .navigationDestination(for: HomeItem.self) { item in
                 if (item.type ?? "") == "show" || item.uri.contains(":show:") {
                     PodcastView(uri: item.uri, title: item.name, image: item.image)
+                } else if (item.type ?? "") == "artist" || item.uri.contains(":artist:") {
+                    ArtistView(uri: item.uri, name: item.name, image: item.image)
                 } else {
                     TrackListView(uri: item.uri, title: item.name, image: item.image, isAlbum: item.type == "album")
                 }
@@ -767,6 +769,8 @@ struct SearchView: View {
             .navigationDestination(for: Card.self) { c in
                 if c.uri.contains(":show:") {
                     PodcastView(uri: c.uri, title: c.name, image: c.image)
+                } else if c.uri.contains(":artist:") {
+                    ArtistView(uri: c.uri, name: c.name, image: c.image)
                 } else {
                     TrackListView(uri: c.uri, title: c.name, image: c.image, isAlbum: c.uri.contains(":album:"))
                 }
@@ -950,6 +954,8 @@ struct LibraryView: View {
             .navigationDestination(for: HomeItem.self) { it in
                 if (it.type ?? "") == "show" || it.uri.contains(":show:") {
                     PodcastView(uri: it.uri, title: it.name, image: it.image)
+                } else if (it.type ?? "") == "artist" || it.uri.contains(":artist:") {
+                    ArtistView(uri: it.uri, name: it.name, image: it.image)
                 } else {
                     TrackListView(uri: it.uri, title: it.name, image: it.image, isAlbum: it.type == "album")
                 }
@@ -1068,6 +1074,88 @@ struct RadioView: View {
             .overlay { if stations.isEmpty { ProgressView().tint(Theme.accent) } }
         }
         .task { if stations.isEmpty { stations = (try? await app.api.radioFavorites()) ?? [] } }
+    }
+}
+
+// MARK: - Artist-Seite
+struct ArtistView: View {
+    @EnvironmentObject var app: AppState
+    @EnvironmentObject var player: PlayerController
+    @Environment(\.dismiss) private var dismiss
+    let uri: String; let name: String; let image: String?
+    @State private var resp: ArtistResponse?
+    @State private var loading = true
+    @State private var hero: Color = Theme.elev
+
+    private var top: [Track] { resp?.top_tracks ?? [] }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                VStack(spacing: 12) {
+                    Artwork(url: resp?.image ?? image, size: 170, corner: 85)
+                        .shadow(color: .black.opacity(0.5), radius: 24, y: 8).padding(.top, 14)
+                    Text(resp?.name ?? name).font(.system(size: 26, weight: .black))
+                        .foregroundStyle(Theme.text).multilineTextAlignment(.center).padding(.horizontal)
+                    if let f = resp?.followers, f > 0 {
+                        Text("\(f.formatted()) Hörer*innen monatlich").font(.system(size: 13)).foregroundStyle(Theme.sub)
+                    }
+                    Button {
+                        if !top.isEmpty { player.shuffle = false; player.play(tracks: top, startAt: 0, contextName: resp?.name ?? name, contextURI: uri) }
+                    } label: {
+                        Image(systemName: "play.fill").font(.system(size: 22)).foregroundStyle(.black)
+                            .frame(width: 56, height: 56).background(Theme.accent).clipShape(Circle())
+                            .shadow(color: Theme.accent.opacity(0.4), radius: 10)
+                    }.padding(.top, 4)
+                }.frame(maxWidth: .infinity).padding(.bottom, 16)
+                .background(LinearGradient(stops: [
+                    .init(color: hero, location: 0), .init(color: hero, location: 0.3),
+                    .init(color: Theme.bg, location: 0.95)], startPoint: .top, endPoint: .bottom))
+
+                if !top.isEmpty {
+                    SectionHeader("Beliebt")
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(top.prefix(10).enumerated()), id: \.offset) { i, t in
+                            NumberedTrackRow(n: i + 1, track: t, playing: player.current?.id == t.id) {
+                                player.shuffle = false; player.play(tracks: top, startAt: i, contextName: resp?.name ?? name, contextURI: uri)
+                            }
+                        }
+                    }.padding(.top, 4)
+                }
+                if let albums = resp?.albums, !albums.isEmpty {
+                    SectionHeader("Alben")
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(alignment: .top, spacing: 14) {
+                            ForEach(albums) { c in
+                                NavigationLink { TrackListView(uri: c.uri, title: c.name, image: c.image, isAlbum: true) } label: {
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Artwork(url: c.image, size: 150, corner: 6)
+                                        Text(c.name).font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.text)
+                                            .lineLimit(1).frame(width: 150, alignment: .leading)
+                                    }
+                                }.buttonStyle(.plain)
+                            }
+                        }.padding(.horizontal)
+                    }
+                }
+                Color.clear.frame(height: 130)
+            }
+        }
+        .scrollContentBackground(.hidden).background(Theme.bg)
+        .navigationTitle("").navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbar { ToolbarItem(placement: .topBarLeading) {
+            Button { dismiss() } label: { Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text) }
+        } }
+        .overlay { if loading { ProgressView().tint(Theme.accent) } }
+        .task {
+            loading = true
+            let absImg = image.flatMap { app.api.absoluteURL($0)?.absoluteString } ?? image
+            if let c = await averageColor(absImg) { hero = c }
+            resp = try? await app.api.artist(uri)
+            loading = false
+        }
     }
 }
 

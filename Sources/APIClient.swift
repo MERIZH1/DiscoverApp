@@ -102,6 +102,10 @@ final class APIClient: ObservableObject {
         try await get("/api/album/\(enc(uri))")
     }
 
+    func artist(_ uri: String) async throws -> ArtistResponse {
+        try await get("/api/artist/\(enc(uri))")
+    }
+
     /// Vorladen wie PWA: Tracks zu YT matchen (/api/yt/bulk-lookup) + erste
     /// Stream-URLs vorwaermen (/api/yt/prewarm). Macht den 1. Klick instant.
     func prewarmPlaylist(_ tracks: [Track]) async {

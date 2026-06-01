@@ -181,6 +181,16 @@ struct PodcastResponse: Codable {
     let episodes: [Episode]
 }
 
+// MARK: - Artist
+struct ArtistResponse: Codable {
+    let uri: String?
+    let name: String?
+    let image: String?
+    let followers: Int?
+    let top_tracks: [Track]?
+    let albums: [Card]?
+}
+
 // MARK: - Radio
 struct RadioStation: Codable, Identifiable, Hashable {
     let id: String
