@@ -1,5 +1,6 @@
 import Foundation
 import AVFoundation
+import UIKit
 
 /// Laedt Songs/Episoden lokal aufs Geraet (Offline-Wiedergabe) + Metadaten.
 @MainActor
@@ -60,7 +61,12 @@ final class DownloadManager: ObservableObject {
             try? FileManager.default.removeItem(at: existing)
         }
         busy.insert(track.uri); progress[track.uri] = 0
-        defer { busy.remove(track.uri); progress[track.uri] = nil }
+        // Extra-Laufzeit, falls die App waehrend des Downloads in den Hintergrund geht
+        let bg = UIApplication.shared.beginBackgroundTask(withName: "dl-\(track.uri)")
+        defer {
+            busy.remove(track.uri); progress[track.uri] = nil
+            if bg != .invalid { UIApplication.shared.endBackgroundTask(bg) }
+        }
 
         guard let r = try? await api.streamURL(for: track), r.ok, let rel = r.url,
               let url = api.absoluteURL(rel) else { return }

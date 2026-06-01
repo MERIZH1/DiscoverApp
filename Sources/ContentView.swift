@@ -22,6 +22,7 @@ struct ContentView: View {
         .environmentObject(app.player)
         .environmentObject(app.downloads)
         .environmentObject(app.player.clock)
+        .environmentObject(app.sync)
         .environment(\.liquidGlass, app.liquidGlass)
         .task {
             DiscoverServices.app = app   // fuer Siri/Kurzbefehle

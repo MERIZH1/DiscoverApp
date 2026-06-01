@@ -29,6 +29,8 @@ final class AppState: ObservableObject {
         didSet { UserDefaults.standard.set(liquidGlass, forKey: "liquidGlass") }
     }
 
+    let sync: SyncManager
+
     init() {
         let a = APIClient(baseURL: UserDefaults.standard.string(forKey: "serverURL") ?? "")
         a.profileId = UserDefaults.standard.string(forKey: "profileId")   // fuer Siri-Start vor restore()
@@ -38,6 +40,7 @@ final class AppState: ObservableObject {
         p.downloads = dl
         self.player = p
         self.downloads = dl
+        self.sync = SyncManager(api: a, player: p)
     }
 
     /// Server setzen + verbinden (laedt Profile zur Validierung).
@@ -82,6 +85,7 @@ final class AppState: ObservableObject {
         player.profileScope = p.id
         cacheSet("lastProfile", p)   // fuer Offline-Start
         player.restoreLast()   // letzten Song in den Mini-Player laden
+        sync.start()   // Cross-Device-Sync starten
     }
 
     /// Profil im laufenden Betrieb wechseln (Account-Menue).

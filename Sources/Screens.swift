@@ -100,10 +100,13 @@ struct MainView: View {
                 RadioView().tabItem { Label("Radio", systemImage: "antenna.radiowaves.left.and.right") }
             }
             .tint(Theme.text)
-            if player.hasContent {
-                NowPlayingBar(showPlayer: $showPlayer).padding(.horizontal, 8).padding(.bottom, 50)
-                    .ignoresSafeArea(.keyboard, edges: .bottom)
-            }
+            VStack(spacing: 8) {
+                SyncBanner()   // sichtbar nur wenn ein anderes Geraet spielt
+                if player.hasContent {
+                    NowPlayingBar(showPlayer: $showPlayer)
+                }
+            }.padding(.horizontal, 8).padding(.bottom, 50)
+                .ignoresSafeArea(.keyboard, edges: .bottom)
         }
         .onAppear(perform: configureAppearance)
         .sheet(isPresented: $showPlayer) { PlayerView() }
@@ -1301,7 +1304,7 @@ struct ArtistView: View {
             VStack(spacing: 0) {
                 VStack(spacing: 12) {
                     Artwork(url: resp?.image ?? image, size: 170, corner: 85)
-                        .shadow(color: .black.opacity(0.5), radius: 24, y: 8).padding(.top, 14)
+                        .shadow(color: .black.opacity(0.5), radius: 24, y: 8).padding(.top, 24)
                     Text(resp?.name ?? name).font(.system(size: 26, weight: .black))
                         .foregroundStyle(Theme.text).multilineTextAlignment(.center).padding(.horizontal)
                     if let f = resp?.followers, f > 0 {
@@ -1315,10 +1318,6 @@ struct ArtistView: View {
                             .shadow(color: Theme.accent.opacity(0.4), radius: 10)
                     }.padding(.top, 4)
                 }.frame(maxWidth: .infinity).padding(.bottom, 16)
-                .background(LinearGradient(stops: [
-                    .init(color: hero, location: 0), .init(color: hero, location: 0.3),
-                    .init(color: Theme.bg, location: 0.95)], startPoint: .top, endPoint: .bottom)
-                    .ignoresSafeArea(edges: .top))
 
                 if !top.isEmpty {
                     SectionHeader("Beliebt")
@@ -1349,7 +1348,16 @@ struct ArtistView: View {
                 Color.clear.frame(height: 130)
             }
         }
-        .scrollContentBackground(.hidden).background(Theme.bg)
+        .scrollContentBackground(.hidden)
+        .background(
+            LinearGradient(stops: [
+                .init(color: hero, location: 0),
+                .init(color: hero, location: 0.16),
+                .init(color: hero.opacity(0.32), location: 0.34),
+                .init(color: Theme.bg, location: 0.52)],
+                startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
+        )
         .navigationTitle("").navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbarBackground(.hidden, for: .navigationBar)
@@ -1927,6 +1935,8 @@ struct PlayerView: View {
     @State private var scrollToLyrics = false
     @State private var hero: Color = Theme.elev
     @State private var showAddPlaylist = false
+    @State private var showArtist = false
+    @State private var showAlbum = false
 
     var body: some View {
         let p = player
@@ -1963,7 +1973,7 @@ struct PlayerView: View {
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle((p.sleepRemaining > 0 || p.sleepAtEnd) ? Theme.accent : Theme.text)
                     }.padding(.trailing, 14)
-                    Menu { if let t = p.current { TrackMenu(track: t, onAddToPlaylist: { showAddPlaylist = true }) } } label: {
+                    Menu { if let t = p.current { TrackMenu(track: t, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }) } } label: {
                         Image(systemName: "ellipsis").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
                     }.disabled(p.current == nil)
                 }.padding(.horizontal, 4).padding(.top, 8)
@@ -2075,6 +2085,16 @@ struct PlayerView: View {
         }
         .presentationDragIndicator(.hidden)
         .sheet(isPresented: $showAddPlaylist) { if let t = player.current { AddToPlaylistSheet(track: t) } }
+        .sheet(isPresented: $showArtist) {
+            if let t = player.current, let u = t.artists?.first?.uri {
+                NavigationStack { ArtistView(uri: u, name: t.artists?.first?.name ?? t.artist, image: t.image) }
+            }
+        }
+        .sheet(isPresented: $showAlbum) {
+            if let t = player.current, let u = t.album_uri {
+                NavigationStack { TrackListView(uri: u, title: t.album ?? "Album", image: t.image, isAlbum: true) }
+            }
+        }
         .task(id: player.displayImage) { if let c = await averageColor(player.displayImage) { hero = c } }
     }
     private func fmt(_ s: Double) -> String {
@@ -2155,22 +2175,80 @@ struct QueueRow: View {
 struct LyricsView: View {
     @EnvironmentObject var app: AppState
     @EnvironmentObject var player: PlayerController
-    @State private var text = "Lade Songtext…"
+    @EnvironmentObject var clock: PlaybackClock
+    @State private var lines: [(t: Double, s: String)] = []   // synced LRC
+    @State private var plain = "Lade Songtext…"
+    @State private var hasSynced = false
+
+    private var currentIndex: Int {
+        guard hasSynced else { return -1 }
+        var idx = -1
+        for (i, l) in lines.enumerated() { if l.t <= clock.time + 0.2 { idx = i } else { break } }
+        return idx
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Songtext").font(.system(size: 20, weight: .bold)).foregroundStyle(Theme.text)
-            Text(text).font(.system(size: 18, weight: .medium)).foregroundStyle(Theme.text)
-                .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: hasSynced ? 12 : 14) {
+            HStack(spacing: 8) {
+                Text("Songtext").font(.system(size: 20, weight: .bold)).foregroundStyle(Theme.text)
+                if hasSynced {
+                    Image(systemName: "waveform").font(.system(size: 13)).foregroundStyle(Theme.accent)
+                }
+            }
+            if hasSynced {
+                ForEach(Array(lines.enumerated()), id: \.offset) { i, l in
+                    if !l.s.isEmpty {
+                        Text(l.s)
+                            .font(.system(size: 19, weight: i == currentIndex ? .bold : .medium))
+                            .foregroundStyle(i == currentIndex ? Theme.text : Theme.sub.opacity(0.55))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                            .onTapGesture { player.seek(l.t) }   // antippen -> dahin springen
+                    }
+                }
+            } else {
+                Text(plain).font(.system(size: 18, weight: .medium)).foregroundStyle(Theme.text)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
         .padding(24).padding(.bottom, 60)
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .task(id: player.current?.id) {
-            guard let t = player.current else { text = "Kein Song"; return }
-            if let ly = try? await app.api.lyrics(title: t.name, artist: t.artist, duration: Int(t.durationSec)) {
-                text = (ly.lyrics?.isEmpty == false) ? (ly.lyrics ?? "") :
-                       (ly.instrumental == true ? "🎵 Instrumental" : "Kein Songtext gefunden")
-            } else { text = "Kein Songtext gefunden" }
+        .task(id: player.current?.id) { await load() }
+    }
+
+    private func load() async {
+        hasSynced = false; lines = []; plain = "Lade Songtext…"
+        guard let t = player.current else { plain = "Kein Song"; return }
+        guard let ly = try? await app.api.lyrics(title: t.name, artist: t.artist, duration: Int(t.durationSec)) else {
+            plain = "Kein Songtext gefunden"; return
         }
+        if let synced = ly.synced, !synced.isEmpty {
+            let parsed = parseLRC(synced)
+            if parsed.count > 2 { lines = parsed; hasSynced = true; return }
+        }
+        plain = (ly.lyrics?.isEmpty == false) ? ly.lyrics! :
+                (ly.instrumental == true ? "🎵 Instrumental" : "Kein Songtext gefunden")
+    }
+
+    /// LRC parsen: [mm:ss.xx] Text  (mehrere Stamps pro Zeile moeglich).
+    private func parseLRC(_ lrc: String) -> [(t: Double, s: String)] {
+        var out: [(Double, String)] = []
+        for raw in lrc.split(separator: "\n") {
+            var rest = String(raw)
+            var stamps: [Double] = []
+            while rest.hasPrefix("[") {
+                guard let close = rest.firstIndex(of: "]") else { break }
+                let tag = String(rest[rest.index(after: rest.startIndex)..<close])
+                rest = String(rest[rest.index(after: close)...])
+                let parts = tag.split(separator: ":")
+                if parts.count == 2, let m = Double(parts[0]), let s = Double(parts[1]) {
+                    stamps.append(m * 60 + s)
+                }
+            }
+            let txt = rest.trimmingCharacters(in: .whitespaces)
+            for st in stamps { out.append((st, txt)) }
+        }
+        return out.sorted { $0.0 < $1.0 }.map { (t: $0.0, s: $0.1) }
     }
 }
 

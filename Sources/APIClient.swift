@@ -80,6 +80,27 @@ final class APIClient: ObservableObject {
         return try JSONDecoder().decode(T.self, from: d)
     }
 
+    // MARK: - Cross-Device-Sync (/api/sync/*)
+    func syncPushState(_ snapshot: [String: Any]) async {
+        _ = try? await data("/api/sync/state", method: "POST", json: snapshot)
+    }
+    func syncGetState() async -> RemoteState? {
+        guard let d = try? await data("/api/sync/state") else { return nil }
+        return (try? JSONDecoder().decode(SyncStateResponse.self, from: d))?.state
+    }
+    func syncSendCommand(_ cmd: String, value: Any? = nil, target: String?, fromID: String) async {
+        var body: [String: Any] = ["cmd": cmd, "from_device_id": fromID]
+        if let value { body["value"] = value }
+        if let target { body["target_device_id"] = target }
+        _ = try? await data("/api/sync/command", method: "POST", json: body)
+    }
+    func syncGetCommands(deviceID: String) async -> [[String: Any]] {
+        guard let d = try? await data("/api/sync/commands?device_id=\(enc(deviceID))"),
+              let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
+              let cmds = obj["commands"] as? [[String: Any]] else { return [] }
+        return cmds
+    }
+
     // MARK: - Endpoints
     func profiles() async throws -> [Profile] {
         let r: ProfilesResponse = try await get("/api/profiles")
