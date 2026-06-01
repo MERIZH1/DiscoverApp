@@ -106,6 +106,15 @@ final class APIClient: ObservableObject {
         try await get("/api/artist/\(enc(uri))")
     }
 
+    /// YouTube-VideoId fuer einen Track (fuer "YouTube-Link teilen").
+    func ytVideoId(for track: Track) async -> String? {
+        let body: [String: Any] = ["spotify_uri": track.uri, "name": track.name,
+                                   "artist": track.artist, "duration_ms": track.duration_ms ?? 0]
+        guard let d = try? await data("/api/yt/lookup", method: "POST", json: body),
+              let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return nil }
+        return obj["videoId"] as? String
+    }
+
     /// Vorladen wie PWA: Tracks zu YT matchen (/api/yt/bulk-lookup) + erste
     /// Stream-URLs vorwaermen (/api/yt/prewarm). Macht den 1. Klick instant.
     func prewarmPlaylist(_ tracks: [Track]) async {

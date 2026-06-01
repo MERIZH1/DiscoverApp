@@ -211,6 +211,7 @@ final class PlayerController: ObservableObject {
         guard queue.count > 1 else { return }
         let cur = current
         if wasOff {
+            if original.isEmpty || original.count != queue.count { original = queue }  // pre-Shuffle-Reihenfolge sichern
             queue = fisherYates(queue, anchor: cur)   // ON: laufenden Track als Anker, Rest mischen
             index = 0
         } else {

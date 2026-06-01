@@ -857,6 +857,99 @@ struct CardRows: View {
     }
 }
 
+// MARK: - Track-Optionen-Sheet (3 Icon-Buttons oben, Trennstrich, Liste)
+struct TrackOptionsSheet: View {
+    @EnvironmentObject var player: PlayerController
+    @EnvironmentObject var app: AppState
+    @EnvironmentObject var downloads: DownloadManager
+    @Environment(\.dismiss) private var dismiss
+    let track: Track
+    @State private var showShare = false
+    @State private var showArtist = false
+    @State private var showAlbum = false
+
+    private var artistURI: String? { track.artists?.first?.uri }
+    private var artistName: String { track.artists?.first?.name ?? track.artist }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Artwork(url: track.image, size: 48, corner: 4)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(track.name).font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.text).lineLimit(1)
+                    Text(track.artist).font(.system(size: 13)).foregroundStyle(Theme.sub).lineLimit(1)
+                }
+                Spacer()
+            }.padding()
+
+            HStack(spacing: 12) {
+                optIcon("square.and.arrow.up") { showShare = true }
+                optIcon("text.line.first.and.arrowtriangle.forward") { player.playNext(track); dismiss() }
+                optIcon("text.badge.plus") { player.addToQueue(track); dismiss() }
+                Spacer()
+            }.padding(.horizontal).padding(.bottom, 10)
+
+            Divider().background(Theme.input)
+
+            VStack(spacing: 0) {
+                optRow(downloads.isDownloaded(track.uri) ? "Aus Offline entfernen" : "Herunterladen",
+                       downloads.isDownloaded(track.uri) ? "trash" : "arrow.down.circle") { downloads.toggle(track); dismiss() }
+                if artistURI != nil { optRow("Künstler anzeigen", "person") { showArtist = true } }
+                if track.album_uri != nil { optRow("Album anzeigen", "square.stack") { showAlbum = true } }
+                optRow("Song-Radio starten", "dot.radiowaves.left.and.right") { startRadio(); dismiss() }
+            }
+            Spacer()
+        }
+        .background(Theme.bg.ignoresSafeArea())
+        .presentationDetents([.medium])
+        .confirmationDialog("Teilen", isPresented: $showShare, titleVisibility: .visible) {
+            Button("Spotify-Link kopieren") { copySpotify() }
+            Button("YouTube-Link kopieren") { Task { await copyYouTube() } }
+        }
+        .sheet(isPresented: $showArtist) {
+            NavigationStack { if let u = artistURI { ArtistView(uri: u, name: artistName, image: track.image) } }
+        }
+        .sheet(isPresented: $showAlbum) {
+            NavigationStack { if let u = track.album_uri { TrackListView(uri: u, title: track.album ?? "Album", image: track.image, isAlbum: true) } }
+        }
+    }
+
+    @ViewBuilder private func optIcon(_ sys: String, _ act: @escaping () -> Void) -> some View {
+        Button(action: act) {
+            Image(systemName: sys).font(.system(size: 20)).foregroundStyle(Theme.text)
+                .frame(width: 58, height: 58).background(Theme.elev).clipShape(RoundedRectangle(cornerRadius: 12))
+        }.buttonStyle(.plain)
+    }
+    @ViewBuilder private func optRow(_ label: String, _ sys: String, _ act: @escaping () -> Void) -> some View {
+        Button(action: act) {
+            HStack(spacing: 16) {
+                Image(systemName: sys).frame(width: 24).foregroundStyle(Theme.sub)
+                Text(label).font(.system(size: 16)).foregroundStyle(Theme.text)
+                Spacer()
+            }.padding(.vertical, 13).padding(.horizontal).contentShape(Rectangle())
+        }.buttonStyle(.plain)
+    }
+    private func copySpotify() {
+        if let id = track.uri.split(separator: ":").last {
+            UIPasteboard.general.string = "https://open.spotify.com/track/\(id)"; Haptics.tap()
+        }
+        dismiss()
+    }
+    private func copyYouTube() async {
+        if let vid = await app.api.ytVideoId(for: track) {
+            UIPasteboard.general.string = "https://www.youtube.com/watch?v=\(vid)"; Haptics.tap()
+        }
+        dismiss()
+    }
+    private func startRadio() {
+        Task {
+            guard let r = try? await app.api.startRadio(track: track), r.ok, let puri = r.playlist_uri,
+                  let resp = try? await app.api.playlistTracks(puri) else { return }
+            player.play(tracks: resp.tracks)
+        }
+    }
+}
+
 // MARK: - Bibliothek
 struct LibraryView: View {
     @EnvironmentObject var app: AppState
@@ -1468,6 +1561,7 @@ struct EpisodeRow: View {
 
 struct NumberedTrackRow: View {
     let n: Int; let track: Track; var showCover: Bool = true; let playing: Bool; let tap: () -> Void
+    @State private var showOpts = false
     var body: some View {
         Button(action: tap) {
             HStack(spacing: 12) {
@@ -1483,16 +1577,15 @@ struct NumberedTrackRow: View {
                 if track.downloaded == true {
                     Image(systemName: "checkmark").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.accent)
                 }
-                Menu {
-                    TrackMenu(track: track)
-                } label: {
+                Button { showOpts = true } label: {
                     Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
                         .frame(width: 34, height: 34).contentShape(Rectangle())
-                }
+                }.buttonStyle(.plain)
             }.padding(.vertical, 9).padding(.horizontal).contentShape(Rectangle())
                 .background(playing ? Theme.accent.opacity(0.08) : .clear)
         }.buttonStyle(.plain)
-        .contextMenu { TrackMenu(track: track) }
+        .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in showOpts = true; Haptics.tap() })
+        .sheet(isPresented: $showOpts) { TrackOptionsSheet(track: track) }
     }
 }
 
@@ -1519,6 +1612,7 @@ struct RecRow: View {
 
 struct TrackRow: View {
     let track: Track; let playing: Bool; let tap: () -> Void
+    @State private var showOpts = false
     var body: some View {
         Button(action: tap) {
             HStack(spacing: 12) {
@@ -1532,15 +1626,14 @@ struct TrackRow: View {
                 if track.downloaded == true {
                     Image(systemName: "arrow.down.circle.fill").font(.system(size: 15)).foregroundStyle(Theme.accent.opacity(0.7))
                 }
-                Menu {
-                    TrackMenu(track: track)
-                } label: {
+                Button { showOpts = true } label: {
                     Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
                         .frame(width: 34, height: 34).contentShape(Rectangle())
-                }
+                }.buttonStyle(.plain)
             }.padding(.vertical, 9).padding(.horizontal).contentShape(Rectangle())
         }.buttonStyle(.plain)
-        .contextMenu { TrackMenu(track: track) }
+        .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in showOpts = true; Haptics.tap() })
+        .sheet(isPresented: $showOpts) { TrackOptionsSheet(track: track) }
     }
 }
 
