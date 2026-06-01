@@ -1,6 +1,17 @@
 import SwiftUI
 import UIKit
 
+// Wisch-zurueck-Geste IMMER erlauben — auch bei eigenem/verstecktem Back-Button.
+extension UINavigationController: UIGestureRecognizerDelegate {
+    open override func viewDidLoad() {
+        super.viewDidLoad()
+        interactivePopGestureRecognizer?.delegate = self
+    }
+    public func gestureRecognizerShouldBegin(_ g: UIGestureRecognizer) -> Bool {
+        viewControllers.count > 1
+    }
+}
+
 // MARK: - Haptik
 enum Haptics {
     static func tap(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .light) {
@@ -211,13 +222,21 @@ struct HomeView: View {
             )
             .navigationBarHidden(true)
             .navigationDestination(for: HomeItem.self) { item in
-                TrackListView(uri: item.uri, title: item.name, image: item.image, isAlbum: item.type == "album")
+                if (item.type ?? "") == "show" || item.uri.contains(":show:") {
+                    PodcastView(uri: item.uri, title: item.name, image: item.image)
+                } else {
+                    TrackListView(uri: item.uri, title: item.name, image: item.image, isAlbum: item.type == "album")
+                }
             }
         }
         .sheet(isPresented: $showAccount) { AccountSheet() }
         .task {
-            if home == nil { home = try? await app.api.home() }
-            if recents.isEmpty { recents = (try? await app.api.recents()) ?? [] }
+            // 1) Cache sofort zeigen
+            if home == nil { home = app.cacheGet("home", HomeResponse.self) }
+            if recents.isEmpty { recents = app.cacheGet("recents", [HomeItem].self) ?? [] }
+            // 2) Frisch nachladen + Cache aktualisieren (taucht beim Zurueckkommen auf)
+            if let h = try? await app.api.home() { home = h; app.cacheSet("home", h) }
+            if let r = try? await app.api.recents() { recents = r; app.cacheSet("recents", r) }
         }
     }
 }
@@ -764,7 +783,7 @@ struct LibraryView: View {
                                                 contextName: e.context_name ?? "", contextURI: e.context_uri ?? "")
                                 } label: { HistoryEntryRow(entry: e) }.buttonStyle(.plain)
                             } else {
-                                NavigationLink(value: Playlist(uri: e.uri, name: e.name, image: e.image)) {
+                                NavigationLink(value: HomeItem(uri: e.uri, name: e.name, image: e.image, sub: e.context_name, type: e.kind)) {
                                     HistoryEntryRow(entry: e)
                                 }.buttonStyle(.plain)
                             }
@@ -785,7 +804,11 @@ struct LibraryView: View {
                 TrackListView(uri: pl.uri, title: pl.name, image: pl.image, isAlbum: false)
             }
             .navigationDestination(for: HomeItem.self) { it in
-                TrackListView(uri: it.uri, title: it.name, image: it.image, isAlbum: it.type == "album")
+                if (it.type ?? "") == "show" || it.uri.contains(":show:") {
+                    PodcastView(uri: it.uri, title: it.name, image: it.image)
+                } else {
+                    TrackListView(uri: it.uri, title: it.name, image: it.image, isAlbum: it.type == "album")
+                }
             }
             .refreshable { await load() }
         }
@@ -795,8 +818,10 @@ struct LibraryView: View {
         }
     }
     private func load() async {
+        // Cache sofort
+        if playlists.isEmpty { playlists = app.cacheGet("playlists", [Playlist].self) ?? [] }
         // Sequenziell (nicht parallel) — vermeidet gleichzeitige Spotify-Token-Fetches
-        if let p = try? await app.api.playlists() { playlists = p }
+        if let p = try? await app.api.playlists() { playlists = p; app.cacheSet("playlists", p) }
         if let s = try? await app.api.subscriptions() {
             subs = Set(s.map { $0.uri })
             subSync = Dictionary(s.compactMap { i in i.last_sync.map { (i.uri, $0) } }) { a, _ in a }
@@ -1018,6 +1043,97 @@ struct TrackListView: View {
             tracks = t; loading = false
         }
         .task(id: reload) { recs = (try? await app.api.recommendations(uri)) ?? [] }
+    }
+}
+
+// MARK: - Podcast
+struct PodcastView: View {
+    @EnvironmentObject var app: AppState
+    @EnvironmentObject var player: PlayerController
+    @Environment(\.dismiss) private var dismiss
+    let uri: String; let title: String; let image: String?
+    @State private var resp: PodcastResponse?
+    @State private var loading = true
+    @State private var hero: Color = Theme.elev
+
+    private var showName: String { resp?.show?.name ?? title }
+    private var showImage: String? { resp?.show?.image ?? image }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                VStack(spacing: 12) {
+                    Artwork(url: showImage, size: 180, corner: 8).shadow(color: .black.opacity(0.5), radius: 24, y: 8).padding(.top, 12)
+                    Text(showName).font(.system(size: 22, weight: .black)).foregroundStyle(Theme.text)
+                        .multilineTextAlignment(.center).padding(.horizontal)
+                    if let pub = resp?.show?.publisher, !pub.isEmpty {
+                        Text(pub).font(.system(size: 13)).foregroundStyle(Theme.sub)
+                    }
+                    Text("\(resp?.episodes.count ?? 0) Folgen").font(.system(size: 13)).foregroundStyle(Theme.sub)
+                }.frame(maxWidth: .infinity).padding(.bottom, 16)
+                .background(LinearGradient(stops: [
+                    .init(color: hero, location: 0), .init(color: hero, location: 0.3),
+                    .init(color: Theme.bg, location: 0.95)], startPoint: .top, endPoint: .bottom))
+
+                LazyVStack(spacing: 0) {
+                    ForEach(resp?.episodes ?? []) { ep in
+                        EpisodeRow(ep: ep, playing: player.current?.uri == ep.uri) {
+                            player.play(tracks: [ep.track(podcast: showName, fallbackImage: showImage)],
+                                        contextName: showName, contextURI: uri)
+                        }
+                    }
+                }.padding(.top, 6)
+                Color.clear.frame(height: 130)
+            }
+        }
+        .scrollContentBackground(.hidden).background(Theme.bg)
+        .navigationTitle("").navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbar { ToolbarItem(placement: .topBarLeading) {
+            Button { dismiss() } label: { Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text) }
+        } }
+        .overlay { if loading { ProgressView().tint(Theme.accent) } }
+        .task {
+            loading = true
+            let absImg = image.flatMap { app.api.absoluteURL($0)?.absoluteString } ?? image
+            if let c = await averageColor(absImg) { hero = c }
+            resp = try? await app.api.podcast(uri)
+            loading = false
+        }
+    }
+}
+
+struct EpisodeRow: View {
+    let ep: Episode; let playing: Bool; let tap: () -> Void
+    private var durText: String {
+        let s = (ep.duration_ms ?? 0) / 1000
+        let h = s / 3600, m = (s % 3600) / 60
+        return h > 0 ? "\(h) Std. \(m) Min." : "\(m) Min."
+    }
+    var body: some View {
+        Button(action: tap) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .top, spacing: 12) {
+                    Artwork(url: ep.image, size: 56, corner: 6)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(ep.name).font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(playing ? Theme.accent : Theme.text).lineLimit(2)
+                        if let d = ep.description, !d.isEmpty {
+                            Text(d).font(.system(size: 13)).foregroundStyle(Theme.sub).lineLimit(2)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
+                HStack(spacing: 12) {
+                    Image(systemName: "play.circle.fill").font(.system(size: 30))
+                        .foregroundStyle(playing ? Theme.accent : Theme.text)
+                    Text(durText).font(.system(size: 12)).foregroundStyle(Theme.sub)
+                    Spacer()
+                }
+            }.padding(.vertical, 12).padding(.horizontal).contentShape(Rectangle())
+        }.buttonStyle(.plain)
+        .overlay(Rectangle().fill(Theme.input).frame(height: 0.5), alignment: .bottom)
     }
 }
 

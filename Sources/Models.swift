@@ -131,6 +131,30 @@ struct SearchResponse: Codable {
     let artists: [Card]?
 }
 
+// MARK: - Podcast
+struct Episode: Codable, Identifiable, Hashable {
+    var id: String { uri }
+    let uri: String
+    let name: String
+    let description: String?
+    let image: String?
+    let duration_ms: Int?
+    func track(podcast: String, fallbackImage: String?) -> Track {
+        Track(uri: uri, name: name, artist: podcast, image: image ?? fallbackImage)
+    }
+}
+struct PodcastShow: Codable, Hashable {
+    let uri: String?
+    let name: String?
+    let image: String?
+    let description: String?
+    let publisher: String?
+}
+struct PodcastResponse: Codable {
+    let show: PodcastShow?
+    let episodes: [Episode]
+}
+
 // MARK: - Radio
 struct RadioStation: Codable, Identifiable, Hashable {
     let id: String

@@ -45,6 +45,18 @@ final class AppState: ObservableObject {
         }
     }
 
+    // MARK: - Cache (profil-spezifisch, persistent)
+    private func cacheKey(_ name: String) -> String { "cache_\(name)_\(profileId)" }
+    func cacheGet<T: Decodable>(_ name: String, _ type: T.Type) -> T? {
+        guard let d = UserDefaults.standard.data(forKey: cacheKey(name)) else { return nil }
+        return try? JSONDecoder().decode(T.self, from: d)
+    }
+    func cacheSet<T: Encodable>(_ name: String, _ value: T) {
+        if let d = try? JSONEncoder().encode(value) {
+            UserDefaults.standard.set(d, forKey: cacheKey(name))
+        }
+    }
+
     /// Auf einen gespeicherten Server wechseln (lädt neu, Profil neu waehlen).
     func switchServer(_ url: String) async {
         player.pause()
