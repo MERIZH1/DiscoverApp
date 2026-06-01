@@ -25,6 +25,7 @@ final class AppState: ObservableObject {
 
     init() {
         let a = APIClient(baseURL: UserDefaults.standard.string(forKey: "serverURL") ?? "")
+        a.profileId = UserDefaults.standard.string(forKey: "profileId")   // fuer Siri-Start vor restore()
         self.api = a
         self.player = PlayerController(api: a)
     }

@@ -23,6 +23,10 @@ struct ContentView: View {
         .task {
             DiscoverServices.app = app   // fuer Siri/Kurzbefehle
             await app.restore()
+            if let t = PendingPlay.track {   // per Siri kalt gestartet
+                app.player.play(tracks: [t], contextName: "Siri", contextURI: "")
+                PendingPlay.track = nil
+            }
             try? await Task.sleep(nanoseconds: 500_000_000)   // kurze Mindestanzeige
             withAnimation(.easeOut(duration: 0.4)) { booting = false }
         }
