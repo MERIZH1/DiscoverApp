@@ -1766,7 +1766,7 @@ struct QueuePage: View {
                             QueueRow(track: t, playing: false)
                                 .listRowBackground(Color.clear).listRowSeparator(.hidden)
                                 .contentShape(Rectangle())
-                                .onTapGesture { player.playAt(player.index + 1 + i) }
+                                .onTapGesture { player.playUpNext(i) }
                                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                     Button(role: .destructive) { player.removeUpNext(at: i) } label: {
                                         Label("Entfernen", systemImage: "trash")
