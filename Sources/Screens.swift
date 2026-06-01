@@ -1926,6 +1926,7 @@ struct PlayerView: View {
     @State private var page = 0
     @State private var scrollToLyrics = false
     @State private var hero: Color = Theme.elev
+    @State private var showAddPlaylist = false
 
     var body: some View {
         let p = player
@@ -1962,7 +1963,7 @@ struct PlayerView: View {
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle((p.sleepRemaining > 0 || p.sleepAtEnd) ? Theme.accent : Theme.text)
                     }.padding(.trailing, 14)
-                    Menu { if let t = p.current { TrackMenu(track: t) } } label: {
+                    Menu { if let t = p.current { TrackMenu(track: t, onAddToPlaylist: { showAddPlaylist = true }) } } label: {
                         Image(systemName: "ellipsis").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
                     }.disabled(p.current == nil)
                 }.padding(.horizontal, 4).padding(.top, 8)
@@ -2073,6 +2074,7 @@ struct PlayerView: View {
             .tabViewStyle(.page(indexDisplayMode: .never))
         }
         .presentationDragIndicator(.hidden)
+        .sheet(isPresented: $showAddPlaylist) { if let t = player.current { AddToPlaylistSheet(track: t) } }
         .task(id: player.displayImage) { if let c = await averageColor(player.displayImage) { hero = c } }
     }
     private func fmt(_ s: Double) -> String {
