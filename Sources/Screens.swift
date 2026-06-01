@@ -157,21 +157,30 @@ struct TrackMenu: View {
     let track: Track
     var onShowArtist: (() -> Void)? = nil
     var onShowAlbum: (() -> Void)? = nil
+    var onAddToPlaylist: (() -> Void)? = nil
     // WICHTIG: NICHT beobachten (kein @EnvironmentObject), sonst zeichnet das
     // offene Menue bei jedem Player-Tick neu (Flackern). Referenz nur lesen.
     private var app: AppState? { DiscoverServices.app }
 
+    private var spotifyURL: URL? {
+        guard let id = track.uri.split(separator: ":").last else { return nil }
+        return URL(string: "https://open.spotify.com/track/\(id)")
+    }
+
     var body: some View {
-        // Quick-Actions als Icon-Reihe oben (wie Ausschneiden/Kopieren/Einsetzen)
+        // Quick-Actions als Icon-Reihe oben — alle drei sind Controls (ShareLink + Buttons)
+        // -> ControlGroup rendert sie gleich gross. ShareLink = natives Teilen-Menue.
         ControlGroup {
-            Menu {
-                Button { copySpotify() } label: { Label("Spotify-Link kopieren", systemImage: "link") }
-                Button { Task { await copyYouTube() } } label: { Label("YouTube-Link kopieren", systemImage: "play.rectangle") }
-            } label: { Label("Teilen", systemImage: "square.and.arrow.up") }
+            ShareLink(item: spotifyURL ?? URL(string: "https://open.spotify.com")!) {
+                Label("Teilen", systemImage: "square.and.arrow.up")
+            }
             Button { app?.player.playNext(track); Haptics.tap() } label: { Label("Als Nächstes", systemImage: "text.line.first.and.arrowtriangle.forward") }
             Button { app?.player.addToQueue(track); Haptics.tap() } label: { Label("Warteschlange", systemImage: "text.badge.plus") }
         }
         // restliche Optionen als Liste darunter
+        if let onAdd = onAddToPlaylist {
+            Button { onAdd() } label: { Label("Zu Playlist hinzufügen", systemImage: "plus.circle") }
+        }
         Button { app?.downloads.toggle(track) } label: {
             let dl = app?.downloads.isDownloaded(track.uri) ?? false
             Label(dl ? "Aus Offline entfernen" : "Herunterladen", systemImage: dl ? "trash" : "arrow.down.circle")
@@ -183,11 +192,7 @@ struct TrackMenu: View {
             Button { onAlbum() } label: { Label("Album anzeigen", systemImage: "square.stack") }
         }
         Button { startRadio() } label: { Label("Song-Radio starten", systemImage: "dot.radiowaves.left.and.right") }
-    }
-    private func copySpotify() {
-        if let id = track.uri.split(separator: ":").last {
-            UIPasteboard.general.string = "https://open.spotify.com/track/\(id)"; Haptics.tap()
-        }
+        Button { Task { await copyYouTube() } } label: { Label("YouTube-Link kopieren", systemImage: "play.rectangle") }
     }
     private func copyYouTube() async {
         guard let api = app?.api else { return }
@@ -342,11 +347,8 @@ struct HomeRow: View {
     let items: [HomeItem]
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(title).font(.system(size: 22, weight: .heavy)).foregroundStyle(Theme.text)
-                Spacer()
-                Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.sub)
-            }.padding(.horizontal)
+            Text(title).font(.system(size: 22, weight: .heavy)).foregroundStyle(Theme.text)
+                .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal)
             if let s = subtitle, !s.isEmpty {
                 Text(s).font(.system(size: 13)).foregroundStyle(Theme.sub)
                     .lineLimit(2).padding(.horizontal)
@@ -918,6 +920,7 @@ private struct TrackNavSheets: ViewModifier {
     let track: Track
     @Binding var showArtist: Bool
     @Binding var showAlbum: Bool
+    @Binding var showAddPlaylist: Bool
     func body(content: Content) -> some View {
         content
             .sheet(isPresented: $showArtist) {
@@ -934,11 +937,99 @@ private struct TrackNavSheets: ViewModifier {
                     }
                 }
             }
+            .sheet(isPresented: $showAddPlaylist) { AddToPlaylistSheet(track: track) }
     }
 }
 extension View {
-    func trackNavSheets(track: Track, showArtist: Binding<Bool>, showAlbum: Binding<Bool>) -> some View {
-        modifier(TrackNavSheets(track: track, showArtist: showArtist, showAlbum: showAlbum))
+    func trackNavSheets(track: Track, showArtist: Binding<Bool>, showAlbum: Binding<Bool>, showAddPlaylist: Binding<Bool>) -> some View {
+        modifier(TrackNavSheets(track: track, showArtist: showArtist, showAlbum: showAlbum, showAddPlaylist: showAddPlaylist))
+    }
+}
+
+// MARK: - "Zu Playlist hinzufügen" — Auswahl-Sheet
+struct AddToPlaylistSheet: View {
+    let track: Track
+    @EnvironmentObject var app: AppState
+    @Environment(\.dismiss) private var dismiss
+    @State private var playlists: [Playlist] = []
+    @State private var filter = ""
+    @State private var newName = ""
+    @State private var showNew = false
+    @State private var status = ""
+    private var shown: [Playlist] {
+        let base = playlists.filter { $0.uri.hasPrefix("spotify:playlist:") }
+        return filter.isEmpty ? base : base.filter { $0.name.localizedCaseInsensitiveContains(filter) }
+    }
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    Artwork(url: track.image, size: 44, corner: 4)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(track.name).font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.text).lineLimit(1)
+                        Text(track.artist).font(.system(size: 13)).foregroundStyle(Theme.sub).lineLimit(1)
+                    }
+                    Spacer()
+                }.padding()
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(Theme.mute)
+                    TextField("Playlist suchen…", text: $filter).foregroundStyle(Theme.text)
+                        .autocorrectionDisabled()
+                }.padding(10).background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8)).padding(.horizontal)
+                Button { newName = ""; showNew = true } label: {
+                    HStack(spacing: 14) {
+                        Image(systemName: "plus").font(.system(size: 18, weight: .semibold))
+                            .frame(width: 44, height: 44).background(Theme.input)
+                            .clipShape(RoundedRectangle(cornerRadius: 6)).foregroundStyle(Theme.text)
+                        Text("Neue Playlist").font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
+                        Spacer()
+                    }.padding(.horizontal).padding(.vertical, 8).contentShape(Rectangle())
+                }.buttonStyle(.plain)
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(shown) { pl in
+                            Button { Task { await doAdd(pl.uri, pl.name) } } label: {
+                                HStack(spacing: 12) {
+                                    Artwork(url: pl.image, size: 44, corner: 4)
+                                    Text(pl.name).font(.system(size: 16)).foregroundStyle(Theme.text).lineLimit(1)
+                                    Spacer()
+                                }.padding(.horizontal).padding(.vertical, 6).contentShape(Rectangle())
+                            }.buttonStyle(.plain)
+                        }
+                    }.padding(.top, 4)
+                }
+            }
+            .background(Theme.bg)
+            .navigationTitle("Zu Playlist hinzufügen").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Abbrechen") { dismiss() }.foregroundStyle(Theme.accent) } }
+            .alert("Neue Playlist", isPresented: $showNew) {
+                TextField("Name", text: $newName)
+                Button("Erstellen") { createAndAdd() }
+                Button("Abbrechen", role: .cancel) {}
+            }
+            .overlay(alignment: .bottom) {
+                if !status.isEmpty {
+                    Text(status).font(.system(size: 14, weight: .semibold)).foregroundStyle(.black)
+                        .padding(.horizontal, 18).padding(.vertical, 10)
+                        .background(Theme.accent).clipShape(Capsule()).padding(.bottom, 30)
+                }
+            }
+        }
+        .task { playlists = (try? await app.api.playlists()) ?? [] }
+    }
+    private func doAdd(_ uri: String, _ name: String) async {
+        let ok = await app.api.addTrack(playlistURI: uri, track: track, playlistName: name)
+        status = ok ? "Hinzugefügt ✓" : "Fehler – erneut versuchen"
+        Haptics.tap()
+        try? await Task.sleep(nanoseconds: 800_000_000)
+        if ok { dismiss() } else { status = "" }
+    }
+    private func createAndAdd() {
+        let n = newName.trimmingCharacters(in: .whitespaces); guard !n.isEmpty else { return }
+        Task {
+            guard let uri = await app.api.createPlaylist(name: n) else { status = "Fehler beim Erstellen"; return }
+            await doAdd(uri, n)
+        }
     }
 }
 
@@ -1658,6 +1749,7 @@ struct NumberedTrackRow: View {
     let n: Int; let track: Track; var showCover: Bool = true; let playing: Bool; let tap: () -> Void
     @State private var showArtist = false
     @State private var showAlbum = false
+    @State private var showAddPlaylist = false
     var body: some View {
         HStack(spacing: 12) {
             Text("\(n)").font(.system(size: 14).monospacedDigit()).foregroundStyle(playing ? Theme.accent : Theme.sub)
@@ -1673,7 +1765,7 @@ struct NumberedTrackRow: View {
                 Image(systemName: "checkmark").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.accent)
             }
             Menu {
-                TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true })
+                TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true })
             } label: {
                 Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
                     .frame(width: 46, height: 46).contentShape(Rectangle())
@@ -1682,8 +1774,8 @@ struct NumberedTrackRow: View {
             .background(playing ? Theme.accent.opacity(0.08) : .clear)
             .contentShape(Rectangle())
             .onTapGesture(perform: tap)
-            .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }) }
-            .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum)
+            .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }) }
+            .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum, showAddPlaylist: $showAddPlaylist)
     }
 }
 
@@ -1712,6 +1804,7 @@ struct TrackRow: View {
     let track: Track; let playing: Bool; let tap: () -> Void
     @State private var showArtist = false
     @State private var showAlbum = false
+    @State private var showAddPlaylist = false
     var body: some View {
         HStack(spacing: 12) {
             Artwork(url: track.image, size: 52, corner: 4)
@@ -1725,7 +1818,7 @@ struct TrackRow: View {
                 Image(systemName: "arrow.down.circle.fill").font(.system(size: 15)).foregroundStyle(Theme.accent.opacity(0.7))
             }
             Menu {
-                TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true })
+                TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true })
             } label: {
                 Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
                     .frame(width: 46, height: 46).contentShape(Rectangle())
@@ -1733,8 +1826,8 @@ struct TrackRow: View {
         }.padding(.vertical, 9).padding(.horizontal)
             .contentShape(Rectangle())
             .onTapGesture(perform: tap)
-            .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }) }
-            .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum)
+            .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }) }
+            .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum, showAddPlaylist: $showAddPlaylist)
     }
 }
 

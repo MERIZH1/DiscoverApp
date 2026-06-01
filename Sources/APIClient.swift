@@ -161,6 +161,23 @@ final class APIClient: ObservableObject {
         return (obj["ok"] as? Bool) ?? false
     }
 
+    /// Neue (leere) Spotify-Playlist anlegen -> uri.
+    func createPlaylist(name: String) async -> String? {
+        guard let d = try? await data("/api/playlist/create", method: "POST", json: ["name": name]),
+              let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
+              (obj["ok"] as? Bool) == true else { return nil }
+        return obj["uri"] as? String
+    }
+
+    /// Bestehende Playlist (z.B. Vorschlag) in die eigene Bibliothek uebernehmen (abonnieren).
+    func importPlaylist(uri: String) async -> Bool {
+        let id = uri.split(separator: ":").last.map(String.init) ?? uri
+        let url = uri.hasPrefix("http") ? uri : "https://open.spotify.com/playlist/\(id)"
+        guard let d = try? await data("/api/import-playlist", method: "POST", json: ["url": url]),
+              let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return false }
+        return (obj["ok"] as? Bool) ?? false
+    }
+
     func search(_ query: String) async throws -> SearchResponse {
         try await get("/api/search?q=\(enc(query))")
     }
