@@ -1275,6 +1275,8 @@ struct TrackListView: View {
                 if let alt = alt?.tracks, !alt.isEmpty { t = alt }
             }
             tracks = t; loading = false
+            let warm = t
+            Task { await app.api.prewarmPlaylist(warm) }   // Server-Vorladen wie PWA
         }
         .task(id: reload) { recs = (try? await app.api.recommendations(uri)) ?? [] }
     }
@@ -1539,11 +1541,6 @@ struct PlayerView: View {
                 }.padding(.horizontal, 4).padding(.top, 8)
                 Spacer()
                 Artwork(url: p.displayImage, size: 300, corner: 12).shadow(radius: 24)
-                    .gesture(DragGesture(minimumDistance: 30).onEnded { v in
-                        if v.translation.height < -60 && abs(v.translation.width) < 60 {
-                            withAnimation(.easeInOut(duration: 0.28)) { showLyrics = true }
-                        }
-                    })
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(p.displayTitle).font(.title2.bold()).foregroundStyle(Theme.text).lineLimit(1)
@@ -1631,14 +1628,19 @@ struct PlayerView: View {
               QueuePage(page: $page).tag(1)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
-        }
-        .presentationDragIndicator(.hidden)
-        .overlay {
             if showLyrics {
                 LyricsView(onClose: { withAnimation(.easeInOut(duration: 0.25)) { showLyrics = false } })
-                    .transition(.move(edge: .bottom))
+                    .zIndex(10).transition(.move(edge: .bottom))
             }
         }
+        .presentationDragIndicator(.hidden)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 25).onEnded { v in
+                if page == 0 && !showLyrics && v.translation.height < -55 && abs(v.translation.width) < 90 {
+                    withAnimation(.easeInOut(duration: 0.28)) { showLyrics = true }
+                }
+            }
+        )
         .task(id: player.displayImage) { if let c = await averageColor(player.displayImage) { hero = c } }
     }
     private func fmt(_ s: Double) -> String {

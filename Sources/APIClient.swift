@@ -102,6 +102,25 @@ final class APIClient: ObservableObject {
         try await get("/api/album/\(enc(uri))")
     }
 
+    /// Vorladen wie PWA: Tracks zu YT matchen (/api/yt/bulk-lookup) + erste
+    /// Stream-URLs vorwaermen (/api/yt/prewarm). Macht den 1. Klick instant.
+    func prewarmPlaylist(_ tracks: [Track]) async {
+        let payload = tracks.prefix(30)
+            .filter { $0.uri.hasPrefix("spotify:track:") }
+            .map { t -> [String: Any] in
+                ["spotify_uri": t.uri, "name": t.name, "artist": t.artist,
+                 "album": t.album ?? "", "duration_ms": t.duration_ms ?? 0]
+            }
+        guard !payload.isEmpty,
+              let d = try? await data("/api/yt/bulk-lookup", method: "POST", json: ["tracks": payload]),
+              let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
+              let results = obj["results"] as? [[String: Any]] else { return }
+        let videoIds = results.prefix(3).compactMap { $0["videoId"] as? String }
+        if !videoIds.isEmpty {
+            _ = try? await data("/api/yt/prewarm", method: "POST", json: ["videoIds": Array(videoIds)])
+        }
+    }
+
     /// "Discover": Empfehlungen basierend auf einer Playlist/einem Album.
     /// skip = bereits gezeigte Track-IDs (fuer "Mehr laden").
     func recommendations(_ uri: String, n: Int = 15, skip: [String] = []) async throws -> [Track] {
