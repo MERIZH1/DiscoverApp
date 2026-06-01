@@ -91,6 +91,11 @@ final class APIClient: ObservableObject {
         try await get("/api/album/\(enc(uri))")
     }
 
+    /// "Discover": Empfehlungen basierend auf einer Playlist/einem Album.
+    func recommendations(_ uri: String, n: Int = 15) async throws -> [Track] {
+        try await get("/api/recommendations/\(enc(uri))?n=\(n)")
+    }
+
     func search(_ query: String) async throws -> SearchResponse {
         try await get("/api/search?q=\(enc(query))")
     }

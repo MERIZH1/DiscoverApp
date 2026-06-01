@@ -797,6 +797,7 @@ struct TrackListView: View {
     @EnvironmentObject var player: PlayerController
     let uri: String; let title: String; let image: String?; let isAlbum: Bool
     @State private var tracks: [Track] = []
+    @State private var recs: [Track] = []
     @State private var loading = true
     @State private var hero: Color = Theme.elev
 
@@ -852,7 +853,23 @@ struct TrackListView: View {
                             player.shuffle = false; player.play(tracks: tracks, startAt: idx)
                         }
                     }
-                }.padding(.bottom, 130).padding(.top, 6)
+                }.padding(.top, 6)
+
+                // Empfehlungen ("Discover")
+                if !recs.isEmpty {
+                    VStack(alignment: .leading, spacing: 2) {
+                        SectionHeader("Empfehlungen")
+                        Text(isAlbum ? "Aehnliche Songs" : "Basierend auf dieser Playlist")
+                            .font(.system(size: 13)).foregroundStyle(Theme.sub)
+                            .padding(.horizontal).padding(.bottom, 4)
+                        ForEach(Array(recs.enumerated()), id: \.offset) { i, t in
+                            TrackRow(track: t, playing: player.current?.id == t.id) {
+                                player.shuffle = false; player.play(tracks: recs, startAt: i)
+                            }
+                        }
+                    }.padding(.top, 14)
+                }
+                Color.clear.frame(height: 130)
             }
         }
         .scrollContentBackground(.hidden).background(Theme.bg)
@@ -863,9 +880,15 @@ struct TrackListView: View {
             loading = true
             let absImg = image.flatMap { app.api.absoluteURL($0)?.absoluteString } ?? image
             if let c = await averageColor(absImg) { hero = c }
-            let resp = isAlbum ? try? await app.api.albumTracks(uri) : try? await app.api.playlistTracks(uri, check: true)
-            tracks = resp?.tracks ?? []; loading = false
+            var t = (isAlbum ? try? await app.api.albumTracks(uri) : try? await app.api.playlistTracks(uri, check: true))?.tracks ?? []
+            // Fallback: History-Items sind manchmal falsch klassifiziert (Album<->Playlist)
+            if t.isEmpty {
+                let alt = isAlbum ? try? await app.api.playlistTracks(uri, check: true) : try? await app.api.albumTracks(uri)
+                if let alt = alt?.tracks, !alt.isEmpty { t = alt }
+            }
+            tracks = t; loading = false
         }
+        .task { recs = (try? await app.api.recommendations(uri)) ?? [] }
     }
 }
 
@@ -977,7 +1000,6 @@ struct PlayerView: View {
             LinearGradient(colors: [hero.opacity(0.85), Theme.bg], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
             TabView(selection: $page) {
               VStack(spacing: 22) {
-                Capsule().fill(Theme.mute).frame(width: 38, height: 5).padding(.top, 8)
                 Spacer()
                 Artwork(url: p.displayImage, size: 300, corner: 12).shadow(radius: 24)
                 VStack(spacing: 6) {

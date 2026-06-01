@@ -81,7 +81,7 @@ struct Track: Codable, Identifiable, Hashable {
     var durationSec: Double { Double(duration_ms ?? 0) / 1000.0 }
 
     enum CodingKeys: String, CodingKey {
-        case uri, name, artist, artists, album, album_uri, image, duration_ms, downloaded
+        case uri, name, artist, artists, album, album_uri, image, duration_ms, downloaded, deezer_cover
     }
     init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self)
@@ -91,7 +91,9 @@ struct Track: Codable, Identifiable, Hashable {
         artists     = try? c.decode([ArtistRef].self, forKey: .artists)
         album       = try? c.decode(String.self, forKey: .album)
         album_uri   = try? c.decode(String.self, forKey: .album_uri)
-        image       = try? c.decode(String.self, forKey: .image)
+        // Empfehlungen liefern teils nur deezer_cover statt image
+        image       = (try? c.decode(String.self, forKey: .image))
+                      ?? (try? c.decode(String.self, forKey: .deezer_cover))
         duration_ms = try? c.decode(Int.self, forKey: .duration_ms)
         downloaded  = try? c.decode(Bool.self, forKey: .downloaded)
     }
