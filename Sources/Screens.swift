@@ -1297,12 +1297,11 @@ struct TrackListView: View {
     }
 
     var body: some View {
-        GeometryReader { geo in
         ScrollView {
             VStack(spacing: 0) {
                 // Hero
                 VStack(spacing: 14) {
-                    Artwork(url: image, size: 210, corner: 6).shadow(color: .black.opacity(0.6), radius: 30, y: 8).padding(.top, 12)
+                    Artwork(url: image, size: 210, corner: 6).shadow(color: .black.opacity(0.6), radius: 30, y: 8).padding(.top, 24)
                     Text(title).font(.system(size: 26, weight: .black)).foregroundStyle(Theme.text)
                         .multilineTextAlignment(.center).padding(.horizontal)
                     HStack(spacing: 5) {
@@ -1343,17 +1342,7 @@ struct TrackListView: View {
                         }
                     }.padding(.horizontal).padding(.top, 8)
                 }
-                .padding(.top, geo.safeAreaInsets.top + 24)   // Cover-Position + etwas Luft
                 .padding(.bottom, 16)
-                .background(
-                    LinearGradient(stops: [
-                        .init(color: hero, location: 0),
-                        .init(color: hero, location: 0.30),
-                        .init(color: hero.opacity(0.35), location: 0.62),
-                        .init(color: Theme.bg, location: 0.95)],
-                        startPoint: .top, endPoint: .bottom)
-                        .ignoresSafeArea(edges: .top)   // Gradient bis ganz nach oben (hinter die Notch)
-                )
                 // Tracks (nummeriert)
                 LazyVStack(spacing: 0) {
                     ForEach(Array(tracks.enumerated()), id: \.element.id) { idx, t in
@@ -1404,7 +1393,18 @@ struct TrackListView: View {
                 Color.clear.frame(height: 130)
             }
         }
-        .scrollContentBackground(.hidden).background(Theme.bg)
+        .scrollContentBackground(.hidden)
+        .background(
+            // Gradient als ScrollView-Hintergrund: bleedet hinter die Notch (kein Clipping);
+            // Cover bleibt korrekt unter der Toolbar, da die ScrollView die Safe-Area respektiert.
+            LinearGradient(stops: [
+                .init(color: hero, location: 0),
+                .init(color: hero, location: 0.16),
+                .init(color: hero.opacity(0.32), location: 0.34),
+                .init(color: Theme.bg, location: 0.52)],
+                startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
+        )
         .navigationTitle("").navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbarBackground(.hidden, for: .navigationBar)
@@ -1424,7 +1424,6 @@ struct TrackListView: View {
                 }
             }
         }
-        .ignoresSafeArea(edges: .top)   // ScrollView bis zur Notch -> Hero-Gradient bleedet hoch
         .overlay { if loading { ProgressView().tint(Theme.accent) } }
         .task(id: reload) {
             loading = true; tracks = []
@@ -1442,8 +1441,6 @@ struct TrackListView: View {
             Task { await app.api.prewarmPlaylist(warm) }   // Server-Vorladen wie PWA
         }
         .task(id: reload) { recs = (try? await app.api.recommendations(uri)) ?? [] }
-        }   // GeometryReader
-        .ignoresSafeArea(edges: .top)   // GeometryReader liefert so den echten safeAreaInsets.top
     }
 }
 
@@ -1544,31 +1541,31 @@ struct NumberedTrackRow: View {
     @State private var showArtist = false
     @State private var showAlbum = false
     var body: some View {
-        Button(action: tap) {
-            HStack(spacing: 12) {
-                Text("\(n)").font(.system(size: 14).monospacedDigit()).foregroundStyle(playing ? Theme.accent : Theme.sub)
-                    .frame(width: 24, alignment: .trailing)
-                if showCover { Artwork(url: track.image, size: 50, corner: 4) }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(track.name).font(.system(size: 16, weight: .regular))
-                        .foregroundStyle(playing ? Theme.accent : Theme.text).lineLimit(1)
-                    Text(track.artist).font(.system(size: 14)).foregroundStyle(Theme.sub).lineLimit(1)
-                }
-                Spacer()
-                if track.downloaded == true {
-                    Image(systemName: "checkmark").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.accent)
-                }
-                Menu {
-                    TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true })
-                } label: {
-                    Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
-                        .frame(width: 34, height: 34).contentShape(Rectangle())
-                }
-            }.padding(.vertical, 9).padding(.horizontal).contentShape(Rectangle())
-                .background(playing ? Theme.accent.opacity(0.08) : .clear)
-        }.buttonStyle(.plain)
-        .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }) }
-        .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum)
+        HStack(spacing: 12) {
+            Text("\(n)").font(.system(size: 14).monospacedDigit()).foregroundStyle(playing ? Theme.accent : Theme.sub)
+                .frame(width: 24, alignment: .trailing)
+            if showCover { Artwork(url: track.image, size: 50, corner: 4) }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(track.name).font(.system(size: 16, weight: .regular))
+                    .foregroundStyle(playing ? Theme.accent : Theme.text).lineLimit(1)
+                Text(track.artist).font(.system(size: 14)).foregroundStyle(Theme.sub).lineLimit(1)
+            }
+            Spacer()
+            if track.downloaded == true {
+                Image(systemName: "checkmark").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.accent)
+            }
+            Menu {
+                TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true })
+            } label: {
+                Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
+                    .frame(width: 34, height: 34).contentShape(Rectangle())
+            }
+        }.padding(.vertical, 9).padding(.horizontal)
+            .background(playing ? Theme.accent.opacity(0.08) : .clear)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: tap)
+            .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }) }
+            .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum)
     }
 }
 
@@ -1598,28 +1595,28 @@ struct TrackRow: View {
     @State private var showArtist = false
     @State private var showAlbum = false
     var body: some View {
-        Button(action: tap) {
-            HStack(spacing: 12) {
-                Artwork(url: track.image, size: 52, corner: 4)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(track.name).font(.system(size: 16))
-                        .foregroundStyle(playing ? Theme.accent : Theme.text).lineLimit(1)
-                    Text(track.artist).font(.system(size: 14)).foregroundStyle(Theme.sub).lineLimit(1)
-                }
-                Spacer()
-                if track.downloaded == true {
-                    Image(systemName: "arrow.down.circle.fill").font(.system(size: 15)).foregroundStyle(Theme.accent.opacity(0.7))
-                }
-                Menu {
-                    TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true })
-                } label: {
-                    Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
-                        .frame(width: 34, height: 34).contentShape(Rectangle())
-                }
-            }.padding(.vertical, 9).padding(.horizontal).contentShape(Rectangle())
-        }.buttonStyle(.plain)
-        .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }) }
-        .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum)
+        HStack(spacing: 12) {
+            Artwork(url: track.image, size: 52, corner: 4)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(track.name).font(.system(size: 16))
+                    .foregroundStyle(playing ? Theme.accent : Theme.text).lineLimit(1)
+                Text(track.artist).font(.system(size: 14)).foregroundStyle(Theme.sub).lineLimit(1)
+            }
+            Spacer()
+            if track.downloaded == true {
+                Image(systemName: "arrow.down.circle.fill").font(.system(size: 15)).foregroundStyle(Theme.accent.opacity(0.7))
+            }
+            Menu {
+                TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true })
+            } label: {
+                Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
+                    .frame(width: 34, height: 34).contentShape(Rectangle())
+            }
+        }.padding(.vertical, 9).padding(.horizontal)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: tap)
+            .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }) }
+            .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum)
     }
 }
 
