@@ -21,6 +21,7 @@ struct ContentView: View {
         .environmentObject(app)
         .environmentObject(app.player)
         .task {
+            DiscoverServices.app = app   // fuer Siri/Kurzbefehle
             await app.restore()
             try? await Task.sleep(nanoseconds: 500_000_000)   // kurze Mindestanzeige
             withAnimation(.easeOut(duration: 0.4)) { booting = false }
