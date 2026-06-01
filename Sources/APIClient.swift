@@ -169,13 +169,15 @@ final class APIClient: ObservableObject {
         return obj["uri"] as? String
     }
 
-    /// Bestehende Playlist (z.B. Vorschlag) in die eigene Bibliothek uebernehmen (abonnieren).
-    func importPlaylist(uri: String) async -> Bool {
-        let id = uri.split(separator: ":").last.map(String.init) ?? uri
-        let url = uri.hasPrefix("http") ? uri : "https://open.spotify.com/playlist/\(id)"
-        guard let d = try? await data("/api/import-playlist", method: "POST", json: ["url": url]),
-              let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return false }
-        return (obj["ok"] as? Bool) ?? false
+    /// Playlist als ECHTE eigene Kopie anlegen: neue Playlist + alle Songs (Spotify + Discover).
+    /// Gibt (uri, anzahl) zurueck.
+    func copyPlaylist(sourceURI: String, name: String) async -> (uri: String, count: Int)? {
+        guard let newURI = await createPlaylist(name: name) else { return nil }
+        guard let resp = try? await playlistTracks(sourceURI) else { return (newURI, 0) }
+        for t in resp.tracks where !t.uri.isEmpty {
+            _ = await addTrack(playlistURI: newURI, track: t, playlistName: name)
+        }
+        return (newURI, resp.tracks.count)
     }
 
     func search(_ query: String) async throws -> SearchResponse {

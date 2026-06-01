@@ -289,13 +289,16 @@ struct HomeView: View {
                         }.padding(.horizontal)
                     }
 
-                    // Zuletzt geoeffnet
+                    // Zuletzt (aus eigenem Verlauf — zuverlaessig)
                     if !recents.isEmpty {
-                        HomeRow(title: "Zuletzt geöffnet", subtitle: nil, items: recents)
+                        HomeRow(title: "Zuletzt", subtitle: nil, items: recents)
                     }
-                    // Spotify-Home-Sektionen (Fuer dich erstellt, Empfohlene Sender, …)
-                    ForEach(home?.sections ?? []) { sec in
-                        HomeRow(title: sec.title, subtitle: sec.subtitle, items: sec.items)
+                    // Spotify-Home-Sektionen — kaputte "Zuletzt"-Sektion + Items ohne Cover rausfiltern
+                    ForEach((home?.sections ?? []).filter { $0.title != "Zuletzt" && $0.title != "Zuletzt gespielt" }) { sec in
+                        let items = sec.items.filter { !($0.image ?? "").isEmpty }
+                        if !items.isEmpty {
+                            HomeRow(title: sec.title, subtitle: sec.subtitle, items: items)
+                        }
                     }
                 }.padding(.bottom, 130)
             }
@@ -329,14 +332,31 @@ struct HomeView: View {
             if let h = try? await app.api.home() { home = h; app.cacheSet("home", h) }
             // Offline ohne Cache: leeren Zustand setzen statt ewig "Lädt..."
             if home == nil { home = HomeResponse(greeting: nil, user_name: nil, country: nil, quick: [], sections: []) }
-            // Recents mit Retry — kann beim Start kurz 502 liefern (Token-Aufwaermung)
-            for attempt in 0..<3 {
-                if let r = try? await app.api.recents(), !r.isEmpty {
-                    recents = r; app.cacheSet("recents", r); break
-                }
-                if attempt < 2 { try? await Task.sleep(nanoseconds: 900_000_000) }
+            // Recents: zuerst Spotify-recents, sonst aus dem lokalen Verlauf bauen (zuverlaessig)
+            if let r = try? await app.api.recents(), !r.isEmpty {
+                recents = r; app.cacheSet("recents", r)
+            } else if let hist = try? await app.api.history(), !hist.isEmpty {
+                recents = recentsFromHistory(hist); app.cacheSet("recents", recents)
             }
         }
+    }
+
+    /// Baut "Zuletzt geoeffnet" aus dem Verlauf: zuletzt geoeffnete Playlists/Alben/Kuenstler/Podcasts.
+    private func recentsFromHistory(_ hist: [HistoryEntry]) -> [HomeItem] {
+        var seen = Set<String>(); var out: [HomeItem] = []
+        for e in hist {
+            let uri = (e.context_uri?.isEmpty == false) ? e.context_uri! : e.uri
+            guard !seen.contains(uri),
+                  uri.contains(":playlist:") || uri.contains(":album:") || uri.contains(":artist:") || uri.contains(":show:")
+            else { continue }
+            seen.insert(uri)
+            let type = uri.contains(":album:") ? "album" : uri.contains(":artist:") ? "artist"
+                     : uri.contains(":show:") ? "show" : "playlist"
+            let name = (e.context_name?.isEmpty == false) ? e.context_name! : e.name
+            out.append(HomeItem(uri: uri, name: name, image: e.image, sub: nil, type: type))
+            if out.count >= 15 { break }
+        }
+        return out
     }
 }
 
@@ -1362,6 +1382,18 @@ struct TrackListView: View {
     @State private var moreLoading = false
     @State private var isSubscribed = false
     @State private var addedRecs: Set<String> = []
+    @State private var copyMsg = ""
+
+    private func copyAsOwn() {
+        guard !tracks.isEmpty else { return }
+        copyMsg = "Kopiere \(tracks.count) Songs…"
+        Task {
+            let res = await app.api.copyPlaylist(sourceURI: uri, name: title + " (Kopie)")
+            copyMsg = res != nil ? "Kopiert ✓ (\(res!.count) Songs)" : "Fehler beim Kopieren"
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            copyMsg = ""
+        }
+    }
 
     private var metaText: String {
         if isAlbum { return "Album · \(tracks.count) Songs" }
@@ -1442,6 +1474,9 @@ struct TrackListView: View {
                             if !isAlbum {
                                 Button { startPlaylistRadio() } label: {
                                     Label("Playlist-Radio starten", systemImage: "dot.radiowaves.left.and.right")
+                                }
+                                Button { copyAsOwn() } label: {
+                                    Label("Als eigene Playlist kopieren", systemImage: "plus.square.on.square")
                                 }
                             }
                         } label: {
@@ -1542,6 +1577,13 @@ struct TrackListView: View {
             }
         }
         .overlay { if loading { LoadingView() } }
+        .overlay(alignment: .bottom) {
+            if !copyMsg.isEmpty {
+                Text(copyMsg).font(.system(size: 14, weight: .semibold)).foregroundStyle(.black)
+                    .padding(.horizontal, 18).padding(.vertical, 10)
+                    .background(Theme.accent).clipShape(Capsule()).padding(.bottom, 150)
+            }
+        }
         .task(id: reload) {
             loading = true; tracks = []
             if !isAlbum { isSubscribed = (try? await app.api.subscriptions())?.contains { $0.uri == uri } ?? false }
