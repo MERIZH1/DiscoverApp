@@ -11,7 +11,7 @@ enum DiscoverServices {
 /// Frei diktierbar: Siri fragt "Was moechtest du hoeren?" -> z.B. "Last Resort von Papa Roach".
 struct PlayInDiscoverIntent: AppIntent {
     static var title: LocalizedStringResource = "In Discover abspielen"
-    static var description = IntentDescription("Sucht einen Song (z.B. „Last Resort von Papa Roach") und spielt ihn in Discover.")
+    static var description = IntentDescription("Sucht einen Song und spielt ihn in Discover.")
     static var openAppWhenRun: Bool = true
 
     @Parameter(title: "Was abspielen?", requestValueDialog: "Was moechtest du hoeren?")
@@ -23,7 +23,7 @@ struct PlayInDiscoverIntent: AppIntent {
             return .result(dialog: "Discover ist noch nicht verbunden.")
         }
         guard let res = try? await app.api.search(query), let track = res.tracks?.first else {
-            return .result(dialog: "Konnte „\(query)" nicht finden.")
+            return .result(dialog: "Konnte nichts zu \(query) finden.")
         }
         app.player.play(tracks: [track], contextName: "Siri", contextURI: "")
         return .result(dialog: "Spiele \(track.name) von \(track.artist).")
