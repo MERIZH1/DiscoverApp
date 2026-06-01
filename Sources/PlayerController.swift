@@ -18,6 +18,7 @@ final class PlayerController: ObservableObject {
     @Published var shuffle = false
     @Published var repeatMode: RepeatMode = .off
     @Published private(set) var isRadio = false
+    @Published private(set) var source = ""   // "youtube" | "navidrome"
     private var radioTitle = ""
     private var radioFavicon: String?
 
@@ -120,7 +121,7 @@ final class PlayerController: ObservableObject {
 
     private func loadCurrent(autoplay: Bool) {
         guard let track = current else { return }
-        loading = true; currentTime = 0; duration = track.durationSec
+        loading = true; currentTime = 0; duration = track.durationSec; source = ""
         updateNowPlaying(title: track.name, artist: track.artist, album: track.album,
                          dur: track.durationSec, art: track.image, live: false)
         let myIndex = index
@@ -129,6 +130,7 @@ final class PlayerController: ObservableObject {
                 let r = try await api.streamURL(for: track)
                 guard myIndex == index, !isRadio else { return }
                 guard r.ok, let rel = r.url, let url = api.absoluteURL(rel) else { loading = false; return }
+                source = r.source ?? ""
                 let item = AVPlayerItem(url: url)
                 attachItemObservers(item)
                 player.replaceCurrentItem(with: item)

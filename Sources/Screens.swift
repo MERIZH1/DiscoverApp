@@ -1004,6 +1004,9 @@ struct PlayerView: View {
                 VStack(spacing: 6) {
                     Text(p.displayTitle).font(.title2.bold()).foregroundStyle(Theme.text).lineLimit(1)
                     Text(p.displayArtist).foregroundStyle(Theme.sub).lineLimit(1)
+                    if !p.isRadio && !p.source.isEmpty {
+                        SourceBadge(source: p.source).padding(.top, 4)
+                    }
                 }
                 if !p.isRadio {
                     VStack(spacing: 2) {
@@ -1152,6 +1155,26 @@ struct LyricsSheet: View {
                        (ly.instrumental == true ? "🎵 Instrumental" : "Kein Songtext gefunden")
             } else { text = "Kein Songtext gefunden" }
         }
+    }
+}
+
+// MARK: - Quellen-Pille (woher kommt der Stream)
+struct SourceBadge: View {
+    let source: String
+    var body: some View {
+        let label: String
+        let color: Color
+        switch source {
+        case "youtube":   label = "YouTube";    color = Color(hex6: 0xFF3B30)
+        case "navidrome": label = "Bibliothek"; color = Theme.accent
+        default:          label = source.capitalized; color = Theme.sub
+        }
+        return HStack(spacing: 6) {
+            Circle().fill(color).frame(width: 7, height: 7)
+            Text(label).font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.sub)
+        }
+        .padding(.horizontal, 10).padding(.vertical, 5)
+        .background(Theme.input).clipShape(Capsule())
     }
 }
 
