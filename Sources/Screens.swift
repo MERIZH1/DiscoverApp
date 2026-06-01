@@ -133,12 +133,13 @@ struct Pill: View {
 
 // MARK: - Track-Kontextmenue (Long-Press + "…")
 struct TrackMenu: View {
-    @EnvironmentObject var player: PlayerController
-    @EnvironmentObject var app: AppState
-    @EnvironmentObject var downloads: DownloadManager
     let track: Track
     var onShowArtist: (() -> Void)? = nil
     var onShowAlbum: (() -> Void)? = nil
+    // WICHTIG: NICHT beobachten (kein @EnvironmentObject), sonst zeichnet das
+    // offene Menue bei jedem Player-Tick neu (Flackern). Referenz nur lesen.
+    private var app: AppState? { DiscoverServices.app }
+
     var body: some View {
         // Quick-Actions als Icon-Reihe oben (wie Ausschneiden/Kopieren/Einsetzen)
         ControlGroup {
@@ -146,13 +147,13 @@ struct TrackMenu: View {
                 Button { copySpotify() } label: { Label("Spotify-Link kopieren", systemImage: "link") }
                 Button { Task { await copyYouTube() } } label: { Label("YouTube-Link kopieren", systemImage: "play.rectangle") }
             } label: { Label("Teilen", systemImage: "square.and.arrow.up") }
-            Button { player.playNext(track); Haptics.tap() } label: { Label("Als Nächstes", systemImage: "text.line.first.and.arrowtriangle.forward") }
-            Button { player.addToQueue(track); Haptics.tap() } label: { Label("Warteschlange", systemImage: "text.badge.plus") }
+            Button { app?.player.playNext(track); Haptics.tap() } label: { Label("Als Nächstes", systemImage: "text.line.first.and.arrowtriangle.forward") }
+            Button { app?.player.addToQueue(track); Haptics.tap() } label: { Label("Warteschlange", systemImage: "text.badge.plus") }
         }
         // restliche Optionen als Liste darunter
-        Button { downloads.toggle(track) } label: {
-            Label(downloads.isDownloaded(track.uri) ? "Aus Offline entfernen" : "Herunterladen",
-                  systemImage: downloads.isDownloaded(track.uri) ? "trash" : "arrow.down.circle")
+        Button { app?.downloads.toggle(track) } label: {
+            let dl = app?.downloads.isDownloaded(track.uri) ?? false
+            Label(dl ? "Aus Offline entfernen" : "Herunterladen", systemImage: dl ? "trash" : "arrow.down.circle")
         }
         if let onArtist = onShowArtist, track.artists?.first?.uri != nil {
             Button { onArtist() } label: { Label("Künstler anzeigen", systemImage: "person") }
@@ -168,15 +169,17 @@ struct TrackMenu: View {
         }
     }
     private func copyYouTube() async {
-        if let vid = await app.api.ytVideoId(for: track) {
+        guard let api = app?.api else { return }
+        if let vid = await api.ytVideoId(for: track) {
             UIPasteboard.general.string = "https://www.youtube.com/watch?v=\(vid)"; Haptics.tap()
         }
     }
     private func startRadio() {
+        guard let api = app?.api, let player = app?.player else { return }
         Task {
-            guard let r = try? await app.api.startRadio(track: track), r.ok,
+            guard let r = try? await api.startRadio(track: track), r.ok,
                   let puri = r.playlist_uri,
-                  let resp = try? await app.api.playlistTracks(puri) else { return }
+                  let resp = try? await api.playlistTracks(puri) else { return }
             player.play(tracks: resp.tracks)
         }
     }
