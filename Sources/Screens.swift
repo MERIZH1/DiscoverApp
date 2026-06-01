@@ -140,9 +140,12 @@ struct LoadingView: View {
     var body: some View {
         VStack(spacing: 10) {
             ProgressView().tint(Theme.accent).scaleEffect(1.3)
-            Text(text + String(repeating: ".", count: dots))
-                .font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.sub)
-                .frame(height: 16)
+            HStack(spacing: 0) {
+                Text(text)
+                Text(String(repeating: ".", count: dots)).frame(width: 16, alignment: .leading)
+            }
+            .font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.sub)
+            .frame(height: 16)
         }
         .frame(maxWidth: .infinity)
         .onReceive(timer) { _ in dots = (dots + 1) % 4 }
@@ -1479,6 +1482,7 @@ struct TrackListView: View {
 struct PodcastView: View {
     @EnvironmentObject var app: AppState
     @EnvironmentObject var player: PlayerController
+    @EnvironmentObject var downloads: DownloadManager
     @Environment(\.dismiss) private var dismiss
     let uri: String; let title: String; let image: String?
     @State private var resp: PodcastResponse?
@@ -1487,6 +1491,9 @@ struct PodcastView: View {
 
     private var showName: String { resp?.show?.name ?? title }
     private var showImage: String? { resp?.show?.image ?? image }
+    private var episodeTracks: [Track] { (resp?.episodes ?? []).map { $0.track(podcast: showName, fallbackImage: showImage) } }
+    private var allDownloaded: Bool { !episodeTracks.isEmpty && episodeTracks.allSatisfy { downloads.isDownloaded($0.uri) } }
+    private var anyDownloaded: Bool { episodeTracks.contains { downloads.isDownloaded($0.uri) } }
 
     var body: some View {
         ScrollView {
@@ -1507,6 +1514,17 @@ struct PodcastView: View {
                         Text("\(resp?.episodes.count ?? 0) Folgen").font(.system(size: 13)).foregroundStyle(Theme.sub)
                     }
                     Text("Cover antippen für Beschreibung").font(.system(size: 11)).foregroundStyle(Theme.mute)
+
+                    Button {
+                        if anyDownloaded { for t in episodeTracks { downloads.delete(t.uri) } }
+                        else { Task { for t in episodeTracks { await downloads.download(t) } } }
+                    } label: {
+                        Label(anyDownloaded ? "Heruntergeladene entfernen" : "Alle Folgen herunterladen",
+                              systemImage: anyDownloaded ? "trash" : "arrow.down.circle")
+                            .font(.system(size: 14, weight: .semibold)).foregroundStyle(anyDownloaded ? Theme.text : .black)
+                            .padding(.horizontal, 18).padding(.vertical, 10)
+                            .background(anyDownloaded ? Theme.input : Theme.accent).clipShape(Capsule())
+                    }.padding(.top, 6)
                 }.frame(maxWidth: .infinity).padding(.bottom, 16)
 
                 LazyVStack(spacing: 0) {
