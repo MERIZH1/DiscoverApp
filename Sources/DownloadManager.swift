@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 
 /// Laedt Songs/Episoden lokal aufs Geraet (Offline-Wiedergabe) + Metadaten.
 @MainActor
@@ -32,25 +33,33 @@ final class DownloadManager: ObservableObject {
     }
 
     func download(_ track: Track) async {
-        guard !track.uri.isEmpty, localURL(for: track.uri) == nil, !busy.contains(track.uri) else { return }
+        guard !track.uri.isEmpty, !busy.contains(track.uri) else { return }
+        // schon vorhanden UND abspielbar? -> fertig. Sonst (korrupt) neu laden.
+        if let existing = localURL(for: track.uri) {
+            if await isPlayable(existing) { done.insert(track.uri); return }
+            try? FileManager.default.removeItem(at: existing)
+        }
         busy.insert(track.uri)
         defer { busy.remove(track.uri) }
-        guard let r = try? await api.streamURL(for: track), r.ok,
-              let rel = r.url, let url = api.absoluteURL(rel),
-              let (tmp, resp) = try? await URLSession.shared.download(from: url) else { return }
-        // Nur echte Audio-Antworten speichern (kein 404/HTML, keine Mini-Fehlerseite)
+        guard let r = try? await api.streamURL(for: track), r.ok, let rel = r.url,
+              let (tmp, resp) = try? await api.downloadAudio(rel) else { return }
         if let http = resp as? HTTPURLResponse, !(200...299).contains(http.statusCode) { return }
-        let size = ((try? FileManager.default.attributesOfItem(atPath: tmp.path))?[.size] as? Int) ?? 0
-        if size < 10_000 { return }
         let dest = dir.appendingPathComponent(key(track.uri) + ".m4a")
         try? FileManager.default.removeItem(at: dest)
         do { try FileManager.default.moveItem(at: tmp, to: dest) } catch { return }
-        // Metadaten fuer die Offline-Bibliothek
+        // Nur behalten, wenn es echtes, abspielbares Audio ist (kein Stream-Müll/Fehlerseite)
+        guard await isPlayable(dest) else { try? FileManager.default.removeItem(at: dest); return }
         if let m = try? JSONEncoder().encode(track) {
             try? m.write(to: dir.appendingPathComponent(key(track.uri) + ".json"))
         }
         done.insert(track.uri)
         if !tracks.contains(where: { $0.uri == track.uri }) { tracks.insert(track, at: 0) }
+    }
+
+    /// Prueft, ob AVPlayer die Datei abspielen kann (Format/Container ok).
+    private func isPlayable(_ url: URL) async -> Bool {
+        let asset = AVURLAsset(url: url)
+        return (try? await asset.load(.isPlayable)) ?? false
     }
 
     func delete(_ uri: String) {

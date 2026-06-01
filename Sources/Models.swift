@@ -165,6 +165,7 @@ struct Episode: Codable, Identifiable, Hashable {
     let description: String?
     let image: String?
     let duration_ms: Int?
+    let release_date: String?   // "YYYY-MM-DD"
     func track(podcast: String, fallbackImage: String?) -> Track {
         Track(uri: uri, name: name, artist: podcast, image: image ?? fallbackImage)
     }
@@ -175,6 +176,8 @@ struct PodcastShow: Codable, Hashable {
     let image: String?
     let description: String?
     let publisher: String?
+    let rating: Double?
+    let rating_count: Int?
 }
 struct PodcastResponse: Codable {
     let show: PodcastShow?

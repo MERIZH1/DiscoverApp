@@ -1484,6 +1484,7 @@ struct PodcastView: View {
     @State private var resp: PodcastResponse?
     @State private var loading = true
     @State private var hero: Color = Theme.elev
+    @State private var showInfo = false
 
     private var showName: String { resp?.show?.name ?? title }
     private var showImage: String? { resp?.show?.image ?? image }
@@ -1498,16 +1499,22 @@ struct PodcastView: View {
                     if let pub = resp?.show?.publisher, !pub.isEmpty {
                         Text(pub).font(.system(size: 13)).foregroundStyle(Theme.sub)
                     }
-                    Text("\(resp?.episodes.count ?? 0) Folgen").font(.system(size: 13)).foregroundStyle(Theme.sub)
+                    HStack(spacing: 5) {
+                        Text("\(resp?.episodes.count ?? 0) Folgen").font(.system(size: 13)).foregroundStyle(Theme.sub)
+                        Image(systemName: "info.circle").font(.system(size: 13)).foregroundStyle(Theme.sub)
+                    }
                 }.frame(maxWidth: .infinity).padding(.bottom, 16)
                 .background(LinearGradient(stops: [
                     .init(color: hero, location: 0), .init(color: hero, location: 0.3),
                     .init(color: Theme.bg, location: 0.95)], startPoint: .top, endPoint: .bottom)
                     .ignoresSafeArea(edges: .top))
+                .contentShape(Rectangle())
+                .onTapGesture { showInfo = true }   // Hero antippen -> Podcast-Info
 
                 LazyVStack(spacing: 0) {
                     ForEach(Array((resp?.episodes ?? []).enumerated()), id: \.element.id) { i, ep in
-                        EpisodeRow(ep: ep, playing: player.current?.uri == ep.uri) {
+                        EpisodeRow(ep: ep, track: ep.track(podcast: showName, fallbackImage: showImage),
+                                   playing: player.current?.uri == ep.uri) {
                             let q = (resp?.episodes ?? []).map { $0.track(podcast: showName, fallbackImage: showImage) }
                             player.play(tracks: q, startAt: i, contextName: showName, contextURI: uri)
                         }
@@ -1524,6 +1531,8 @@ struct PodcastView: View {
             Button { dismiss() } label: { Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text) }
         } }
         .overlay { if loading { LoadingView() } }
+        .sheet(isPresented: $showInfo) { PodcastInfoSheet(show: resp?.show, name: showName, image: showImage,
+                                                          episodeCount: resp?.episodes.count ?? 0) }
         .task {
             loading = true
             let absImg = image.flatMap { app.api.absoluteURL($0)?.absoluteString } ?? image
@@ -1534,35 +1543,95 @@ struct PodcastView: View {
     }
 }
 
+// MARK: - Podcast-Info (Beschreibung, Bewertung)
+struct PodcastInfoSheet: View {
+    let show: PodcastShow?
+    let name: String
+    let image: String?
+    let episodeCount: Int
+    @Environment(\.dismiss) private var dismiss
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 16) {
+                    Artwork(url: show?.image ?? image, size: 160, corner: 10)
+                        .shadow(color: .black.opacity(0.5), radius: 20, y: 6).padding(.top, 12)
+                    Text(name).font(.title3.bold()).foregroundStyle(Theme.text)
+                        .multilineTextAlignment(.center).padding(.horizontal)
+                    if let pub = show?.publisher, !pub.isEmpty {
+                        Text(pub).font(.system(size: 14)).foregroundStyle(Theme.sub)
+                    }
+                    HStack(spacing: 14) {
+                        if let r = show?.rating, r > 0 {
+                            Label(String(format: "%.1f", r), systemImage: "star.fill")
+                                .font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.accent)
+                        }
+                        Text("\(episodeCount) Folgen").font(.system(size: 13)).foregroundStyle(Theme.sub)
+                    }
+                    if let d = show?.description, !d.isEmpty {
+                        Text(d).font(.system(size: 15)).foregroundStyle(Theme.text.opacity(0.9))
+                            .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal).padding(.top, 4)
+                    }
+                }.padding(.bottom, 30)
+            }
+            .scrollContentBackground(.hidden).background(Theme.bg)
+            .navigationTitle("Info").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) {
+                Button("Fertig") { dismiss() }.foregroundStyle(Theme.accent)
+            } }
+        }
+    }
+}
+
 struct EpisodeRow: View {
-    let ep: Episode; let playing: Bool; let tap: () -> Void
+    let ep: Episode; let track: Track; let playing: Bool; let tap: () -> Void
+    @EnvironmentObject var downloads: DownloadManager
     private var durText: String {
         let s = (ep.duration_ms ?? 0) / 1000
         let h = s / 3600, m = (s % 3600) / 60
         return h > 0 ? "\(h) Std. \(m) Min." : "\(m) Min."
     }
+    private var dateText: String {
+        guard let d = ep.release_date, !d.isEmpty else { return "" }
+        let inF = DateFormatter(); inF.dateFormat = "yyyy-MM-dd"; inF.locale = Locale(identifier: "en_US_POSIX")
+        guard let date = inF.date(from: d) else { return d }
+        let out = DateFormatter(); out.locale = Locale(identifier: "de_DE"); out.dateFormat = "d. MMM yyyy"
+        return out.string(from: date)
+    }
     var body: some View {
-        Button(action: tap) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .top, spacing: 12) {
-                    Artwork(url: ep.image, size: 56, corner: 6)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(ep.name).font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(playing ? Theme.accent : Theme.text).lineLimit(2)
-                        if let d = ep.description, !d.isEmpty {
-                            Text(d).font(.system(size: 13)).foregroundStyle(Theme.sub).lineLimit(2)
-                        }
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 12) {
+                Artwork(url: ep.image, size: 56, corner: 6)
+                VStack(alignment: .leading, spacing: 4) {
+                    if !dateText.isEmpty {
+                        Text(dateText).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.sub)
                     }
-                    Spacer(minLength: 0)
+                    Text(ep.name).font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(playing ? Theme.accent : Theme.text).lineLimit(2)
+                    if let d = ep.description, !d.isEmpty {
+                        Text(d).font(.system(size: 13)).foregroundStyle(Theme.sub).lineLimit(2)
+                    }
                 }
-                HStack(spacing: 12) {
-                    Image(systemName: "play.circle.fill").font(.system(size: 30))
-                        .foregroundStyle(playing ? Theme.accent : Theme.text)
-                    Text(durText).font(.system(size: 12)).foregroundStyle(Theme.sub)
-                    Spacer()
-                }
-            }.padding(.vertical, 12).padding(.horizontal).contentShape(Rectangle())
-        }.buttonStyle(.plain)
+                Spacer(minLength: 0)
+            }
+            HStack(spacing: 14) {
+                Image(systemName: "play.circle.fill").font(.system(size: 30))
+                    .foregroundStyle(playing ? Theme.accent : Theme.text)
+                Text(durText).font(.system(size: 12)).foregroundStyle(Theme.sub)
+                Spacer()
+                Button { downloads.toggle(track) } label: {
+                    if downloads.isBusy(track.uri) {
+                        ProgressView().tint(Theme.accent)
+                    } else {
+                        Image(systemName: downloads.isDownloaded(track.uri) ? "checkmark.circle.fill" : "arrow.down.circle")
+                            .font(.system(size: 22))
+                            .foregroundStyle(downloads.isDownloaded(track.uri) ? Theme.accent : Theme.sub)
+                    }
+                }.buttonStyle(.plain).frame(width: 44, height: 44).contentShape(Rectangle())
+            }
+        }.padding(.vertical, 12).padding(.horizontal)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: tap)
         .overlay(Rectangle().fill(Theme.input).frame(height: 0.5), alignment: .bottom)
     }
 }

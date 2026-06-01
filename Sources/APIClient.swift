@@ -75,6 +75,14 @@ final class APIClient: ObservableObject {
         return data
     }
 
+    /// Audiodatei laden (mit Profil-Header) -> temporaere Datei + Response.
+    func downloadAudio(_ relativeOrAbsolute: String) async throws -> (URL, URLResponse) {
+        guard let url = absoluteURL(relativeOrAbsolute) else { throw APIError.badURL }
+        var req = URLRequest(url: url)
+        if let pid = profileId { req.setValue(pid, forHTTPHeaderField: "X-Profile-Id") }
+        return try await session.download(for: req)
+    }
+
     private func get<T: Decodable>(_ path: String) async throws -> T {
         let d = try await data(path)
         return try JSONDecoder().decode(T.self, from: d)
