@@ -29,6 +29,7 @@ final class APIClient: ObservableObject {
     @Published var baseURL: String { didSet { ImageBase.url = ImageBase.normalize(baseURL) } }
     var profileId: String?
     private let session: URLSession
+    private let downloadSession: URLSession   // grosse Dateien (Podcasts) -> langes Zeitlimit
 
     init(baseURL: String = "") {
         self.baseURL = baseURL
@@ -38,6 +39,11 @@ final class APIClient: ObservableObject {
         cfg.timeoutIntervalForResource = 30
         cfg.waitsForConnectivity = false   // offline sofort scheitern statt endlos warten
         self.session = URLSession(configuration: cfg)
+        let dcfg = URLSessionConfiguration.default
+        dcfg.timeoutIntervalForRequest = 30
+        dcfg.timeoutIntervalForResource = 1800   // 30 Min — grosse Podcast-Folgen
+        dcfg.waitsForConnectivity = false
+        self.downloadSession = URLSession(configuration: dcfg)
     }
 
     private var base: String {
@@ -83,7 +89,7 @@ final class APIClient: ObservableObject {
         // Manche Podcast-CDNs liefern ohne Browser-UA 403
         req.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15",
                      forHTTPHeaderField: "User-Agent")
-        return try await session.download(for: req)
+        return try await downloadSession.download(for: req)
     }
 
     private func get<T: Decodable>(_ path: String) async throws -> T {
