@@ -24,6 +24,11 @@ final class AppState: ObservableObject {
     @Published var profile: Profile?
     @Published var connected = false
 
+    /// Liquid-Glass-Design (iOS 26) — nur in der App umschaltbar.
+    @Published var liquidGlass: Bool = UserDefaults.standard.bool(forKey: "liquidGlass") {
+        didSet { UserDefaults.standard.set(liquidGlass, forKey: "liquidGlass") }
+    }
+
     init() {
         let a = APIClient(baseURL: UserDefaults.standard.string(forKey: "serverURL") ?? "")
         a.profileId = UserDefaults.standard.string(forKey: "profileId")   // fuer Siri-Start vor restore()

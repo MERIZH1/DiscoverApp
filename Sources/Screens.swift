@@ -116,6 +116,7 @@ struct Pill: View {
     var activeBg: Color = .white
     var icon: String? = nil
     let tap: () -> Void
+    @Environment(\.liquidGlass) private var glass
     var body: some View {
         Button(action: tap) {
             HStack(spacing: 5) {
@@ -124,7 +125,7 @@ struct Pill: View {
             }
             .foregroundStyle(active ? .black : Theme.text)
             .padding(.horizontal, 14).padding(.vertical, 7)
-            .background(active ? activeBg : Theme.input)
+            .glassSurface(active ? false : glass, shape: Capsule(), fallback: active ? activeBg : Theme.input)
             .clipShape(Capsule())
         }.buttonStyle(.plain)
     }
@@ -136,19 +137,35 @@ struct TrackMenu: View {
     @EnvironmentObject var app: AppState
     @EnvironmentObject var downloads: DownloadManager
     let track: Track
+    var onShowArtist: (() -> Void)? = nil
+    var onShowAlbum: (() -> Void)? = nil
     var body: some View {
-        Button { player.playNext(track) } label: { Label("Als Nächstes spielen", systemImage: "text.line.first.and.arrowtriangle.forward") }
-        Button { player.addToQueue(track) } label: { Label("Zur Warteschlange", systemImage: "text.badge.plus") }
-        Button { startRadio() } label: { Label("Song-Radio starten", systemImage: "dot.radiowaves.left.and.right") }
+        Button { player.playNext(track); Haptics.tap() } label: { Label("Als Nächstes spielen", systemImage: "text.line.first.and.arrowtriangle.forward") }
+        Button { player.addToQueue(track); Haptics.tap() } label: { Label("Zur Warteschlange", systemImage: "text.badge.plus") }
         Button { downloads.toggle(track) } label: {
             Label(downloads.isDownloaded(track.uri) ? "Aus Offline entfernen" : "Herunterladen",
                   systemImage: downloads.isDownloaded(track.uri) ? "trash" : "arrow.down.circle")
         }
-        if track.uri.hasPrefix("spotify:track:"), let id = track.uri.split(separator: ":").last {
-            Button {
-                UIPasteboard.general.string = "https://open.spotify.com/track/\(id)"
-                Haptics.tap()
-            } label: { Label("Spotify-Link kopieren", systemImage: "link") }
+        if let onArtist = onShowArtist, track.artists?.first?.uri != nil {
+            Button { onArtist() } label: { Label("Künstler anzeigen", systemImage: "person") }
+        }
+        if let onAlbum = onShowAlbum, track.album_uri != nil {
+            Button { onAlbum() } label: { Label("Album anzeigen", systemImage: "square.stack") }
+        }
+        Button { startRadio() } label: { Label("Song-Radio starten", systemImage: "dot.radiowaves.left.and.right") }
+        Menu {
+            Button { copySpotify() } label: { Label("Spotify-Link kopieren", systemImage: "link") }
+            Button { Task { await copyYouTube() } } label: { Label("YouTube-Link kopieren", systemImage: "play.rectangle") }
+        } label: { Label("Teilen", systemImage: "square.and.arrow.up") }
+    }
+    private func copySpotify() {
+        if let id = track.uri.split(separator: ":").last {
+            UIPasteboard.general.string = "https://open.spotify.com/track/\(id)"; Haptics.tap()
+        }
+    }
+    private func copyYouTube() async {
+        if let vid = await app.api.ytVideoId(for: track) {
+            UIPasteboard.general.string = "https://www.youtube.com/watch?v=\(vid)"; Haptics.tap()
         }
     }
     private func startRadio() {
@@ -483,6 +500,15 @@ struct SettingsView: View {
                         Toggle(isOn: $hideForeign) {
                             Text("Fremdsprachige Playlists ausblenden").font(.system(size: 15)).foregroundStyle(Theme.text)
                         }.tint(Theme.accent).onChange(of: hideForeign) { _ in if loaded { saveProfile() } }
+                    }
+                    // Darstellung
+                    SettingsGroup("DARSTELLUNG") {
+                        Toggle(isOn: $app.liquidGlass) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Liquid Glass").font(.system(size: 15)).foregroundStyle(Theme.text)
+                                Text("Durchscheinendes Glas-Design (iOS 26)").font(.caption2).foregroundStyle(Theme.mute)
+                            }
+                        }.tint(Theme.accent)
                     }
                     // Wiedergabe
                     SettingsGroup("WIEDERGABE") {
@@ -857,96 +883,32 @@ struct CardRows: View {
     }
 }
 
-// MARK: - Track-Optionen-Sheet (3 Icon-Buttons oben, Trennstrich, Liste)
-struct TrackOptionsSheet: View {
-    @EnvironmentObject var player: PlayerController
-    @EnvironmentObject var app: AppState
-    @EnvironmentObject var downloads: DownloadManager
-    @Environment(\.dismiss) private var dismiss
+// MARK: - Künstler/Album-Navigation aus dem Track-Menue (Modal-Sheets)
+private struct TrackNavSheets: ViewModifier {
     let track: Track
-    @State private var showShare = false
-    @State private var showArtist = false
-    @State private var showAlbum = false
-
-    private var artistURI: String? { track.artists?.first?.uri }
-    private var artistName: String { track.artists?.first?.name ?? track.artist }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Artwork(url: track.image, size: 48, corner: 4)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(track.name).font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.text).lineLimit(1)
-                    Text(track.artist).font(.system(size: 13)).foregroundStyle(Theme.sub).lineLimit(1)
+    @Binding var showArtist: Bool
+    @Binding var showAlbum: Bool
+    func body(content: Content) -> some View {
+        content
+            .sheet(isPresented: $showArtist) {
+                NavigationStack {
+                    if let u = track.artists?.first?.uri {
+                        ArtistView(uri: u, name: track.artists?.first?.name ?? track.artist, image: track.image)
+                    }
                 }
-                Spacer()
-            }.padding()
-
-            HStack(spacing: 12) {
-                optIcon("square.and.arrow.up") { showShare = true }
-                optIcon("text.line.first.and.arrowtriangle.forward") { player.playNext(track); dismiss() }
-                optIcon("text.badge.plus") { player.addToQueue(track); dismiss() }
-                Spacer()
-            }.padding(.horizontal).padding(.bottom, 10)
-
-            Divider().background(Theme.input)
-
-            VStack(spacing: 0) {
-                optRow(downloads.isDownloaded(track.uri) ? "Aus Offline entfernen" : "Herunterladen",
-                       downloads.isDownloaded(track.uri) ? "trash" : "arrow.down.circle") { downloads.toggle(track); dismiss() }
-                if artistURI != nil { optRow("Künstler anzeigen", "person") { showArtist = true } }
-                if track.album_uri != nil { optRow("Album anzeigen", "square.stack") { showAlbum = true } }
-                optRow("Song-Radio starten", "dot.radiowaves.left.and.right") { startRadio(); dismiss() }
             }
-            Spacer()
-        }
-        .background(Theme.bg.ignoresSafeArea())
-        .presentationDetents([.medium])
-        .confirmationDialog("Teilen", isPresented: $showShare, titleVisibility: .visible) {
-            Button("Spotify-Link kopieren") { copySpotify() }
-            Button("YouTube-Link kopieren") { Task { await copyYouTube() } }
-        }
-        .sheet(isPresented: $showArtist) {
-            NavigationStack { if let u = artistURI { ArtistView(uri: u, name: artistName, image: track.image) } }
-        }
-        .sheet(isPresented: $showAlbum) {
-            NavigationStack { if let u = track.album_uri { TrackListView(uri: u, title: track.album ?? "Album", image: track.image, isAlbum: true) } }
-        }
+            .sheet(isPresented: $showAlbum) {
+                NavigationStack {
+                    if let u = track.album_uri {
+                        TrackListView(uri: u, title: track.album ?? "Album", image: track.image, isAlbum: true)
+                    }
+                }
+            }
     }
-
-    @ViewBuilder private func optIcon(_ sys: String, _ act: @escaping () -> Void) -> some View {
-        Button(action: act) {
-            Image(systemName: sys).font(.system(size: 20)).foregroundStyle(Theme.text)
-                .frame(width: 58, height: 58).background(Theme.elev).clipShape(RoundedRectangle(cornerRadius: 12))
-        }.buttonStyle(.plain)
-    }
-    @ViewBuilder private func optRow(_ label: String, _ sys: String, _ act: @escaping () -> Void) -> some View {
-        Button(action: act) {
-            HStack(spacing: 16) {
-                Image(systemName: sys).frame(width: 24).foregroundStyle(Theme.sub)
-                Text(label).font(.system(size: 16)).foregroundStyle(Theme.text)
-                Spacer()
-            }.padding(.vertical, 13).padding(.horizontal).contentShape(Rectangle())
-        }.buttonStyle(.plain)
-    }
-    private func copySpotify() {
-        if let id = track.uri.split(separator: ":").last {
-            UIPasteboard.general.string = "https://open.spotify.com/track/\(id)"; Haptics.tap()
-        }
-        dismiss()
-    }
-    private func copyYouTube() async {
-        if let vid = await app.api.ytVideoId(for: track) {
-            UIPasteboard.general.string = "https://www.youtube.com/watch?v=\(vid)"; Haptics.tap()
-        }
-        dismiss()
-    }
-    private func startRadio() {
-        Task {
-            guard let r = try? await app.api.startRadio(track: track), r.ok, let puri = r.playlist_uri,
-                  let resp = try? await app.api.playlistTracks(puri) else { return }
-            player.play(tracks: resp.tracks)
-        }
+}
+extension View {
+    func trackNavSheets(track: Track, showArtist: Binding<Bool>, showAlbum: Binding<Bool>) -> some View {
+        modifier(TrackNavSheets(track: track, showArtist: showArtist, showAlbum: showAlbum))
     }
 }
 
@@ -1561,7 +1523,8 @@ struct EpisodeRow: View {
 
 struct NumberedTrackRow: View {
     let n: Int; let track: Track; var showCover: Bool = true; let playing: Bool; let tap: () -> Void
-    @State private var showOpts = false
+    @State private var showArtist = false
+    @State private var showAlbum = false
     var body: some View {
         Button(action: tap) {
             HStack(spacing: 12) {
@@ -1577,15 +1540,17 @@ struct NumberedTrackRow: View {
                 if track.downloaded == true {
                     Image(systemName: "checkmark").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.accent)
                 }
-                Button { showOpts = true } label: {
+                Menu {
+                    TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true })
+                } label: {
                     Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
                         .frame(width: 34, height: 34).contentShape(Rectangle())
-                }.buttonStyle(.plain)
+                }
             }.padding(.vertical, 9).padding(.horizontal).contentShape(Rectangle())
                 .background(playing ? Theme.accent.opacity(0.08) : .clear)
         }.buttonStyle(.plain)
-        .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in showOpts = true; Haptics.tap() })
-        .sheet(isPresented: $showOpts) { TrackOptionsSheet(track: track) }
+        .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }) }
+        .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum)
     }
 }
 
@@ -1612,7 +1577,8 @@ struct RecRow: View {
 
 struct TrackRow: View {
     let track: Track; let playing: Bool; let tap: () -> Void
-    @State private var showOpts = false
+    @State private var showArtist = false
+    @State private var showAlbum = false
     var body: some View {
         Button(action: tap) {
             HStack(spacing: 12) {
@@ -1626,14 +1592,16 @@ struct TrackRow: View {
                 if track.downloaded == true {
                     Image(systemName: "arrow.down.circle.fill").font(.system(size: 15)).foregroundStyle(Theme.accent.opacity(0.7))
                 }
-                Button { showOpts = true } label: {
+                Menu {
+                    TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true })
+                } label: {
                     Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
                         .frame(width: 34, height: 34).contentShape(Rectangle())
-                }.buttonStyle(.plain)
+                }
             }.padding(.vertical, 9).padding(.horizontal).contentShape(Rectangle())
         }.buttonStyle(.plain)
-        .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in showOpts = true; Haptics.tap() })
-        .sheet(isPresented: $showOpts) { TrackOptionsSheet(track: track) }
+        .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }) }
+        .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum)
     }
 }
 
@@ -1647,6 +1615,7 @@ struct SectionHeader: View {
 // MARK: - Now-Playing-Bar
 struct NowPlayingBar: View {
     @EnvironmentObject var player: PlayerController
+    @Environment(\.liquidGlass) private var glass
     @Binding var showPlayer: Bool
     var body: some View {
         if player.hasContent {
@@ -1669,11 +1638,8 @@ struct NowPlayingBar: View {
                 }
             }
             .padding(.horizontal, 10).padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(hex6: 0x282828))
-                    .shadow(color: .black.opacity(0.5), radius: 12, y: 4)
-            )
+            .glassSurface(glass, shape: RoundedRectangle(cornerRadius: 8), fallback: Color(hex6: 0x282828))
+            .shadow(color: .black.opacity(0.5), radius: 12, y: 4)
             .onTapGesture { showPlayer = true }
         }
     }
@@ -1683,6 +1649,7 @@ struct NowPlayingBar: View {
 struct PlayerView: View {
     @EnvironmentObject var player: PlayerController
     @EnvironmentObject var downloads: DownloadManager
+    @Environment(\.liquidGlass) private var glass
     @Environment(\.dismiss) private var dismiss
     @State private var scrub: Double = 0
     @State private var scrubbing = false
@@ -1787,7 +1754,14 @@ struct PlayerView: View {
                             Button { p.prev() } label: { Image(systemName: "backward.fill").font(.title) }
                             Spacer()
                             Button { p.toggle() } label: {
-                                Image(systemName: p.isPlaying ? "pause.circle.fill" : "play.circle.fill").font(.system(size: 72))
+                                if glass {
+                                    Image(systemName: p.isPlaying ? "pause.fill" : "play.fill")
+                                        .font(.system(size: 30)).foregroundStyle(Theme.text)
+                                        .frame(width: 78, height: 78)
+                                        .glassButton(true, shape: Circle(), fallback: .clear)
+                                } else {
+                                    Image(systemName: p.isPlaying ? "pause.circle.fill" : "play.circle.fill").font(.system(size: 72))
+                                }
                             }
                             Spacer()
                             Button { p.next() } label: { Image(systemName: "forward.fill").font(.title) }
