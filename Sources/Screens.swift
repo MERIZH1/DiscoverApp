@@ -144,6 +144,12 @@ struct TrackMenu: View {
             Label(downloads.isDownloaded(track.uri) ? "Aus Offline entfernen" : "Herunterladen",
                   systemImage: downloads.isDownloaded(track.uri) ? "trash" : "arrow.down.circle")
         }
+        if track.uri.hasPrefix("spotify:track:"), let id = track.uri.split(separator: ":").last {
+            Button {
+                UIPasteboard.general.string = "https://open.spotify.com/track/\(id)"
+                Haptics.tap()
+            } label: { Label("Spotify-Link kopieren", systemImage: "link") }
+        }
     }
     private func startRadio() {
         Task {
@@ -1207,7 +1213,7 @@ struct TrackListView: View {
         Task {
             if await app.api.addTrack(playlistURI: uri, track: t, playlistName: title) {
                 addedRecs.insert(t.uri); Haptics.tap()
-                if !tracks.contains(where: { $0.uri == t.uri }) { tracks.insert(t, at: 0) }
+                if !tracks.contains(where: { $0.uri == t.uri }) { tracks.append(t) }   // ans Ende wie PWA
             }
         }
     }
@@ -1216,11 +1222,10 @@ struct TrackListView: View {
         guard !moreLoading else { return }
         moreLoading = true
         Task {
+            // Alte ueberspringen + komplett durch neue ersetzen (wie PWA-Refresh)
             let skip = recs.compactMap { $0.uri.split(separator: ":").last.map(String.init) }
-            let more = (try? await app.api.recommendations(uri, n: 15, skip: skip)) ?? []
-            let existing = Set(recs.map { $0.uri })
-            let fresh = more.filter { !existing.contains($0.uri) }
-            recs = fresh.isEmpty ? ((try? await app.api.recommendations(uri, n: 15)) ?? recs) : recs + fresh
+            let fresh = (try? await app.api.recommendations(uri, n: 15, skip: skip)) ?? []
+            recs = fresh.isEmpty ? ((try? await app.api.recommendations(uri, n: 15)) ?? recs) : fresh
             moreLoading = false
         }
     }

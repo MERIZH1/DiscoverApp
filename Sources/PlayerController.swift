@@ -214,9 +214,15 @@ final class PlayerController: ObservableObject {
             queue = fisherYates(queue, anchor: cur)   // ON: laufenden Track als Anker, Rest mischen
             index = 0
         } else {
-            let src = original.isEmpty ? queue : original   // OFF: Original-Reihenfolge wieder her
-            queue = src
-            index = cur.flatMap { c in src.firstIndex { $0.uri == c.uri } } ?? 0
+            // OFF: Original-Reihenfolge wieder her, ab Position des laufenden Songs
+            let src = original.isEmpty ? queue : original
+            if let c = cur, let pos = src.firstIndex(where: { $0.uri == c.uri }) {
+                queue = src; index = pos
+            } else if let c = cur {
+                queue = [c] + src.filter { $0.uri != c.uri }; index = 0
+            } else {
+                queue = src; index = 0
+            }
         }
     }
     func cycleRepeat() { repeatMode = repeatMode == .off ? .all : (repeatMode == .all ? .one : .off); saveMode() }
