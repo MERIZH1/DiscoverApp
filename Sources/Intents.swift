@@ -8,25 +8,22 @@ enum DiscoverServices {
 }
 
 /// Sucht einen Song/Kuenstler und spielt ihn in Discover.
-/// Frei diktierbar: Siri fragt "Was moechtest du hoeren?" -> z.B. "Last Resort von Papa Roach".
+/// Frei diktierbar: Siri fragt nach -> z.B. "Last Resort von Papa Roach".
 struct PlayInDiscoverIntent: AppIntent {
     static var title: LocalizedStringResource = "In Discover abspielen"
-    static var description = IntentDescription("Sucht einen Song und spielt ihn in Discover.")
     static var openAppWhenRun: Bool = true
 
     @Parameter(title: "Was abspielen?", requestValueDialog: "Was moechtest du hoeren?")
     var query: String
 
     @MainActor
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        guard let app = DiscoverServices.app, app.connected else {
-            return .result(dialog: "Discover ist noch nicht verbunden.")
+    func perform() async throws -> some IntentResult {
+        if let app = DiscoverServices.app, app.connected,
+           let res = try? await app.api.search(query),
+           let track = res.tracks?.first {
+            app.player.play(tracks: [track], contextName: "Siri", contextURI: "")
         }
-        guard let res = try? await app.api.search(query), let track = res.tracks?.first else {
-            return .result(dialog: "Konnte nichts zu \(query) finden.")
-        }
-        app.player.play(tracks: [track], contextName: "Siri", contextURI: "")
-        return .result(dialog: "Spiele \(track.name) von \(track.artist).")
+        return .result()
     }
 
     static var parameterSummary: some ParameterSummary {
@@ -43,7 +40,6 @@ struct DiscoverShortcuts: AppShortcutsProvider {
                 "Spiele etwas in \(.applicationName)",
                 "Spiele Musik in \(.applicationName)",
                 "Suche in \(.applicationName)",
-                "Spiele \(\.$query) in \(.applicationName)",
             ],
             shortTitle: "Abspielen",
             systemImageName: "play.fill"
