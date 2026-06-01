@@ -75,7 +75,7 @@ struct ProfilePickerView: View {
 
     var body: some View {
         VStack(spacing: 24) {
-            Text("Profil waehlen").font(.title2.bold()).padding(.top, 40)
+            Text("Profil wählen").font(.title2.bold()).padding(.top, 40)
             if let error { Text(error).foregroundStyle(.red) }
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))], spacing: 20) {

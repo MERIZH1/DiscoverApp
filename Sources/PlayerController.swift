@@ -44,10 +44,14 @@ final class PlayerController: ObservableObject {
         addTimeObserver()
     }
 
+    private var ctxName = ""
+    private var ctxURI = ""
+
     // MARK: - Tracks
-    func play(tracks: [Track], startAt i: Int = 0) {
+    func play(tracks: [Track], startAt i: Int = 0, contextName: String = "", contextURI: String = "") {
         guard !tracks.isEmpty else { return }
         isRadio = false
+        ctxName = contextName; ctxURI = contextURI
         queue = tracks
         index = max(0, min(i, tracks.count - 1))
         loadCurrent(autoplay: true)
@@ -131,6 +135,8 @@ final class PlayerController: ObservableObject {
                 guard myIndex == index, !isRadio else { return }
                 guard r.ok, let rel = r.url, let url = api.absoluteURL(rel) else { loading = false; return }
                 source = r.source ?? ""
+                let played = track
+                Task { await api.postHistory(played, contextName: ctxName, contextURI: ctxURI) }
                 let item = AVPlayerItem(url: url)
                 attachItemObservers(item)
                 player.replaceCurrentItem(with: item)

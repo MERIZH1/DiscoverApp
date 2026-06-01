@@ -43,6 +43,19 @@ struct HomeResponse: Codable {
     let sections: [HomeSection]?
 }
 
+// MARK: - Verlauf
+struct HistoryEntry: Codable, Identifiable, Hashable {
+    var id: String { "\(ts)-\(uri)" }
+    let ts: Int
+    let kind: String?
+    let name: String
+    let artist: String?
+    let uri: String
+    let image: String?
+    let context_name: String?
+    let context_uri: String?
+}
+
 // MARK: - Abos
 struct SubItem: Codable, Identifiable, Hashable {
     var id: String { uri }

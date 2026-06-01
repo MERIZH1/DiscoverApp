@@ -98,7 +98,7 @@ struct TrackMenu: View {
     @EnvironmentObject var app: AppState
     let track: Track
     var body: some View {
-        Button { player.playNext(track) } label: { Label("Als Naechstes spielen", systemImage: "text.line.first.and.arrowtriangle.forward") }
+        Button { player.playNext(track) } label: { Label("Als Nächstes spielen", systemImage: "text.line.first.and.arrowtriangle.forward") }
         Button { player.addToQueue(track) } label: { Label("Zur Warteschlange", systemImage: "text.badge.plus") }
         Button { startRadio() } label: { Label("Song-Radio starten", systemImage: "dot.radiowaves.left.and.right") }
     }
@@ -191,7 +191,7 @@ struct HomeView: View {
 
                     // Zuletzt geoeffnet
                     if !recents.isEmpty {
-                        HomeRow(title: "Zuletzt geoeffnet", subtitle: nil, items: recents)
+                        HomeRow(title: "Zuletzt geöffnet", subtitle: nil, items: recents)
                     }
                     // Spotify-Home-Sektionen (Fuer dich erstellt, Empfohlene Sender, …)
                     ForEach(home?.sections ?? []) { sec in
@@ -320,7 +320,7 @@ struct AccountSheet: View {
                             }.padding(.vertical, 8).padding(.horizontal).contentShape(Rectangle())
                         }.buttonStyle(.plain)
                     }
-                    AccountAction(icon: "plus.circle", label: "Server hinzufuegen / aendern") { app.changeServer(); dismiss() }
+                    AccountAction(icon: "plus.circle", label: "Server hinzufügen / ändern") { app.changeServer(); dismiss() }
 
                     if isAdmin {
                         Divider().background(Theme.input).padding(.vertical, 8)
@@ -422,7 +422,7 @@ struct SettingsView: View {
                     SettingsGroup("WIEDERGABE") {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Offline-Buffer").font(.system(size: 15)).foregroundStyle(Theme.text)
-                            Text("Songs vorladen fuer unterbrochene Verbindung").font(.caption2).foregroundStyle(Theme.mute)
+                            Text("Songs vorladen für unterbrochene Verbindung").font(.caption2).foregroundStyle(Theme.mute)
                             Menu {
                                 ForEach(bufferOptions, id: \.0) { opt in
                                     Button(opt.1) { prebuffer = opt.0; if loaded { saveSettings() } }
@@ -436,25 +436,25 @@ struct SettingsView: View {
                             }
                         }
                         Toggle(isOn: $normalize) {
-                            Text("Lautstaerke normalisieren").font(.system(size: 15)).foregroundStyle(Theme.text)
+                            Text("Lautstärke normalisieren").font(.system(size: 15)).foregroundStyle(Theme.text)
                         }.tint(Theme.accent).onChange(of: normalize) { _ in if loaded { saveSettings() } }
                     }
 
                     // Auto-Download (Smart-Cache)
                     SettingsGroup("AUTO-DOWNLOAD (SMART-CACHE)") {
                         Toggle(isOn: $scEnabled) {
-                            Text("Oft gehoerte Songs automatisch auf den Server laden")
+                            Text("Oft gehörte Songs automatisch auf den Server laden")
                                 .font(.system(size: 15)).foregroundStyle(Theme.text)
                         }.tint(Theme.accent).onChange(of: scEnabled) { _ in if loaded { saveSmartCache() } }
-                        SCField(label: "...ab so vielen Sekunden gehoert (0 = aus)", value: $scSec) { if loaded { saveSmartCache() } }
-                        SCField(label: "...ODER ab so viel % der Songlaenge (0 = aus)", value: $scPct) { if loaded { saveSmartCache() } }
+                        SCField(label: "...ab so vielen Sekunden gehört (0 = aus)", value: $scSec) { if loaded { saveSmartCache() } }
+                        SCField(label: "...ODER ab so viel % der Songlänge (0 = aus)", value: $scPct) { if loaded { saveSmartCache() } }
                         SCField(label: "...ODER nach so vielen Wiedergaben (0 = aus)", value: $scPlays) { if loaded { saveSmartCache() } }
                     }
                     // Spotify-Cookie
                     SettingsGroup("SPOTIFY-COOKIE (sp_dc)") {
                         Text("Cookie-Status: \(app.profile?.has_spotify_cookie == true ? "✓ gesetzt" : "fehlt / abgelaufen")")
                             .font(.system(size: 14)).foregroundStyle(app.profile?.has_spotify_cookie == true ? Theme.accent : Theme.sub)
-                        TextField("sp_dc-Wert einfuegen", text: $cookie)
+                        TextField("sp_dc-Wert einfügen", text: $cookie)
                             .autocorrectionDisabled().textInputAutocapitalization(.never)
                             .foregroundStyle(Theme.text).padding(10)
                             .background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8))
@@ -704,10 +704,18 @@ struct LibraryView: View {
     @State private var playlists: [Playlist] = []
     @State private var subs: Set<String> = []
     @State private var subSync: [String: String] = [:]
-    @State private var radios: [RadioStation] = []
-    @State private var history: [HomeItem] = []
+    @State private var history: [HistoryEntry] = []
     @State private var filter = ""
     @State private var tab = "all"
+
+    private func isRadioItem(_ uri: String) -> Bool {
+        uri.hasPrefix("radio-name:") || uri.hasPrefix("radio:") || uri.hasPrefix("radio-id:")
+    }
+    private var radioPlaylists: [Playlist] {
+        var list = playlists.filter { isRadioItem($0.uri) }
+        if !filter.isEmpty { list = list.filter { $0.name.localizedCaseInsensitiveContains(filter) } }
+        return list
+    }
 
     @State private var loaded = false
     private let tabs: [(String, String)] = [
@@ -716,7 +724,7 @@ struct LibraryView: View {
     ]
 
     private var shown: [Playlist] {
-        var list = playlists
+        var list = playlists.filter { !isRadioItem($0.uri) }   // Radios haben eigenen Filter
         if tab == "subs" { list = list.filter { subs.contains($0.uri) } }
         if !filter.isEmpty { list = list.filter { $0.name.localizedCaseInsensitiveContains(filter) } }
         if tab == "alpha" { list.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending } }
@@ -743,12 +751,23 @@ struct LibraryView: View {
 
                 LazyVStack(spacing: 2) {
                     if tab == "radios" {
-                        ForEach(radios) { st in
-                            Button { player.playRadio(st) } label: { RadioRow(station: st) }.buttonStyle(.plain)
+                        ForEach(radioPlaylists) { pl in
+                            NavigationLink(value: pl) {
+                                LibraryRow(pl: pl, subscribed: false, sync: nil)
+                            }.buttonStyle(.plain)
                         }
                     } else if tab == "history" {
-                        ForEach(history) { it in
-                            NavigationLink(value: it) { HistoryRow(item: it) }.buttonStyle(.plain)
+                        ForEach(history) { e in
+                            if (e.kind ?? "") == "track" {
+                                Button {
+                                    player.play(tracks: [Track(uri: e.uri, name: e.name, artist: e.artist ?? "", image: e.image)],
+                                                contextName: e.context_name ?? "", contextURI: e.context_uri ?? "")
+                                } label: { HistoryEntryRow(entry: e) }.buttonStyle(.plain)
+                            } else {
+                                NavigationLink(value: Playlist(uri: e.uri, name: e.name, image: e.image)) {
+                                    HistoryEntryRow(entry: e)
+                                }.buttonStyle(.plain)
+                            }
                         }
                     } else {
                         ForEach(shown) { pl in
@@ -772,8 +791,7 @@ struct LibraryView: View {
         }
         .task(id: app.profile?.id) { await load() }
         .task(id: tab) {
-            if tab == "radios", radios.isEmpty { radios = (try? await app.api.radioFavorites()) ?? [] }
-            if tab == "history", history.isEmpty { history = (try? await app.api.recents()) ?? [] }
+            if tab == "history" { history = (try? await app.api.history()) ?? [] }
         }
     }
     private func load() async {
@@ -825,6 +843,22 @@ struct HistoryRow: View {
     }
 }
 
+struct HistoryEntryRow: View {
+    let entry: HistoryEntry
+    private var isTrack: Bool { (entry.kind ?? "") == "track" }
+    var body: some View {
+        HStack(spacing: 12) {
+            Artwork(url: entry.image, size: 50, corner: isTrack ? 4 : 6)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(entry.name).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
+                Text((entry.artist?.isEmpty == false ? entry.artist! : (entry.context_name ?? "")))
+                    .font(.system(size: 13)).foregroundStyle(Theme.sub).lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }.padding(.vertical, 6).padding(.horizontal).contentShape(Rectangle())
+    }
+}
+
 struct RadioRow: View {
     let station: RadioStation
     var body: some View {
@@ -867,11 +901,13 @@ struct RadioView: View {
 struct TrackListView: View {
     @EnvironmentObject var app: AppState
     @EnvironmentObject var player: PlayerController
+    @Environment(\.dismiss) private var dismiss
     let uri: String; let title: String; let image: String?; let isAlbum: Bool
     @State private var tracks: [Track] = []
     @State private var recs: [Track] = []
     @State private var loading = true
     @State private var hero: Color = Theme.elev
+    @State private var reload = 0
 
     private var metaText: String {
         if isAlbum { return "Album · \(tracks.count) Songs" }
@@ -899,10 +935,10 @@ struct TrackListView: View {
                         Image(systemName: "arrow.down.circle").font(.title2).foregroundStyle(Theme.sub)
                         Image(systemName: "ellipsis").font(.title3).foregroundStyle(Theme.sub).padding(.leading, 14)
                         Spacer()
-                        Button { if !tracks.isEmpty { player.shuffle = true; player.play(tracks: tracks.shuffled()) } } label: {
+                        Button { if !tracks.isEmpty { player.shuffle = true; player.play(tracks: tracks.shuffled(), contextName: title, contextURI: uri) } } label: {
                             Image(systemName: "shuffle").font(.title2).foregroundStyle(Theme.text)
                         }.padding(.trailing, 18)
-                        Button { if !tracks.isEmpty { player.shuffle = false; player.play(tracks: tracks, startAt: 0) } } label: {
+                        Button { if !tracks.isEmpty { player.shuffle = false; player.play(tracks: tracks, startAt: 0, contextName: title, contextURI: uri) } } label: {
                             Image(systemName: "play.fill").font(.system(size: 22)).foregroundStyle(.black)
                                 .frame(width: 56, height: 56).background(Theme.accent).clipShape(Circle())
                                 .shadow(color: Theme.accent.opacity(0.4), radius: 10)
@@ -922,21 +958,34 @@ struct TrackListView: View {
                 LazyVStack(spacing: 0) {
                     ForEach(Array(tracks.enumerated()), id: \.element.id) { idx, t in
                         NumberedTrackRow(n: idx + 1, track: t, showCover: !isAlbum, playing: player.current?.id == t.id) {
-                            player.shuffle = false; player.play(tracks: tracks, startAt: idx)
+                            player.shuffle = false; player.play(tracks: tracks, startAt: idx, contextName: title, contextURI: uri)
                         }
                     }
                 }.padding(.top, 6)
+
+                // Leer/Fehler -> erneut versuchen
+                if tracks.isEmpty && !loading {
+                    VStack(spacing: 12) {
+                        Text("Konnte nicht geladen werden").foregroundStyle(Theme.sub)
+                        Button { reload += 1 } label: {
+                            Label("Erneut versuchen", systemImage: "arrow.clockwise")
+                                .font(.system(size: 15, weight: .semibold)).foregroundStyle(.black)
+                                .padding(.horizontal, 20).padding(.vertical, 10)
+                                .background(Theme.accent).clipShape(Capsule())
+                        }
+                    }.frame(maxWidth: .infinity).padding(.top, 40)
+                }
 
                 // Empfehlungen ("Discover")
                 if !recs.isEmpty {
                     VStack(alignment: .leading, spacing: 2) {
                         SectionHeader("Empfehlungen")
-                        Text(isAlbum ? "Aehnliche Songs" : "Basierend auf dieser Playlist")
+                        Text(isAlbum ? "Ähnliche Songs" : "Basierend auf dieser Playlist")
                             .font(.system(size: 13)).foregroundStyle(Theme.sub)
                             .padding(.horizontal).padding(.bottom, 4)
                         ForEach(Array(recs.enumerated()), id: \.offset) { i, t in
                             TrackRow(track: t, playing: player.current?.id == t.id) {
-                                player.shuffle = false; player.play(tracks: recs, startAt: i)
+                                player.shuffle = false; player.play(tracks: recs, startAt: i, contextName: "Empfehlungen", contextURI: uri)
                             }
                         }
                     }.padding(.top, 14)
@@ -946,10 +995,18 @@ struct TrackListView: View {
         }
         .scrollContentBackground(.hidden).background(Theme.bg)
         .navigationTitle("").navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button { dismiss() } label: {
+                    Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
+                }
+            }
+        }
         .overlay { if loading { ProgressView().tint(Theme.accent) } }
-        .task {
-            loading = true
+        .task(id: reload) {
+            loading = true; tracks = []
             let absImg = image.flatMap { app.api.absoluteURL($0)?.absoluteString } ?? image
             if let c = await averageColor(absImg) { hero = c }
             var t = (isAlbum ? try? await app.api.albumTracks(uri) : try? await app.api.playlistTracks(uri, check: true))?.tracks ?? []
@@ -960,7 +1017,7 @@ struct TrackListView: View {
             }
             tracks = t; loading = false
         }
-        .task { recs = (try? await app.api.recommendations(uri)) ?? [] }
+        .task(id: reload) { recs = (try? await app.api.recommendations(uri)) ?? [] }
     }
 }
 
@@ -1038,7 +1095,13 @@ struct NowPlayingBar: View {
                 Artwork(url: player.displayImage, size: 44, corner: 5)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(player.displayTitle).font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.text).lineLimit(1)
-                    Text(player.displayArtist).font(.caption).foregroundStyle(Theme.sub).lineLimit(1)
+                    HStack(spacing: 5) {
+                        if !player.isRadio && !player.source.isEmpty {
+                            Circle().fill(player.source == "youtube" ? Color(hex6: 0xFF3B30) : Theme.accent)
+                                .frame(width: 6, height: 6)
+                        }
+                        Text(player.displayArtist).font(.caption).foregroundStyle(Theme.sub).lineLimit(1)
+                    }
                 }
                 Spacer()
                 Button { player.toggle() } label: {
@@ -1074,6 +1137,9 @@ struct PlayerView: View {
               VStack(spacing: 22) {
                 Spacer()
                 Artwork(url: p.displayImage, size: 300, corner: 12).shadow(radius: 24)
+                    .gesture(DragGesture(minimumDistance: 30).onEnded { v in
+                        if v.translation.height < -60 && abs(v.translation.width) < 60 { showLyrics = true }
+                    })
                 VStack(spacing: 6) {
                     Text(p.displayTitle).font(.title2.bold()).foregroundStyle(Theme.text).lineLimit(1)
                     Text(p.displayArtist).foregroundStyle(Theme.sub).lineLimit(1)
@@ -1147,11 +1213,7 @@ struct QueuePage: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Button { withAnimation { page = 0 } } label: {
-                    Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
-                }
-                Spacer()
-                Text("Warteschlange").font(.system(size: 17, weight: .bold)).foregroundStyle(Theme.text)
+                Text("Warteschlange").font(.system(size: 18, weight: .bold)).foregroundStyle(Theme.text)
                 Spacer()
                 Button { player.clearUpNext(); Haptics.tap() } label: {
                     Text("Leeren").font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.accent)
@@ -1163,7 +1225,7 @@ struct QueuePage: View {
                     Section {
                         QueueRow(track: c, playing: true)
                             .listRowBackground(Color.clear).listRowSeparator(.hidden)
-                    } header: { QueueHeader("Jetzt laeuft") }
+                    } header: { QueueHeader("Jetzt läuft") }
                 }
                 if !player.upNext.isEmpty {
                     Section {
@@ -1172,10 +1234,14 @@ struct QueuePage: View {
                                 .listRowBackground(Color.clear).listRowSeparator(.hidden)
                                 .contentShape(Rectangle())
                                 .onTapGesture { player.playAt(player.index + 1 + i) }
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) { player.removeUpNext(at: i) } label: {
+                                        Label("Entfernen", systemImage: "trash")
+                                    }
+                                }
                         }
                         .onMove { src, dst in player.moveUpNext(from: src, to: dst); Haptics.tap(.medium) }
-                        .onDelete { idx in idx.forEach { player.removeUpNext(at: $0) } }
-                    } header: { QueueHeader("Als Naechstes") }
+                    } header: { QueueHeader("Als Nächstes") }
                 }
             }
             .listStyle(.plain)

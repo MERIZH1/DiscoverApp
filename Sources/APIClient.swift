@@ -151,6 +151,21 @@ final class APIClient: ObservableObject {
         return r.items
     }
 
+    /// Wiedergabe-Verlauf laden.
+    func history(limit: Int = 200) async throws -> [HistoryEntry] {
+        struct R: Codable { let items: [HistoryEntry] }
+        let r: R = try await get("/api/me/history?limit=\(limit)")
+        return r.items
+    }
+
+    /// Track im Verlauf protokollieren (beim Abspielen).
+    func postHistory(_ t: Track, contextName: String = "", contextURI: String = "") async {
+        _ = try? await data("/api/me/history", method: "POST", json: [
+            "kind": "track", "name": t.name, "artist": t.artist, "uri": t.uri,
+            "image": t.image ?? "", "context_name": contextName, "context_uri": contextURI,
+        ])
+    }
+
     /// Abonnierte Playlists (fuer "Abo"-Markierung in der Bibliothek).
     func subscriptions() async throws -> [SubItem] {
         let r: SubsResponse = try await get("/api/subscriptions")
