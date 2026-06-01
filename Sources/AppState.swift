@@ -23,6 +23,7 @@ final class AppState: ObservableObject {
     @Published var downloads: DownloadManager
     @Published var profile: Profile?
     @Published var connected = false
+    @Published var allProfiles: [Profile] = []   // fuer "An Nutzer senden"
 
     /// Liquid-Glass-Design (iOS 26) — nur in der App umschaltbar.
     @Published var liquidGlass: Bool = UserDefaults.standard.bool(forKey: "liquidGlass") {
@@ -48,7 +49,7 @@ final class AppState: ObservableObject {
         let url = normalize(server)
         api.baseURL = url
         do {
-            _ = try await api.profiles()
+            allProfiles = (try? await api.profiles()) ?? []
             serverURL = url
             rememberServer(url)
             connected = true
@@ -113,6 +114,7 @@ final class AppState: ObservableObject {
         api.baseURL = serverURL
         do {
             let profs = try await api.profiles()
+            allProfiles = profs
             connected = true
             if let p = profs.first(where: { $0.id == profileId }) {
                 selectProfile(p)

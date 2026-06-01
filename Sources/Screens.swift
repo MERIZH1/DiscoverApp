@@ -170,6 +170,14 @@ struct TrackMenu: View {
         guard let id = track.uri.split(separator: ":").last else { return nil }
         return URL(string: "https://open.spotify.com/track/\(id)")
     }
+    private var others: [Profile] {
+        (app?.allProfiles ?? []).filter { $0.id != app?.profile?.id }
+    }
+    private func sendTo(_ p: Profile) {
+        guard let api = app?.api else { return }
+        Haptics.tap()
+        Task { _ = await api.pushToProfile(p.id, track: track) }
+    }
 
     var body: some View {
         // Quick-Actions als Icon-Reihe oben — alle drei sind Controls (ShareLink + Buttons)
@@ -179,14 +187,20 @@ struct TrackMenu: View {
                 Label("Teilen", systemImage: "square.and.arrow.up")
             }
             Button { app?.player.playNext(track); Haptics.tap() } label: { Label("Als Nächstes", systemImage: "text.line.first.and.arrowtriangle.forward") }
-            Button { app?.player.addToQueue(track); Haptics.tap() } label: { Label("Warteschlange", systemImage: "text.badge.plus") }
+            Menu {
+                if others.isEmpty {
+                    Text("Keine anderen Profile")
+                } else {
+                    ForEach(others) { p in
+                        Button { sendTo(p) } label: { Label(p.name, systemImage: "person.crop.circle") }
+                    }
+                }
+            } label: { Label("Senden", systemImage: "paperplane") }
         }
         // restliche Optionen als Liste darunter
+        Button { app?.player.addToQueue(track); Haptics.tap() } label: { Label("Zur Warteschlange", systemImage: "text.badge.plus") }
         if let onAdd = onAddToPlaylist {
             Button { onAdd() } label: { Label("Zu Playlist hinzufügen", systemImage: "plus.circle") }
-        }
-        if let onSend = onSendToUser {
-            Button { onSend() } label: { Label("An Nutzer senden", systemImage: "paperplane") }
         }
         Button { app?.downloads.toggle(track) } label: {
             let dl = app?.downloads.isDownloaded(track.uri) ?? false
