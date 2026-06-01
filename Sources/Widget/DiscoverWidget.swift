@@ -38,8 +38,8 @@ struct DiscoverHomeWidgetView: View {
     private let bg = Color(red: 0.07, green: 0.07, blue: 0.07)
     var body: some View {
         let content = VStack(spacing: 8) {
-            Image(systemName: "waveform.circle.fill")
-                .font(.system(size: 44)).foregroundColor(Color(red: 0.12, green: 0.84, blue: 0.38))
+            Image("WidgetLogo").resizable().scaledToFit()
+                .frame(width: 56, height: 56).clipShape(RoundedRectangle(cornerRadius: 13))
             Text("Discover").font(.system(size: 15, weight: .bold)).foregroundColor(.white)
         }.frame(maxWidth: .infinity, maxHeight: .infinity)
         if #available(iOS 17.0, *) {
