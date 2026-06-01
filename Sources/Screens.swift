@@ -140,8 +140,16 @@ struct TrackMenu: View {
     var onShowArtist: (() -> Void)? = nil
     var onShowAlbum: (() -> Void)? = nil
     var body: some View {
-        Button { player.playNext(track); Haptics.tap() } label: { Label("Als Nächstes spielen", systemImage: "text.line.first.and.arrowtriangle.forward") }
-        Button { player.addToQueue(track); Haptics.tap() } label: { Label("Zur Warteschlange", systemImage: "text.badge.plus") }
+        // Quick-Actions als Icon-Reihe oben (wie Ausschneiden/Kopieren/Einsetzen)
+        ControlGroup {
+            Menu {
+                Button { copySpotify() } label: { Label("Spotify-Link kopieren", systemImage: "link") }
+                Button { Task { await copyYouTube() } } label: { Label("YouTube-Link kopieren", systemImage: "play.rectangle") }
+            } label: { Label("Teilen", systemImage: "square.and.arrow.up") }
+            Button { player.playNext(track); Haptics.tap() } label: { Label("Als Nächstes", systemImage: "text.line.first.and.arrowtriangle.forward") }
+            Button { player.addToQueue(track); Haptics.tap() } label: { Label("Warteschlange", systemImage: "text.badge.plus") }
+        }
+        // restliche Optionen als Liste darunter
         Button { downloads.toggle(track) } label: {
             Label(downloads.isDownloaded(track.uri) ? "Aus Offline entfernen" : "Herunterladen",
                   systemImage: downloads.isDownloaded(track.uri) ? "trash" : "arrow.down.circle")
@@ -153,10 +161,6 @@ struct TrackMenu: View {
             Button { onAlbum() } label: { Label("Album anzeigen", systemImage: "square.stack") }
         }
         Button { startRadio() } label: { Label("Song-Radio starten", systemImage: "dot.radiowaves.left.and.right") }
-        Menu {
-            Button { copySpotify() } label: { Label("Spotify-Link kopieren", systemImage: "link") }
-            Button { Task { await copyYouTube() } } label: { Label("YouTube-Link kopieren", systemImage: "play.rectangle") }
-        } label: { Label("Teilen", systemImage: "square.and.arrow.up") }
     }
     private func copySpotify() {
         if let id = track.uri.split(separator: ":").last {
