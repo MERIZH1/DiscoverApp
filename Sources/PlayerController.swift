@@ -17,6 +17,24 @@ final class PlaybackClock: ObservableObject {
     @Published var duration: Double = 0
 }
 
+/// Liest den ICY-StreamTitle (laufender Song) aus einem Live-Radio-Stream.
+/// (SHOUTcast/Icecast senden den aktuellen Titel als Timed-Metadata.)
+final class ICYMetadataReader: NSObject, AVPlayerItemMetadataOutputPushDelegate {
+    var onTitle: ((String) -> Void)?
+    nonisolated func metadataOutput(_ output: AVPlayerItemMetadataOutput,
+                                    didOutputTimedMetadataGroups groups: [AVTimedMetadataGroup],
+                                    from track: AVPlayerItemTrack?) {
+        for group in groups {
+            for item in group.items {
+                if let s = item.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty {
+                    onTitle?(s)
+                    return
+                }
+            }
+        }
+    }
+}
+
 /// Nativer Player: Queue + AVPlayer + Lock-Screen. Spielt Tracks (ueber das
 /// Backend aufgeloest) und Live-Radio (direkte Stream-URL). Komplett nativ.
 @MainActor
@@ -37,6 +55,8 @@ final class PlayerController: ObservableObject {
     @Published private(set) var source = ""   // "youtube" | "navidrome"
     private var radioTitle = ""
     private var radioFavicon: String?
+    @Published private(set) var radioNowPlaying = ""   // ICY-StreamTitle (laufender Song im Radio)
+    private let metaReader = ICYMetadataReader()
     private var primedNotLoaded = false   // letzter Song wiederhergestellt, aber noch nicht gestreamt
     var profileScope = ""                 // fuer profil-spezifische Persistenz
     weak var downloads: DownloadManager?  // Offline-Wiedergabe
@@ -48,7 +68,7 @@ final class PlayerController: ObservableObject {
     var hasContent: Bool { current != nil || isRadio }
     var isEpisode: Bool { !isRadio && (current?.uri.hasPrefix("spotify:episode:") ?? false) }
     var displayTitle: String { isRadio ? radioTitle : (current?.name ?? "") }
-    var displayArtist: String { isRadio ? "Live-Radio" : (current?.artist ?? "") }
+    var displayArtist: String { isRadio ? (radioNowPlaying.isEmpty ? "Live-Radio" : radioNowPlaying) : (current?.artist ?? "") }
     var displayImage: String? { isRadio ? radioFavicon : current?.image }
     var upNext: [Track] { manualQueue + (index + 1 < queue.count ? Array(queue[(index+1)...]) : []) }
 
@@ -90,7 +110,7 @@ final class PlayerController: ObservableObject {
     // MARK: - Tracks
     func play(tracks: [Track], startAt i: Int = 0, contextName: String = "", contextURI: String = "") {
         guard !tracks.isEmpty else { return }
-        isRadio = false
+        isRadio = false; radioNowPlaying = ""
         ctxName = contextName; ctxURI = contextURI
         original = tracks
         manualQueue = []
@@ -122,7 +142,7 @@ final class PlayerController: ObservableObject {
               let d = UserDefaults.standard.data(forKey: "playerSnap_\(profileScope)"),
               let snap = try? JSONDecoder().decode(PlayerSnapshot.self, from: d),
               !snap.tracks.isEmpty else { return }
-        isRadio = false
+        isRadio = false; radioNowPlaying = ""
         queue = snap.tracks
         original = snap.original ?? snap.tracks
         manualQueue = []
@@ -321,10 +341,22 @@ final class PlayerController: ObservableObject {
     func playRadio(_ s: RadioStation) {
         guard let url = URL(string: s.url) else { return }
         isRadio = true; queue = []; index = 0; manualQueue = []; original = []
-        radioTitle = s.name; radioFavicon = s.favicon
+        radioTitle = s.name; radioFavicon = s.favicon; radioNowPlaying = ""
         currentTime = 0; duration = 0; loading = true
         let item = AVPlayerItem(url: url)
         attachItemObservers(item)
+        // ICY-StreamTitle (laufender Song) live mitlesen
+        let mdOut = AVPlayerItemMetadataOutput(identifiers: nil)
+        metaReader.onTitle = { [weak self] title in
+            Task { @MainActor in
+                guard let self, self.isRadio else { return }
+                self.radioNowPlaying = title
+                self.updateNowPlaying(title: self.radioTitle, artist: title.isEmpty ? "Live-Radio" : title,
+                                      album: nil, dur: 0, art: self.radioFavicon, live: true)
+            }
+        }
+        mdOut.setDelegate(metaReader, queue: .main)
+        item.add(mdOut)
         player.replaceCurrentItem(with: item)
         updateNowPlaying(title: s.name, artist: "Live-Radio", album: nil, dur: 0, art: s.favicon, live: true)
         resume(); loading = false

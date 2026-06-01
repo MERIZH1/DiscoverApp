@@ -1330,7 +1330,8 @@ struct TrackListView: View {
                             }
                         } label: {
                             Image(systemName: "ellipsis").font(.title3).foregroundStyle(Theme.sub)
-                        }.padding(.leading, 14)
+                                .frame(width: 46, height: 46).contentShape(Rectangle())
+                        }.padding(.leading, 4)
                         Spacer()
                         Button { if !tracks.isEmpty { player.shuffle = true; player.play(tracks: tracks.shuffled(), contextName: title, contextURI: uri) } } label: {
                             Image(systemName: "shuffle").font(.title2).foregroundStyle(Theme.text)
@@ -1558,7 +1559,7 @@ struct NumberedTrackRow: View {
                 TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true })
             } label: {
                 Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
-                    .frame(width: 34, height: 34).contentShape(Rectangle())
+                    .frame(width: 46, height: 46).contentShape(Rectangle())
             }
         }.padding(.vertical, 9).padding(.horizontal)
             .background(playing ? Theme.accent.opacity(0.08) : .clear)
@@ -1610,7 +1611,7 @@ struct TrackRow: View {
                 TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true })
             } label: {
                 Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
-                    .frame(width: 34, height: 34).contentShape(Rectangle())
+                    .frame(width: 46, height: 46).contentShape(Rectangle())
             }
         }.padding(.vertical, 9).padding(.horizontal)
             .contentShape(Rectangle())
