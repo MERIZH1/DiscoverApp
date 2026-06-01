@@ -1484,7 +1484,6 @@ struct PodcastView: View {
     @State private var resp: PodcastResponse?
     @State private var loading = true
     @State private var hero: Color = Theme.elev
-    @State private var showInfo = false
 
     private var showName: String { resp?.show?.name ?? title }
     private var showImage: String? { resp?.show?.image ?? image }
@@ -1493,23 +1492,22 @@ struct PodcastView: View {
         ScrollView {
             VStack(spacing: 0) {
                 VStack(spacing: 12) {
-                    Artwork(url: showImage, size: 180, corner: 8).shadow(color: .black.opacity(0.5), radius: 24, y: 8).padding(.top, 12)
+                    PodcastFlipCard(image: showImage, description: resp?.show?.description, hero: hero)
+                        .padding(.top, 24)
                     Text(showName).font(.system(size: 22, weight: .black)).foregroundStyle(Theme.text)
                         .multilineTextAlignment(.center).padding(.horizontal)
                     if let pub = resp?.show?.publisher, !pub.isEmpty {
                         Text(pub).font(.system(size: 13)).foregroundStyle(Theme.sub)
                     }
-                    HStack(spacing: 5) {
+                    HStack(spacing: 10) {
+                        if let r = resp?.show?.rating, r > 0 {
+                            Label(String(format: "%.1f", r), systemImage: "star.fill")
+                                .font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.accent)
+                        }
                         Text("\(resp?.episodes.count ?? 0) Folgen").font(.system(size: 13)).foregroundStyle(Theme.sub)
-                        Image(systemName: "info.circle").font(.system(size: 13)).foregroundStyle(Theme.sub)
                     }
+                    Text("Cover antippen für Beschreibung").font(.system(size: 11)).foregroundStyle(Theme.mute)
                 }.frame(maxWidth: .infinity).padding(.bottom, 16)
-                .background(LinearGradient(stops: [
-                    .init(color: hero, location: 0), .init(color: hero, location: 0.3),
-                    .init(color: Theme.bg, location: 0.95)], startPoint: .top, endPoint: .bottom)
-                    .ignoresSafeArea(edges: .top))
-                .contentShape(Rectangle())
-                .onTapGesture { showInfo = true }   // Hero antippen -> Podcast-Info
 
                 LazyVStack(spacing: 0) {
                     ForEach(Array((resp?.episodes ?? []).enumerated()), id: \.element.id) { i, ep in
@@ -1523,7 +1521,16 @@ struct PodcastView: View {
                 Color.clear.frame(height: 130)
             }
         }
-        .scrollContentBackground(.hidden).background(Theme.bg)
+        .scrollContentBackground(.hidden)
+        .background(
+            LinearGradient(stops: [
+                .init(color: hero, location: 0),
+                .init(color: hero, location: 0.16),
+                .init(color: hero.opacity(0.32), location: 0.34),
+                .init(color: Theme.bg, location: 0.52)],
+                startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
+        )
         .navigationTitle("").navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbarBackground(.hidden, for: .navigationBar)
@@ -1531,8 +1538,6 @@ struct PodcastView: View {
             Button { dismiss() } label: { Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text) }
         } }
         .overlay { if loading { LoadingView() } }
-        .sheet(isPresented: $showInfo) { PodcastInfoSheet(show: resp?.show, name: showName, image: showImage,
-                                                          episodeCount: resp?.episodes.count ?? 0) }
         .task {
             loading = true
             let absImg = image.flatMap { app.api.absoluteURL($0)?.absoluteString } ?? image
@@ -1543,43 +1548,37 @@ struct PodcastView: View {
     }
 }
 
-// MARK: - Podcast-Info (Beschreibung, Bewertung)
-struct PodcastInfoSheet: View {
-    let show: PodcastShow?
-    let name: String
+// MARK: - Podcast-Cover, das zur Beschreibung umklappt (Flip-Card)
+struct PodcastFlipCard: View {
     let image: String?
-    let episodeCount: Int
-    @Environment(\.dismiss) private var dismiss
+    let description: String?
+    var hero: Color = Theme.elev
+    @State private var flipped = false
+    private let side: CGFloat = 230
+
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    Artwork(url: show?.image ?? image, size: 160, corner: 10)
-                        .shadow(color: .black.opacity(0.5), radius: 20, y: 6).padding(.top, 12)
-                    Text(name).font(.title3.bold()).foregroundStyle(Theme.text)
-                        .multilineTextAlignment(.center).padding(.horizontal)
-                    if let pub = show?.publisher, !pub.isEmpty {
-                        Text(pub).font(.system(size: 14)).foregroundStyle(Theme.sub)
-                    }
-                    HStack(spacing: 14) {
-                        if let r = show?.rating, r > 0 {
-                            Label(String(format: "%.1f", r), systemImage: "star.fill")
-                                .font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.accent)
-                        }
-                        Text("\(episodeCount) Folgen").font(.system(size: 13)).foregroundStyle(Theme.sub)
-                    }
-                    if let d = show?.description, !d.isEmpty {
-                        Text(d).font(.system(size: 15)).foregroundStyle(Theme.text.opacity(0.9))
-                            .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal).padding(.top, 4)
-                    }
-                }.padding(.bottom, 30)
-            }
-            .scrollContentBackground(.hidden).background(Theme.bg)
-            .navigationTitle("Info").navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .topBarTrailing) {
-                Button("Fertig") { dismiss() }.foregroundStyle(Theme.accent)
-            } }
+        ZStack {
+            Artwork(url: image, size: side, corner: 12)
+                .opacity(flipped ? 0 : 1)
+            back
+                .opacity(flipped ? 1 : 0)
+                .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))   // Text nicht gespiegelt
         }
+        .rotation3DEffect(.degrees(flipped ? 180 : 0), axis: (x: 0, y: 1, z: 0))
+        .animation(.easeInOut(duration: 0.5), value: flipped)
+        .shadow(color: .black.opacity(0.5), radius: 24, y: 8)
+        .onTapGesture { flipped.toggle() }
+    }
+
+    private var back: some View {
+        ScrollView {
+            Text((description?.isEmpty == false) ? description! : "Keine Beschreibung verfügbar.")
+                .font(.system(size: 13)).foregroundStyle(Theme.text)
+                .frame(maxWidth: .infinity, alignment: .leading).padding(14)
+        }
+        .frame(width: side, height: side)
+        .background(LinearGradient(colors: [hero.opacity(0.95), Theme.elev], startPoint: .top, endPoint: .bottom))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 

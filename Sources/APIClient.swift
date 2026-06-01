@@ -80,6 +80,9 @@ final class APIClient: ObservableObject {
         guard let url = absoluteURL(relativeOrAbsolute) else { throw APIError.badURL }
         var req = URLRequest(url: url)
         if let pid = profileId { req.setValue(pid, forHTTPHeaderField: "X-Profile-Id") }
+        // Manche Podcast-CDNs liefern ohne Browser-UA 403
+        req.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15",
+                     forHTTPHeaderField: "User-Agent")
         return try await session.download(for: req)
     }
 
