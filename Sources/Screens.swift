@@ -1178,7 +1178,8 @@ struct ArtistView: View {
                 }.frame(maxWidth: .infinity).padding(.bottom, 16)
                 .background(LinearGradient(stops: [
                     .init(color: hero, location: 0), .init(color: hero, location: 0.3),
-                    .init(color: Theme.bg, location: 0.95)], startPoint: .top, endPoint: .bottom))
+                    .init(color: Theme.bg, location: 0.95)], startPoint: .top, endPoint: .bottom)
+                    .ignoresSafeArea(edges: .top))
 
                 if !top.isEmpty {
                     SectionHeader("Beliebt")
@@ -1346,6 +1347,7 @@ struct TrackListView: View {
                         .init(color: hero.opacity(0.35), location: 0.62),
                         .init(color: Theme.bg, location: 0.95)],
                         startPoint: .top, endPoint: .bottom)
+                        .ignoresSafeArea(edges: .top)   // Gradient bis ganz nach oben (hinter die Notch)
                 )
                 // Tracks (nummeriert)
                 LazyVStack(spacing: 0) {
@@ -1464,7 +1466,8 @@ struct PodcastView: View {
                 }.frame(maxWidth: .infinity).padding(.bottom, 16)
                 .background(LinearGradient(stops: [
                     .init(color: hero, location: 0), .init(color: hero, location: 0.3),
-                    .init(color: Theme.bg, location: 0.95)], startPoint: .top, endPoint: .bottom))
+                    .init(color: Theme.bg, location: 0.95)], startPoint: .top, endPoint: .bottom)
+                    .ignoresSafeArea(edges: .top))
 
                 LazyVStack(spacing: 0) {
                     ForEach(Array((resp?.episodes ?? []).enumerated()), id: \.element.id) { i, ep in
