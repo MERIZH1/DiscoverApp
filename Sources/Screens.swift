@@ -959,11 +959,14 @@ struct LibraryView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
+                Text("Meine Bibliothek").font(.system(size: 28, weight: .heavy)).foregroundStyle(Theme.text)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal).padding(.top, 6)
+
                 HStack(spacing: 10) {
                     Image(systemName: "magnifyingglass").foregroundStyle(Theme.mute)
                     TextField("In Bibliothek suchen", text: $filter).foregroundStyle(Theme.text)
                 }.padding(.horizontal, 14).padding(.vertical, 12).background(Theme.input)
-                    .clipShape(RoundedRectangle(cornerRadius: 8)).padding(.horizontal).padding(.top, 4)
+                    .clipShape(RoundedRectangle(cornerRadius: 8)).padding(.horizontal).padding(.top, 10)
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -1015,7 +1018,7 @@ struct LibraryView: View {
             }
             .scrollContentBackground(.hidden).background(Theme.bg)
             .overlay { if !loaded && playlists.isEmpty { ProgressView().tint(Theme.accent) } }
-            .navigationTitle("Meine Bibliothek")
+            .navigationTitle("").navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: Playlist.self) { pl in
                 TrackListView(uri: pl.uri, title: pl.name, image: pl.image, isAlbum: false)
             }
@@ -1294,6 +1297,7 @@ struct TrackListView: View {
     }
 
     var body: some View {
+        GeometryReader { geo in
         ScrollView {
             VStack(spacing: 0) {
                 // Hero
@@ -1339,6 +1343,7 @@ struct TrackListView: View {
                         }
                     }.padding(.horizontal).padding(.top, 8)
                 }
+                .padding(.top, geo.safeAreaInsets.top)   // Cover-Position erhalten (Notch+Navbar)
                 .padding(.bottom, 16)
                 .background(
                     LinearGradient(stops: [
@@ -1419,6 +1424,7 @@ struct TrackListView: View {
                 }
             }
         }
+        .ignoresSafeArea(edges: .top)   // ScrollView bis zur Notch -> Hero-Gradient bleedet hoch
         .overlay { if loading { ProgressView().tint(Theme.accent) } }
         .task(id: reload) {
             loading = true; tracks = []
@@ -1436,6 +1442,8 @@ struct TrackListView: View {
             Task { await app.api.prewarmPlaylist(warm) }   // Server-Vorladen wie PWA
         }
         .task(id: reload) { recs = (try? await app.api.recommendations(uri)) ?? [] }
+        }   // GeometryReader
+        .ignoresSafeArea(edges: .top)   // GeometryReader liefert so den echten safeAreaInsets.top
     }
 }
 
