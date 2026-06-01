@@ -339,6 +339,13 @@ final class PlayerController: ObservableObject {
                 if it.status == .readyToPlay {
                     let d = CMTimeGetSeconds(it.duration)
                     if d.isFinite, d > 0 { self.duration = d }
+                } else if it.status == .failed {
+                    // Offline-Datei kaputt? -> loeschen und stattdessen streamen
+                    if self.source == "offline", let t = self.current {
+                        self.downloads?.delete(t.uri)
+                        self.source = ""
+                        self.loadCurrent(autoplay: true)
+                    }
                 }
             }
         }

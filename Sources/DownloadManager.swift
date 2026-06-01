@@ -37,7 +37,11 @@ final class DownloadManager: ObservableObject {
         defer { busy.remove(track.uri) }
         guard let r = try? await api.streamURL(for: track), r.ok,
               let rel = r.url, let url = api.absoluteURL(rel),
-              let (tmp, _) = try? await URLSession.shared.download(from: url) else { return }
+              let (tmp, resp) = try? await URLSession.shared.download(from: url) else { return }
+        // Nur echte Audio-Antworten speichern (kein 404/HTML, keine Mini-Fehlerseite)
+        if let http = resp as? HTTPURLResponse, !(200...299).contains(http.statusCode) { return }
+        let size = ((try? FileManager.default.attributesOfItem(atPath: tmp.path))?[.size] as? Int) ?? 0
+        if size < 10_000 { return }
         let dest = dir.appendingPathComponent(key(track.uri) + ".m4a")
         try? FileManager.default.removeItem(at: dest)
         do { try FileManager.default.moveItem(at: tmp, to: dest) } catch { return }
