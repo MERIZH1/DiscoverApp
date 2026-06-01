@@ -21,6 +21,8 @@ final class PlayerController: ObservableObject {
     @Published private(set) var source = ""   // "youtube" | "navidrome"
     private var radioTitle = ""
     private var radioFavicon: String?
+    private var primedNotLoaded = false   // letzter Song wiederhergestellt, aber noch nicht gestreamt
+    var profileScope = ""                 // fuer profil-spezifische Persistenz
 
     var current: Track? { queue.indices.contains(index) ? queue[index] : nil }
     var hasContent: Bool { current != nil || isRadio }
@@ -58,9 +60,35 @@ final class PlayerController: ObservableObject {
         loadCurrent(autoplay: true)
     }
 
-    func toggle() { isPlaying ? pause() : resume() }
-    func resume() { player.play(); isPlaying = true; updateRate() }
+    func toggle() {
+        if primedNotLoaded { loadCurrent(autoplay: true); return }
+        isPlaying ? pause() : resume()
+    }
+    func resume() {
+        if primedNotLoaded { loadCurrent(autoplay: true); return }
+        player.play(); isPlaying = true; updateRate()
+    }
     func pause() { player.pause(); isPlaying = false; updateRate() }
+
+    /// Letzten Song wiederherstellen (Mini-Player sofort da, aber noch nicht gestreamt).
+    func prime(_ t: Track) {
+        guard !hasContent else { return }
+        isRadio = false; queue = [t]; index = 0
+        currentTime = 0; duration = t.durationSec; source = ""; isPlaying = false
+        primedNotLoaded = true
+        updateNowPlaying(title: t.name, artist: t.artist, album: t.album, dur: t.durationSec, art: t.image, live: false)
+    }
+    func restoreLast() {
+        guard !hasContent,
+              let d = UserDefaults.standard.data(forKey: "lastTrack_\(profileScope)"),
+              let t = try? JSONDecoder().decode(Track.self, from: d) else { return }
+        prime(t)
+    }
+    private func persistLast(_ t: Track) {
+        if let d = try? JSONEncoder().encode(t) {
+            UserDefaults.standard.set(d, forKey: "lastTrack_\(profileScope)")
+        }
+    }
 
     func next(auto: Bool = false) {
         if isRadio { return }
@@ -134,6 +162,8 @@ final class PlayerController: ObservableObject {
 
     private func loadCurrent(autoplay: Bool) {
         guard let track = current else { return }
+        primedNotLoaded = false
+        persistLast(track)
         updateRemoteForContent()
         loading = true; currentTime = 0; duration = track.durationSec; source = ""
         updateNowPlaying(title: track.name, artist: track.artist, album: track.album,

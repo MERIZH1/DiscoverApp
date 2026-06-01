@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var app = AppState()
+    @State private var booting = true
 
     var body: some View {
         ZStack {
@@ -15,11 +16,37 @@ struct ContentView: View {
                     MainView()
                 }
             }
+            if booting { SplashView().transition(.opacity).zIndex(10) }
         }
         .environmentObject(app)
         .environmentObject(app.player)
-        .task { await app.restore() }
+        .task {
+            await app.restore()
+            try? await Task.sleep(nanoseconds: 500_000_000)   // kurze Mindestanzeige
+            withAnimation(.easeOut(duration: 0.4)) { booting = false }
+        }
         .preferredColorScheme(.dark)
+    }
+}
+
+// MARK: - Ladescreen
+struct SplashView: View {
+    @State private var pulse = false
+    var body: some View {
+        ZStack {
+            Color(hex6: 0x121212).ignoresSafeArea()
+            VStack(spacing: 16) {
+                Image(systemName: "waveform.circle.fill")
+                    .font(.system(size: 92)).foregroundStyle(Color(hex6: 0x1ED760))
+                    .scaleEffect(pulse ? 1.08 : 0.9)
+                    .shadow(color: .black.opacity(0.4), radius: 18, y: 8)
+                Text("Discover").font(.system(size: 22, weight: .bold)).foregroundStyle(.white)
+                Text("Lädt…").font(.system(size: 13)).foregroundStyle(.white.opacity(0.55))
+            }
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.75).repeatForever(autoreverses: true)) { pulse = true }
+        }
     }
 }
 

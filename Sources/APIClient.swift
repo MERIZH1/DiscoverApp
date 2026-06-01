@@ -160,11 +160,20 @@ final class APIClient: ObservableObject {
         return d != nil
     }
 
-    /// "Zuletzt geoeffnet" (Recents-Feed) — Container (Album/Artist/Playlist/Podcast).
+    /// "Zuletzt geoeffnet" (Recents-Feed). Robust dekodiert — ein einzelnes
+    /// fehlerhaftes Item (z.B. ohne name) darf nicht die ganze Liste kippen.
     func recents(limit: Int = 20) async throws -> [HomeItem] {
-        struct R: Codable { let items: [HomeItem] }
-        let r: R = try await get("/api/recents?limit=\(limit)")
-        return r.items
+        let d = try await data("/api/recents?limit=\(limit)")
+        let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any]
+        let items = (obj?["items"] as? [[String: Any]]) ?? []
+        return items.compactMap { dict in
+            guard let uri = dict["uri"] as? String, !uri.isEmpty else { return nil }
+            return HomeItem(uri: uri,
+                            name: (dict["name"] as? String) ?? "",
+                            image: dict["image"] as? String,
+                            sub: dict["sub"] as? String,
+                            type: dict["type"] as? String)
+        }
     }
 
     /// Wiedergabe-Verlauf laden.

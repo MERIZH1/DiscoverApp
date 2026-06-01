@@ -68,6 +68,8 @@ final class AppState: ObservableObject {
         profile = p
         profileId = p.id
         api.profileId = p.id
+        player.profileScope = p.id
+        player.restoreLast()   // letzten Song in den Mini-Player laden
     }
 
     /// Profil im laufenden Betrieb wechseln (Account-Menue).

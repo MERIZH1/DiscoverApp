@@ -237,7 +237,13 @@ struct HomeView: View {
             if recents.isEmpty { recents = app.cacheGet("recents", [HomeItem].self) ?? [] }
             // 2) Frisch nachladen + Cache aktualisieren (taucht beim Zurueckkommen auf)
             if let h = try? await app.api.home() { home = h; app.cacheSet("home", h) }
-            if let r = try? await app.api.recents() { recents = r; app.cacheSet("recents", r) }
+            // Recents mit Retry — kann beim Start kurz 502 liefern (Token-Aufwaermung)
+            for attempt in 0..<3 {
+                if let r = try? await app.api.recents(), !r.isEmpty {
+                    recents = r; app.cacheSet("recents", r); break
+                }
+                if attempt < 2 { try? await Task.sleep(nanoseconds: 900_000_000) }
+            }
         }
     }
 }
@@ -619,6 +625,7 @@ struct SearchView: View {
     @State private var res: SearchResponse?
     @State private var scope = "all"
     @State private var busy = false
+    @State private var debounce: Task<Void, Never>?
 
     var body: some View {
         NavigationStack {
@@ -629,6 +636,7 @@ struct SearchView: View {
                         .foregroundStyle(.black).tint(.black)
                         .autocorrectionDisabled().textInputAutocapitalization(.never)
                         .onSubmit { runSearch() }
+                        .onChange(of: query) { _ in debounceSearch() }
                     if !query.isEmpty {
                         Button { query = ""; res = nil } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.black.opacity(0.5)) }
                     }
@@ -655,9 +663,9 @@ struct SearchView: View {
                             }
                             if scope == "all" || scope == "tracks", let tracks = r.tracks, !tracks.isEmpty {
                                 SectionHeader("Songs")
-                                ForEach(Array(tracks.prefix(scope == "tracks" ? 50 : 6).enumerated()), id: \.element.id) { i, t in
+                                ForEach(Array(tracks.prefix(scope == "tracks" ? 50 : 6).enumerated()), id: \.offset) { i, t in
                                     TrackRow(track: t, playing: player.current?.id == t.id) {
-                                        player.play(tracks: tracks, startAt: i)
+                                        player.play(tracks: tracks, startAt: i, contextName: "Suche", contextURI: "")
                                     }
                                 }
                             }
@@ -707,6 +715,20 @@ struct SearchView: View {
         guard !q.isEmpty else { return }
         busy = true
         Task { res = try? await app.api.search(q); busy = false }
+    }
+    /// Tippen -> nach kurzer Pause automatisch suchen (wie PWA).
+    private func debounceSearch() {
+        debounce?.cancel()
+        let q = query.trimmingCharacters(in: .whitespaces)
+        if q.isEmpty { res = nil; busy = false; return }
+        debounce = Task {
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            if Task.isCancelled { return }
+            busy = true
+            let r = try? await app.api.search(q)
+            if Task.isCancelled { return }
+            res = r; busy = false
+        }
     }
 }
 
@@ -861,15 +883,17 @@ struct LibraryView: View {
         }
     }
     private func load() async {
-        // Cache sofort
+        // Cache sofort (Playlists + Abos) -> Sortierung gleich korrekt, kein Hochschnellen
         if playlists.isEmpty { playlists = app.cacheGet("playlists", [Playlist].self) ?? [] }
+        if subs.isEmpty, let cs = app.cacheGet("subs", [SubItem].self) { applySubs(cs) }
         // Sequenziell (nicht parallel) — vermeidet gleichzeitige Spotify-Token-Fetches
         if let p = try? await app.api.playlists() { playlists = p; app.cacheSet("playlists", p) }
-        if let s = try? await app.api.subscriptions() {
-            subs = Set(s.map { $0.uri })
-            subSync = Dictionary(s.compactMap { i in i.last_sync.map { (i.uri, $0) } }) { a, _ in a }
-        }
+        if let s = try? await app.api.subscriptions() { applySubs(s); app.cacheSet("subs", s) }
         loaded = true
+    }
+    private func applySubs(_ s: [SubItem]) {
+        subs = Set(s.map { $0.uri })
+        subSync = Dictionary(s.compactMap { i in i.last_sync.map { (i.uri, $0) } }) { a, _ in a }
     }
 }
 
