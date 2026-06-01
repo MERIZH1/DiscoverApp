@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 import UIKit
 import AVKit
 import CoreSpotlight
@@ -96,7 +97,7 @@ struct MainView: View {
                 HomeView().tabItem { Label("Home", systemImage: "house.fill") }
                 SearchView().tabItem { Label("Suchen", systemImage: "magnifyingglass") }
                 LibraryView().tabItem { Label("Bibliothek", systemImage: "books.vertical.fill") }
-                RadioView().tabItem { Label("Radio", systemImage: "dot.radiowaves.left.and.right") }
+                RadioView().tabItem { Label("Radio", systemImage: "antenna.radiowaves.left.and.right") }
             }
             .tint(Theme.text)
             if player.hasContent {
@@ -128,6 +129,23 @@ struct Pill: View {
             .glassSurface(active ? false : glass, shape: Capsule(), fallback: active ? activeBg : Theme.input)
             .clipShape(Capsule())
         }.buttonStyle(.plain)
+    }
+}
+
+// MARK: - Lade-Anzeige (Spinner + "Lädt" mit animierten Punkten, wie PWA)
+struct LoadingView: View {
+    var text = "Lädt"
+    @State private var dots = 0
+    private let timer = Timer.publish(every: 0.35, on: .main, in: .common).autoconnect()
+    var body: some View {
+        VStack(spacing: 10) {
+            ProgressView().tint(Theme.accent).scaleEffect(1.3)
+            Text(text + String(repeating: ".", count: dots))
+                .font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.sub)
+                .frame(height: 16)
+        }
+        .frame(maxWidth: .infinity)
+        .onReceive(timer) { _ in dots = (dots + 1) % 4 }
     }
 }
 
@@ -244,7 +262,7 @@ struct HomeView: View {
 
                     // Quick-Grid (4x2)
                     if home == nil {
-                        ProgressView().tint(Theme.accent).frame(maxWidth: .infinity).padding(.top, 60)
+                        LoadingView().padding(.top, 60)
                     } else {
                         LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                             ForEach(quick) { item in
@@ -741,7 +759,7 @@ struct SearchView: View {
                 }
 
                 ScrollView {
-                    if busy { ProgressView().tint(Theme.accent).padding(.top, 40) }
+                    if busy { LoadingView().padding(.top, 40) }
                     else if let r = res {
                         LazyVStack(alignment: .leading, spacing: 18) {
                             if scope == "all", let hit = r.top_hit, !hit.realURI.isEmpty {
@@ -1017,7 +1035,7 @@ struct LibraryView: View {
                 }.padding(.top, 10).padding(.bottom, 130)
             }
             .scrollContentBackground(.hidden).background(Theme.bg)
-            .overlay { if !loaded && playlists.isEmpty { ProgressView().tint(Theme.accent) } }
+            .overlay { if !loaded && playlists.isEmpty { LoadingView() } }
             .navigationTitle("").navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: Playlist.self) { pl in
                 TrackListView(uri: pl.uri, title: pl.name, image: pl.image, isAlbum: false)
@@ -1134,15 +1152,17 @@ struct RadioView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
+                Text("Live-Radio").font(.system(size: 28, weight: .heavy)).foregroundStyle(Theme.text)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal).padding(.top, 6)
                 LazyVStack(spacing: 4) {
                     ForEach(stations) { st in
                         Button { player.playRadio(st) } label: { RadioRow(station: st) }.buttonStyle(.plain)
                     }
-                }.padding(.top, 8).padding(.bottom, 130)
+                }.padding(.top, 10).padding(.bottom, 130)
             }
             .scrollContentBackground(.hidden).background(Theme.bg)
-            .navigationTitle("Live-Radio")
-            .overlay { if stations.isEmpty { ProgressView().tint(Theme.accent) } }
+            .navigationTitle("").navigationBarTitleDisplayMode(.inline)
+            .overlay { if stations.isEmpty { LoadingView() } }
         }
         .task { if stations.isEmpty { stations = (try? await app.api.radioFavorites()) ?? [] } }
     }
@@ -1220,7 +1240,7 @@ struct ArtistView: View {
         .toolbar { ToolbarItem(placement: .topBarLeading) {
             Button { dismiss() } label: { Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text) }
         } }
-        .overlay { if loading { ProgressView().tint(Theme.accent) } }
+        .overlay { if loading { LoadingView() } }
         .task {
             loading = true
             let absImg = image.flatMap { app.api.absoluteURL($0)?.absoluteString } ?? image
@@ -1425,7 +1445,7 @@ struct TrackListView: View {
                 }
             }
         }
-        .overlay { if loading { ProgressView().tint(Theme.accent) } }
+        .overlay { if loading { LoadingView() } }
         .task(id: reload) {
             loading = true; tracks = []
             if !isAlbum { isSubscribed = (try? await app.api.subscriptions())?.contains { $0.uri == uri } ?? false }
@@ -1501,7 +1521,7 @@ struct PodcastView: View {
         .toolbar { ToolbarItem(placement: .topBarLeading) {
             Button { dismiss() } label: { Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text) }
         } }
-        .overlay { if loading { ProgressView().tint(Theme.accent) } }
+        .overlay { if loading { LoadingView() } }
         .task {
             loading = true
             let absImg = image.flatMap { app.api.absoluteURL($0)?.absoluteString } ?? image
