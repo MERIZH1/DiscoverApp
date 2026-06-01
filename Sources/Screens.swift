@@ -153,7 +153,8 @@ struct HomeView: View {
     }
     private var quick: [HomeItem] {
         let q = home?.quick ?? []
-        return filter == "all" ? q : q.filter { ($0.type ?? "") == filter }
+        let filtered = filter == "all" ? q : q.filter { ($0.type ?? "") == filter }
+        return Array(filtered.prefix(8))
     }
 
     var body: some View {
@@ -648,6 +649,10 @@ struct SearchView: View {
                     if busy { ProgressView().tint(Theme.accent).padding(.top, 40) }
                     else if let r = res {
                         LazyVStack(alignment: .leading, spacing: 18) {
+                            if scope == "all", let hit = r.top_hit, !hit.realURI.isEmpty {
+                                SectionHeader("Top-Ergebnis")
+                                TopHitCard(hit: hit)
+                            }
                             if scope == "all" || scope == "tracks", let tracks = r.tracks, !tracks.isEmpty {
                                 SectionHeader("Songs")
                                 ForEach(Array(tracks.prefix(scope == "tracks" ? 50 : 6).enumerated()), id: \.element.id) { i, t in
@@ -702,6 +707,37 @@ struct SearchView: View {
         guard !q.isEmpty else { return }
         busy = true
         Task { res = try? await app.api.search(q); busy = false }
+    }
+}
+
+struct TopHitCard: View {
+    @EnvironmentObject var player: PlayerController
+    let hit: TopHit
+    var body: some View {
+        Group {
+            if hit.type == "track" {
+                Button {
+                    player.play(tracks: [Track(uri: hit.realURI, name: hit.name ?? "", artist: hit.artist ?? "", image: hit.image)])
+                } label: { card }.buttonStyle(.plain)
+            } else {
+                NavigationLink(value: Card(uri: hit.realURI, name: hit.name ?? "", image: hit.image, artist: hit.artist, owner: nil, desc: nil)) {
+                    card
+                }.buttonStyle(.plain)
+            }
+        }
+    }
+    private var card: some View {
+        HStack(spacing: 14) {
+            Artwork(url: hit.image, size: 92, corner: hit.type == "artist" ? 46 : 8)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(hit.name ?? "").font(.system(size: 20, weight: .bold)).foregroundStyle(Theme.text).lineLimit(2)
+                Text(hit.typeLabel).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.sub)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.elev).clipShape(RoundedRectangle(cornerRadius: 10))
+        .padding(.horizontal)
     }
 }
 
@@ -1246,6 +1282,7 @@ struct NowPlayingBar: View {
 // MARK: - Vollbild-Player
 struct PlayerView: View {
     @EnvironmentObject var player: PlayerController
+    @Environment(\.dismiss) private var dismiss
     @State private var scrub: Double = 0
     @State private var scrubbing = false
     @State private var page = 0
@@ -1258,18 +1295,43 @@ struct PlayerView: View {
             LinearGradient(colors: [hero.opacity(0.85), Theme.bg], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
             TabView(selection: $page) {
               VStack(spacing: 22) {
+                // Obere Leiste: runter / WIEDERGABE+Titel / Menue
+                HStack {
+                    Button { dismiss() } label: {
+                        Image(systemName: "chevron.down").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
+                    }
+                    Spacer()
+                    VStack(spacing: 2) {
+                        Text("WIEDERGABE").font(.system(size: 11, weight: .bold)).foregroundStyle(Theme.sub).tracking(1)
+                        Text(p.displayTitle).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
+                    }
+                    Spacer()
+                    Menu { if let t = p.current { TrackMenu(track: t) } } label: {
+                        Image(systemName: "ellipsis").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
+                    }.disabled(p.current == nil)
+                }.padding(.horizontal, 4).padding(.top, 8)
                 Spacer()
                 Artwork(url: p.displayImage, size: 300, corner: 12).shadow(radius: 24)
                     .gesture(DragGesture(minimumDistance: 30).onEnded { v in
                         if v.translation.height < -60 && abs(v.translation.width) < 60 { showLyrics = true }
                     })
-                VStack(spacing: 6) {
-                    Text(p.displayTitle).font(.title2.bold()).foregroundStyle(Theme.text).lineLimit(1)
-                    Text(p.displayArtist).foregroundStyle(Theme.sub).lineLimit(1)
-                    if !p.isRadio && !p.source.isEmpty {
-                        SourceBadge(source: p.source).padding(.top, 4)
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(p.displayTitle).font(.title2.bold()).foregroundStyle(Theme.text).lineLimit(1)
+                        Text(p.displayArtist).foregroundStyle(Theme.sub).lineLimit(1)
+                        if p.isEpisode {
+                            SourceBadge(source: "podcast").padding(.top, 4)
+                        } else if !p.isRadio && !p.source.isEmpty {
+                            SourceBadge(source: p.source).padding(.top, 4)
+                        }
                     }
-                }
+                    Spacer(minLength: 8)
+                    if let t = p.current {
+                        Button { player.addToQueue(t); Haptics.tap() } label: {
+                            Image(systemName: "plus.circle").font(.system(size: 26)).foregroundStyle(Theme.text)
+                        }
+                    }
+                }.padding(.horizontal, 4)
                 if !p.isRadio {
                     VStack(spacing: 2) {
                         Slider(value: Binding(get: { scrubbing ? scrub : p.currentTime }, set: { scrub = $0 }),
@@ -1445,6 +1507,7 @@ struct SourceBadge: View {
         switch source {
         case "youtube":   label = "YouTube";    color = Color(hex6: 0xFF3B30)
         case "navidrome": label = "Bibliothek"; color = Theme.accent
+        case "podcast":   label = "Podcast";    color = Theme.sub
         default:          label = source.capitalized; color = Theme.sub
         }
         return HStack(spacing: 6) {

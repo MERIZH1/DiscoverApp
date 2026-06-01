@@ -124,7 +124,27 @@ struct PlaylistTracksResponse: Codable {
 }
 
 // MARK: - Suche
+struct TopHit: Codable, Hashable {
+    let type: String?
+    let uri: String?
+    let spotify_uri: String?
+    let name: String?
+    let image: String?
+    let artist: String?
+    var realURI: String { uri ?? spotify_uri ?? "" }
+    var typeLabel: String {
+        switch type {
+        case "track": return "Song"
+        case "artist": return "Künstler"
+        case "album": return "Album"
+        case "playlist": return "Playlist"
+        case "show": return "Podcast"
+        default: return (type ?? "").capitalized
+        }
+    }
+}
 struct SearchResponse: Codable {
+    let top_hit: TopHit?
     let tracks: [Track]?
     let playlists: [Card]?
     let albums: [Card]?
