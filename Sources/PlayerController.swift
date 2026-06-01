@@ -8,6 +8,15 @@ enum RepeatMode { case off, all, one }
 /// Gesamter Player-Zustand fuer Session-Persistenz (ganze Queue + Position).
 struct PlayerSnapshot: Codable { let tracks: [Track]; let index: Int; let original: [Track]? }
 
+/// Hochfrequente Wiedergabe-Position. Bewusst SEPARAT vom PlayerController,
+/// damit die Sekunden-Ticks NICHT alle Views (Listen, offene Menues) neu
+/// rendern — nur der Player-Screen beobachtet diese Uhr.
+@MainActor
+final class PlaybackClock: ObservableObject {
+    @Published var time: Double = 0
+    @Published var duration: Double = 0
+}
+
 /// Nativer Player: Queue + AVPlayer + Lock-Screen. Spielt Tracks (ueber das
 /// Backend aufgeloest) und Live-Radio (direkte Stream-URL). Komplett nativ.
 @MainActor
@@ -17,8 +26,10 @@ final class PlayerController: ObservableObject {
     private var original: [Track] = []                       // Anzeige-Reihenfolge (zum Entshufflen)
     @Published private(set) var manualQueue: [Track] = []    // Play-Next / Add-to-Queue (wird zuerst gespielt)
     @Published private(set) var isPlaying = false
-    @Published private(set) var currentTime: Double = 0
-    @Published private(set) var duration: Double = 0
+    // currentTime/duration leben in der separaten Uhr (kein Listen-Rerender pro Tick)
+    let clock = PlaybackClock()
+    var currentTime: Double { get { clock.time } set { clock.time = newValue } }
+    var duration: Double { get { clock.duration } set { clock.duration = newValue } }
     @Published private(set) var loading = false
     @Published var shuffle = false
     @Published var repeatMode: RepeatMode = .off

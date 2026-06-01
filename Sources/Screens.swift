@@ -1343,7 +1343,7 @@ struct TrackListView: View {
                         }
                     }.padding(.horizontal).padding(.top, 8)
                 }
-                .padding(.top, geo.safeAreaInsets.top)   // Cover-Position erhalten (Notch+Navbar)
+                .padding(.top, geo.safeAreaInsets.top + 24)   // Cover-Position + etwas Luft
                 .padding(.bottom, 16)
                 .background(
                     LinearGradient(stops: [
@@ -1667,6 +1667,7 @@ struct NowPlayingBar: View {
 struct PlayerView: View {
     @EnvironmentObject var player: PlayerController
     @EnvironmentObject var downloads: DownloadManager
+    @EnvironmentObject var clock: PlaybackClock   // Live-Position (haengt nur hier, nicht an Listen)
     @Environment(\.liquidGlass) private var glass
     @Environment(\.dismiss) private var dismiss
     @State private var scrub: Double = 0
@@ -1740,13 +1741,13 @@ struct PlayerView: View {
                 }.padding(.horizontal, 4)
                 if !p.isRadio {
                     VStack(spacing: 2) {
-                        Slider(value: Binding(get: { scrubbing ? scrub : p.currentTime }, set: { scrub = $0 }),
-                               in: 0...max(p.duration, 1), onEditingChanged: { e in scrubbing = e; if !e { p.seek(scrub) } })
+                        Slider(value: Binding(get: { scrubbing ? scrub : clock.time }, set: { scrub = $0 }),
+                               in: 0...max(clock.duration, 1), onEditingChanged: { e in scrubbing = e; if !e { p.seek(scrub) } })
                             .tint(Theme.accent)
                         HStack {
-                            Text(fmt(scrubbing ? scrub : p.currentTime)).font(.caption2).foregroundStyle(Theme.sub)
+                            Text(fmt(scrubbing ? scrub : clock.time)).font(.caption2).foregroundStyle(Theme.sub)
                             Spacer()
-                            Text(fmt(p.duration)).font(.caption2).foregroundStyle(Theme.sub)
+                            Text(fmt(clock.duration)).font(.caption2).foregroundStyle(Theme.sub)
                         }
                     }.padding(.horizontal)
                     if p.isEpisode {
