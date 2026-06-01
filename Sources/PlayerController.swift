@@ -130,7 +130,7 @@ final class PlayerController: ObservableObject {
         isPlaying ? pause() : resume()
     }
     func resume() {
-        if primedNotLoaded { loadCurrent(autoplay: true); return }
+        if primedNotLoaded && !isRadio { loadCurrent(autoplay: true); return }
         player.play(); isPlaying = true; updateRate()
     }
     func pause() { player.pause(); isPlaying = false; updateRate() }
@@ -340,7 +340,8 @@ final class PlayerController: ObservableObject {
     // MARK: - Radio
     func playRadio(_ s: RadioStation) {
         guard let url = URL(string: s.url) else { return }
-        isRadio = true; queue = []; index = 0; manualQueue = []; original = []
+        isRadio = true; primedNotLoaded = false   // sonst leitet resume() faelschlich in loadCurrent um
+        queue = []; index = 0; manualQueue = []; original = []
         radioTitle = s.name; radioFavicon = s.favicon; radioNowPlaying = ""
         currentTime = 0; duration = 0; loading = true
         let item = AVPlayerItem(url: url)

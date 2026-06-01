@@ -1441,7 +1441,15 @@ struct TrackListView: View {
             let warm = t
             Task { await app.api.prewarmPlaylist(warm) }   // Server-Vorladen wie PWA
         }
-        .task(id: reload) { recs = (try? await app.api.recommendations(uri)) ?? [] }
+        .task(id: reload) {
+            // Cache-first: sofort die letzten Empfehlungen zeigen, dann im Hintergrund auffrischen
+            let ckey = "recs_\(uri)"
+            if recs.isEmpty, let cached = app.cacheGet(ckey, [Track].self) { recs = cached }
+            if let fresh = try? await app.api.recommendations(uri), !fresh.isEmpty {
+                recs = fresh
+                app.cacheSet(ckey, fresh)
+            }
+        }
     }
 }
 
