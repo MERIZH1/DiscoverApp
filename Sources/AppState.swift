@@ -20,6 +20,7 @@ final class AppState: ObservableObject {
 
     @Published var api: APIClient
     @Published var player: PlayerController
+    @Published var downloads: DownloadManager
     @Published var profile: Profile?
     @Published var connected = false
 
@@ -27,7 +28,11 @@ final class AppState: ObservableObject {
         let a = APIClient(baseURL: UserDefaults.standard.string(forKey: "serverURL") ?? "")
         a.profileId = UserDefaults.standard.string(forKey: "profileId")   // fuer Siri-Start vor restore()
         self.api = a
-        self.player = PlayerController(api: a)
+        let p = PlayerController(api: a)
+        let dl = DownloadManager(api: a)
+        p.downloads = dl
+        self.player = p
+        self.downloads = dl
     }
 
     /// Server setzen + verbinden (laedt Profile zur Validierung).

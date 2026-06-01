@@ -23,6 +23,10 @@ final class PlayerController: ObservableObject {
     private var radioFavicon: String?
     private var primedNotLoaded = false   // letzter Song wiederhergestellt, aber noch nicht gestreamt
     var profileScope = ""                 // fuer profil-spezifische Persistenz
+    weak var downloads: DownloadManager?  // Offline-Wiedergabe
+    @Published var sleepRemaining = 0     // Sekunden, 0 = aus
+    @Published var sleepAtEnd = false     // bis Songende
+    private var sleepTimer: Timer?
 
     var current: Track? { queue.indices.contains(index) ? queue[index] : nil }
     var hasContent: Bool { current != nil || isRadio }
@@ -91,7 +95,24 @@ final class PlayerController: ObservableObject {
         }
     }
 
+    // MARK: - Sleep-Timer
+    func setSleep(minutes: Int) {
+        cancelSleep()
+        guard minutes > 0 else { return }
+        sleepRemaining = minutes * 60
+        sleepTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                self.sleepRemaining -= 1
+                if self.sleepRemaining <= 0 { self.cancelSleep(); self.pause() }
+            }
+        }
+    }
+    func setSleepEndOfTrack() { cancelSleep(); sleepAtEnd = true }
+    func cancelSleep() { sleepTimer?.invalidate(); sleepTimer = nil; sleepRemaining = 0; sleepAtEnd = false }
+
     func next(auto: Bool = false) {
+        if auto && sleepAtEnd { sleepAtEnd = false; pause(); return }
         if isRadio { return }
         guard !queue.isEmpty else { return }
         if auto && repeatMode == .one { seek(0); resume(); return }
@@ -169,6 +190,17 @@ final class PlayerController: ObservableObject {
         loading = true; currentTime = 0; duration = track.durationSec; source = ""
         updateNowPlaying(title: track.name, artist: track.artist, album: track.album,
                          dur: track.durationSec, art: track.image, live: false)
+        // Offline vorhanden? -> lokal abspielen, kein Stream noetig
+        if let local = downloads?.localURL(for: track.uri) {
+            source = "offline"
+            let item = AVPlayerItem(url: local)
+            attachItemObservers(item)
+            player.replaceCurrentItem(with: item)
+            if autoplay { resume() }
+            loading = false
+            Task { await api.postHistory(track, contextName: ctxName, contextURI: ctxURI) }
+            return
+        }
         let myIndex = index
         Task {
             do {

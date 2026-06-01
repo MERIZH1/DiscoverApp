@@ -20,6 +20,7 @@ struct ContentView: View {
         }
         .environmentObject(app)
         .environmentObject(app.player)
+        .environmentObject(app.downloads)
         .task {
             DiscoverServices.app = app   // fuer Siri/Kurzbefehle
             await app.restore()

@@ -1,6 +1,19 @@
 import SwiftUI
 import UIKit
 import AVKit
+import CoreSpotlight
+import UniformTypeIdentifiers
+
+/// Playlists in der iOS-Suche (Spotlight) indexieren.
+func indexPlaylistsInSpotlight(_ pls: [Playlist]) {
+    let items = pls.prefix(150).map { pl -> CSSearchableItem in
+        let attr = CSSearchableItemAttributeSet(contentType: .content)
+        attr.title = pl.name
+        attr.contentDescription = "Discover-Playlist"
+        return CSSearchableItem(uniqueIdentifier: pl.uri, domainIdentifier: "discover.playlist", attributeSet: attr)
+    }
+    CSSearchableIndex.default().indexSearchableItems(items)
+}
 
 /// AirPlay-Routen-Button (HomePod, AppleTV, AirPlay-Boxen).
 struct AirPlayButton: UIViewRepresentable {
@@ -121,11 +134,16 @@ struct Pill: View {
 struct TrackMenu: View {
     @EnvironmentObject var player: PlayerController
     @EnvironmentObject var app: AppState
+    @EnvironmentObject var downloads: DownloadManager
     let track: Track
     var body: some View {
         Button { player.playNext(track) } label: { Label("Als Nächstes spielen", systemImage: "text.line.first.and.arrowtriangle.forward") }
         Button { player.addToQueue(track) } label: { Label("Zur Warteschlange", systemImage: "text.badge.plus") }
         Button { startRadio() } label: { Label("Song-Radio starten", systemImage: "dot.radiowaves.left.and.right") }
+        Button { downloads.toggle(track) } label: {
+            Label(downloads.isDownloaded(track.uri) ? "Aus Offline entfernen" : "Herunterladen",
+                  systemImage: downloads.isDownloaded(track.uri) ? "trash" : "arrow.down.circle")
+        }
     }
     private func startRadio() {
         Task {
@@ -833,6 +851,7 @@ struct CardRows: View {
 struct LibraryView: View {
     @EnvironmentObject var app: AppState
     @EnvironmentObject var player: PlayerController
+    @EnvironmentObject var downloads: DownloadManager
     @State private var playlists: [Playlist] = []
     @State private var subs: Set<String> = []
     @State private var subSync: [String: String] = [:]
@@ -853,7 +872,7 @@ struct LibraryView: View {
     @State private var loaded = false
     private let tabs: [(String, String)] = [
         ("all", "Alle"), ("subs", "Abos"), ("alpha", "A–Z"),
-        ("radios", "📻 Radios"), ("history", "📜 Verlauf"),
+        ("radios", "📻 Radios"), ("history", "📜 Verlauf"), ("offline", "⬇️ Offline"),
     ]
 
     private var shown: [Playlist] {
@@ -888,6 +907,17 @@ struct LibraryView: View {
                             NavigationLink(value: pl) {
                                 LibraryRow(pl: pl, subscribed: false, sync: nil)
                             }.buttonStyle(.plain)
+                        }
+                    } else if tab == "offline" {
+                        if downloads.tracks.isEmpty {
+                            Text("Noch nichts heruntergeladen.\nIm Song-Menue (…) auf Herunterladen tippen.")
+                                .font(.system(size: 14)).foregroundStyle(Theme.mute)
+                                .multilineTextAlignment(.center).frame(maxWidth: .infinity).padding(.top, 50)
+                        }
+                        ForEach(Array(downloads.tracks.enumerated()), id: \.offset) { i, t in
+                            TrackRow(track: t, playing: player.current?.id == t.id) {
+                                player.play(tracks: downloads.tracks, startAt: i, contextName: "Offline", contextURI: "")
+                            }
                         }
                     } else if tab == "history" {
                         ForEach(history) { e in
@@ -936,7 +966,10 @@ struct LibraryView: View {
         if playlists.isEmpty { playlists = app.cacheGet("playlists", [Playlist].self) ?? [] }
         if subs.isEmpty, let cs = app.cacheGet("subs", [SubItem].self) { applySubs(cs) }
         // Sequenziell (nicht parallel) — vermeidet gleichzeitige Spotify-Token-Fetches
-        if let p = try? await app.api.playlists() { playlists = p; app.cacheSet("playlists", p) }
+        if let p = try? await app.api.playlists() {
+            playlists = p; app.cacheSet("playlists", p)
+            indexPlaylistsInSpotlight(p)   // iOS-Suche
+        }
         if let s = try? await app.api.subscriptions() { applySubs(s); app.cacheSet("subs", s) }
         loaded = true
     }
@@ -1355,6 +1388,7 @@ struct NowPlayingBar: View {
 // MARK: - Vollbild-Player
 struct PlayerView: View {
     @EnvironmentObject var player: PlayerController
+    @EnvironmentObject var downloads: DownloadManager
     @Environment(\.dismiss) private var dismiss
     @State private var scrub: Double = 0
     @State private var scrubbing = false
@@ -1379,6 +1413,20 @@ struct PlayerView: View {
                         Text(p.displayTitle).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
                     }
                     Spacer()
+                    Menu {
+                        if p.sleepRemaining > 0 || p.sleepAtEnd {
+                            Button("Sleep-Timer aus", role: .destructive) { p.cancelSleep() }
+                        }
+                        Button("15 Minuten") { p.setSleep(minutes: 15) }
+                        Button("30 Minuten") { p.setSleep(minutes: 30) }
+                        Button("45 Minuten") { p.setSleep(minutes: 45) }
+                        Button("60 Minuten") { p.setSleep(minutes: 60) }
+                        Button("Ende des Songs") { p.setSleepEndOfTrack() }
+                    } label: {
+                        Image(systemName: (p.sleepRemaining > 0 || p.sleepAtEnd) ? "moon.fill" : "moon")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle((p.sleepRemaining > 0 || p.sleepAtEnd) ? Theme.accent : Theme.text)
+                    }.padding(.trailing, 14)
                     Menu { if let t = p.current { TrackMenu(track: t) } } label: {
                         Image(systemName: "ellipsis").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
                     }.disabled(p.current == nil)
@@ -1400,6 +1448,11 @@ struct PlayerView: View {
                     }
                     Spacer(minLength: 8)
                     if let t = p.current {
+                        Button { downloads.toggle(t); Haptics.tap() } label: {
+                            Image(systemName: downloads.isDownloaded(t.uri) ? "arrow.down.circle.fill" : "arrow.down.circle")
+                                .font(.system(size: 24))
+                                .foregroundStyle(downloads.isDownloaded(t.uri) ? Theme.accent : Theme.text)
+                        }
                         Button { player.addToQueue(t); Haptics.tap() } label: {
                             Image(systemName: "plus.circle").font(.system(size: 26)).foregroundStyle(Theme.text)
                         }
@@ -1582,6 +1635,7 @@ struct SourceBadge: View {
         case "youtube":   label = "YouTube";    color = Color(hex6: 0xFF3B30)
         case "navidrome": label = "Bibliothek"; color = Theme.accent
         case "podcast":   label = "Podcast";    color = Theme.sub
+        case "offline":   label = "Offline";    color = Color(hex6: 0x4A90E2)
         default:          label = source.capitalized; color = Theme.sub
         }
         return HStack(spacing: 6) {
