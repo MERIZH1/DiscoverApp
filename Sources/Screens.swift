@@ -704,10 +704,9 @@ struct LibraryView: View {
         }
     }
     private func load() async {
-        async let pls = app.api.playlists()
-        async let sub = app.api.subscriptions()
-        if let p = try? await pls { playlists = p }
-        if let s = try? await sub {
+        // Sequenziell (nicht parallel) — vermeidet gleichzeitige Spotify-Token-Fetches
+        if let p = try? await app.api.playlists() { playlists = p }
+        if let s = try? await app.api.subscriptions() {
             subs = Set(s.map { $0.uri })
             subSync = Dictionary(s.compactMap { i in i.last_sync.map { (i.uri, $0) } }) { a, _ in a }
         }
