@@ -3,6 +3,7 @@ import AVFoundation
 import MediaPlayer
 import UIKit
 import ActivityKit
+import WidgetKit
 
 enum RepeatMode { case off, all, one }
 
@@ -191,6 +192,18 @@ final class PlayerController: ObservableObject {
         loading = true; currentTime = 0; duration = track.durationSec; source = ""
         updateNowPlaying(title: track.name, artist: track.artist, album: track.album,
                          dur: track.durationSec, art: track.image, live: false)
+        // Gapless: vorab geladenes Item nutzen, wenn es passt -> kein Netz-Loch
+        if let item = prefetchedItem, prefetchedURI == track.uri {
+            prefetchedItem = nil; prefetchedURI = nil
+            source = downloads?.localURL(for: track.uri) != nil ? "offline" : ""
+            attachItemObservers(item)
+            player.replaceCurrentItem(with: item)
+            if autoplay { resume() }
+            loading = false
+            Task { await api.postHistory(track, contextName: ctxName, contextURI: ctxURI) }
+            prefetchNext()
+            return
+        }
         // Offline vorhanden? -> lokal abspielen, kein Stream noetig
         if let local = downloads?.localURL(for: track.uri) {
             source = "offline"
@@ -200,6 +213,7 @@ final class PlayerController: ObservableObject {
             if autoplay { resume() }
             loading = false
             Task { await api.postHistory(track, contextName: ctxName, contextURI: ctxURI) }
+            prefetchNext()
             return
         }
         let myIndex = index
@@ -217,7 +231,28 @@ final class PlayerController: ObservableObject {
                 player.replaceCurrentItem(with: item)
                 if autoplay { resume() }
                 loading = false
+                prefetchNext()
             } catch { loading = false }
+        }
+    }
+
+    // MARK: - Gapless-Prefetch (naechster Song vorab laden)
+    private var prefetchedItem: AVPlayerItem?
+    private var prefetchedURI: String?
+    private func prefetchNext() {
+        prefetchedItem = nil; prefetchedURI = nil
+        guard !isRadio, !shuffle, repeatMode != .one, index + 1 < queue.count else { return }
+        let nextTrack = queue[index + 1]
+        if let local = downloads?.localURL(for: nextTrack.uri) {
+            prefetchedItem = AVPlayerItem(url: local); prefetchedURI = nextTrack.uri; return
+        }
+        let myIndex = index
+        Task {
+            guard let r = try? await api.streamURL(for: nextTrack), r.ok,
+                  let rel = r.url, let url = api.absoluteURL(rel) else { return }
+            guard myIndex == index, index + 1 < queue.count, queue[index + 1].uri == nextTrack.uri else { return }
+            prefetchedItem = AVPlayerItem(url: url)
+            prefetchedURI = nextTrack.uri
         }
     }
 
@@ -264,7 +299,16 @@ final class PlayerController: ObservableObject {
     }
 
     // MARK: - Lock-Screen
+    private func updateWidgetData(title: String, artist: String) {
+        if let ud = UserDefaults(suiteName: "group.com.discover.app") {
+            ud.set(title, forKey: "np_title")
+            ud.set(artist, forKey: "np_artist")
+        }
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
     private func updateNowPlaying(title: String, artist: String, album: String?, dur: Double, art: String?, live: Bool) {
+        updateWidgetData(title: title, artist: artist)
         var info: [String: Any] = [MPMediaItemPropertyTitle: title, MPMediaItemPropertyArtist: artist]
         if let al = album { info[MPMediaItemPropertyAlbumTitle] = al }
         if dur > 0 { info[MPMediaItemPropertyPlaybackDuration] = dur }

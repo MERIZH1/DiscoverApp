@@ -41,6 +41,11 @@ targets:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
+    entitlements:
+      path: Sources/DiscoverApp.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.discover.app
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.discover.app
@@ -64,6 +69,11 @@ targets:
         CFBundleVersion: "1"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: Sources/Widget/DiscoverWidget.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.discover.app
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.discover.app.widget

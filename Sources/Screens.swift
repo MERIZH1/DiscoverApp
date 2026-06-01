@@ -1540,7 +1540,9 @@ struct PlayerView: View {
                 Spacer()
                 Artwork(url: p.displayImage, size: 300, corner: 12).shadow(radius: 24)
                     .gesture(DragGesture(minimumDistance: 30).onEnded { v in
-                        if v.translation.height < -60 && abs(v.translation.width) < 60 { showLyrics = true }
+                        if v.translation.height < -60 && abs(v.translation.width) < 60 {
+                            withAnimation(.easeInOut(duration: 0.28)) { showLyrics = true }
+                        }
                     })
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 6) {
@@ -1610,7 +1612,7 @@ struct PlayerView: View {
                         }.foregroundStyle(Theme.text).padding(.horizontal, 8)
                     }
                     HStack(spacing: 30) {
-                        Button { showLyrics = true } label: { Label("Songtext", systemImage: "quote.bubble").font(.system(size: 15, weight: .semibold)) }
+                        Button { withAnimation(.easeInOut(duration: 0.28)) { showLyrics = true } } label: { Label("Songtext", systemImage: "quote.bubble").font(.system(size: 15, weight: .semibold)) }
                         AirPlayButton().frame(width: 30, height: 30)
                         Button { withAnimation { page = 1 } } label: { Label("Warteschlange", systemImage: "list.bullet").font(.system(size: 15, weight: .semibold)) }
                     }.foregroundStyle(Theme.sub).padding(.top, 4)
@@ -1631,7 +1633,12 @@ struct PlayerView: View {
             .tabViewStyle(.page(indexDisplayMode: .never))
         }
         .presentationDragIndicator(.hidden)
-        .sheet(isPresented: $showLyrics) { LyricsSheet() }
+        .overlay {
+            if showLyrics {
+                LyricsView(onClose: { withAnimation(.easeInOut(duration: 0.25)) { showLyrics = false } })
+                    .transition(.move(edge: .bottom))
+            }
+        }
         .task(id: player.displayImage) { if let c = await averageColor(player.displayImage) { hero = c } }
     }
     private func fmt(_ s: Double) -> String {
@@ -1708,6 +1715,41 @@ struct QueueRow: View {
 }
 
 // MARK: - Songtext
+/// Songtext eingebunden im Player (von unten hochwischen).
+struct LyricsView: View {
+    @EnvironmentObject var app: AppState
+    @EnvironmentObject var player: PlayerController
+    let onClose: () -> Void
+    @State private var text = "Lade Songtext…"
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Button { onClose() } label: {
+                    Image(systemName: "chevron.down").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
+                }
+                Spacer()
+                Text("Songtext").font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.text)
+                Spacer()
+                Color.clear.frame(width: 24, height: 1)
+            }.padding(.horizontal).padding(.top, 16).padding(.bottom, 8)
+            ScrollView {
+                Text(text).font(.system(size: 18, weight: .medium)).foregroundStyle(Theme.text)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding()
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.bg.opacity(0.98).ignoresSafeArea())
+        .gesture(DragGesture(minimumDistance: 30).onEnded { v in if v.translation.height > 60 { onClose() } })
+        .task(id: player.current?.id) {
+            guard let t = player.current else { text = "Kein Song"; return }
+            if let ly = try? await app.api.lyrics(title: t.name, artist: t.artist, duration: Int(t.durationSec)) {
+                text = (ly.lyrics?.isEmpty == false) ? (ly.lyrics ?? "") :
+                       (ly.instrumental == true ? "🎵 Instrumental" : "Kein Songtext gefunden")
+            } else { text = "Kein Songtext gefunden" }
+        }
+    }
+}
+
 struct LyricsSheet: View {
     @EnvironmentObject var app: AppState
     @EnvironmentObject var player: PlayerController

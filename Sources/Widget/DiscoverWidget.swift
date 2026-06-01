@@ -10,38 +10,55 @@ struct DiscoverWidgetBundle: WidgetBundle {
     }
 }
 
-// MARK: - Home-Screen-Widget (Branding + oeffnet die App)
-struct DiscoverEntry: TimelineEntry { let date: Date }
+// MARK: - Home-Screen-Widget (laufender/letzter Song via App-Group)
+struct DiscoverEntry: TimelineEntry {
+    let date: Date
+    let title: String
+    let artist: String
+}
 
 struct DiscoverProvider: TimelineProvider {
-    func placeholder(in context: Context) -> DiscoverEntry { DiscoverEntry(date: Date()) }
-    func getSnapshot(in context: Context, completion: @escaping (DiscoverEntry) -> Void) {
-        completion(DiscoverEntry(date: Date()))
+    private func current() -> DiscoverEntry {
+        let ud = UserDefaults(suiteName: "group.com.discover.app")
+        return DiscoverEntry(date: Date(),
+                             title: ud?.string(forKey: "np_title") ?? "",
+                             artist: ud?.string(forKey: "np_artist") ?? "")
     }
+    func placeholder(in context: Context) -> DiscoverEntry { DiscoverEntry(date: Date(), title: "", artist: "") }
+    func getSnapshot(in context: Context, completion: @escaping (DiscoverEntry) -> Void) { completion(current()) }
     func getTimeline(in context: Context, completion: @escaping (Timeline<DiscoverEntry>) -> Void) {
-        completion(Timeline(entries: [DiscoverEntry(date: Date())], policy: .never))
+        completion(Timeline(entries: [current()], policy: .never))
     }
 }
 
 struct DiscoverHomeWidget: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "DiscoverHomeWidget", provider: DiscoverProvider()) { _ in
-            DiscoverHomeWidgetView()
+        StaticConfiguration(kind: "DiscoverHomeWidget", provider: DiscoverProvider()) { entry in
+            DiscoverHomeWidgetView(entry: entry)
         }
         .configurationDisplayName("Discover")
-        .description("Discover oeffnen")
+        .description("Zeigt den laufenden Song")
         .supportedFamilies([.systemSmall])
     }
 }
 
 struct DiscoverHomeWidgetView: View {
+    let entry: DiscoverEntry
     private let bg = Color(red: 0.07, green: 0.07, blue: 0.07)
     var body: some View {
-        let content = VStack(spacing: 8) {
+        let hasSong = !entry.title.isEmpty
+        let content = VStack(spacing: 7) {
             Image("WidgetLogo").resizable().scaledToFit()
-                .frame(width: 56, height: 56).clipShape(RoundedRectangle(cornerRadius: 13))
-            Text("Discover").font(.system(size: 15, weight: .bold)).foregroundColor(.white)
-        }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(width: hasSong ? 40 : 56, height: hasSong ? 40 : 56)
+                .clipShape(RoundedRectangle(cornerRadius: hasSong ? 9 : 13))
+            if hasSong {
+                Text(entry.title).font(.system(size: 13, weight: .bold)).foregroundColor(.white)
+                    .lineLimit(2).multilineTextAlignment(.center)
+                Text(entry.artist).font(.system(size: 11)).foregroundColor(.gray).lineLimit(1)
+            } else {
+                Text("Discover").font(.system(size: 15, weight: .bold)).foregroundColor(.white)
+            }
+        }.frame(maxWidth: .infinity, maxHeight: .infinity).padding(8)
         if #available(iOS 17.0, *) {
             content.containerBackground(bg, for: .widget)
         } else {
