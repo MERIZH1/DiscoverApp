@@ -26,6 +26,9 @@ jobs:
           VER="1.0.${{ github.run_number }}"
           plutil -replace CFBundleShortVersionString -string "$VER" Sources/Info.plist
           plutil -replace CFBundleVersion -string "${{ github.run_number }}" Sources/Info.plist
+          # Widget-Extension muss exakt dieselbe Version haben (sonst Install-Fehler)
+          plutil -replace CFBundleShortVersionString -string "$VER" Sources/Widget/Info.plist
+          plutil -replace CFBundleVersion -string "${{ github.run_number }}" Sources/Widget/Info.plist
           echo "VER=$VER" >> "$GITHUB_ENV"
 
       - name: Archive app (unsigned)

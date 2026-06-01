@@ -2,6 +2,7 @@ import Foundation
 import AVFoundation
 import MediaPlayer
 import UIKit
+import ActivityKit
 
 enum RepeatMode { case off, all, one }
 
@@ -294,6 +295,24 @@ final class PlayerController: ObservableObject {
         var i = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
         i[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
         MPNowPlayingInfoCenter.default().nowPlayingInfo = i
+        updateLiveActivity()
+    }
+
+    // MARK: - Live Activity / Dynamic Island
+    private var activity: Activity<NowPlayingAttributes>?
+    func updateLiveActivity() {
+        guard hasContent, !isRadio else { endLiveActivity(); return }
+        let state = NowPlayingAttributes.ContentState(title: displayTitle, artist: displayArtist, isPlaying: isPlaying)
+        if let activity {
+            Task { await activity.update(using: state) }
+        } else if ActivityAuthorizationInfo().areActivitiesEnabled {
+            activity = try? Activity.request(attributes: NowPlayingAttributes(), contentState: state)
+        }
+    }
+    func endLiveActivity() {
+        guard let a = activity else { return }
+        activity = nil
+        Task { await a.end(dismissalPolicy: .immediate) }
     }
     private func setupRemoteCommands() {
         let c = MPRemoteCommandCenter.shared()
