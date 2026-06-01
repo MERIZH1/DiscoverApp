@@ -83,6 +83,7 @@ final class PlayerController: ObservableObject {
               let d = UserDefaults.standard.data(forKey: "lastTrack_\(profileScope)"),
               let t = try? JSONDecoder().decode(Track.self, from: d) else { return }
         prime(t)
+        source = UserDefaults.standard.string(forKey: "lastSource_\(profileScope)") ?? ""
     }
     private func persistLast(_ t: Track) {
         if let d = try? JSONEncoder().encode(t) {
@@ -175,6 +176,7 @@ final class PlayerController: ObservableObject {
                 guard myIndex == index, !isRadio else { return }
                 guard r.ok, let rel = r.url, let url = api.absoluteURL(rel) else { loading = false; return }
                 source = r.source ?? ""
+                UserDefaults.standard.set(source, forKey: "lastSource_\(profileScope)")
                 let played = track
                 Task { await api.postHistory(played, contextName: ctxName, contextURI: ctxURI) }
                 let item = AVPlayerItem(url: url)

@@ -96,11 +96,13 @@ struct Track: Codable, Identifiable, Hashable {
     enum CodingKeys: String, CodingKey {
         case uri, name, artist, artists, album, album_uri, image, duration_ms, downloaded
     }
-    private enum ExtraKeys: String, CodingKey { case deezer_cover }
+    private enum ExtraKeys: String, CodingKey { case deezer_cover, spotify_uri }
     init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self)
         let extra = try? d.container(keyedBy: ExtraKeys.self)
-        uri         = (try? c.decode(String.self, forKey: .uri)) ?? ""
+        // Such-Ergebnisse liefern spotify_uri statt uri
+        uri         = (try? c.decode(String.self, forKey: .uri)).flatMap { $0.isEmpty ? nil : $0 }
+                      ?? (extra.flatMap { try? $0.decode(String.self, forKey: .spotify_uri) }) ?? ""
         name        = (try? c.decode(String.self, forKey: .name)) ?? "?"
         artist      = (try? c.decode(String.self, forKey: .artist)) ?? ""
         artists     = try? c.decode([ArtistRef].self, forKey: .artists)

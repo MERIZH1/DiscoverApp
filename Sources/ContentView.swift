@@ -36,11 +36,12 @@ struct SplashView: View {
         ZStack {
             Color(hex6: 0x121212).ignoresSafeArea()
             VStack(spacing: 16) {
-                Image(systemName: "waveform.circle.fill")
-                    .font(.system(size: 92)).foregroundStyle(Color(hex6: 0x1ED760))
-                    .scaleEffect(pulse ? 1.08 : 0.9)
+                Image("AppLogo")
+                    .resizable().scaledToFit()
+                    .frame(width: 104, height: 104)
+                    .clipShape(RoundedRectangle(cornerRadius: 22))
+                    .scaleEffect(pulse ? 1.06 : 0.92)
                     .shadow(color: .black.opacity(0.4), radius: 18, y: 8)
-                Text("Discover").font(.system(size: 22, weight: .bold)).foregroundStyle(.white)
                 Text("Lädt…").font(.system(size: 13)).foregroundStyle(.white.opacity(0.55))
             }
         }

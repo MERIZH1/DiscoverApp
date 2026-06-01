@@ -626,6 +626,19 @@ struct SearchView: View {
     @State private var scope = "all"
     @State private var busy = false
     @State private var debounce: Task<Void, Never>?
+    @AppStorage("recentSearches") private var recentRaw = ""
+
+    private var recentList: [String] { recentRaw.split(separator: "\n").map(String.init) }
+    private func saveRecent() {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return }
+        var list = recentList.filter { $0.lowercased() != q.lowercased() }
+        list.insert(q, at: 0)
+        recentRaw = list.prefix(10).joined(separator: "\n")
+    }
+    private func removeRecent(_ q: String) {
+        recentRaw = recentList.filter { $0 != q }.joined(separator: "\n")
+    }
 
     var body: some View {
         NavigationStack {
@@ -635,7 +648,8 @@ struct SearchView: View {
                     TextField("", text: $query, prompt: Text("Songs, Künstler suchen…").foregroundColor(Color.black.opacity(0.55)))
                         .foregroundStyle(.black).tint(.black)
                         .autocorrectionDisabled().textInputAutocapitalization(.never)
-                        .onSubmit { runSearch() }
+                        .submitLabel(.search)
+                        .onSubmit { runSearch(); saveRecent() }
                         .onChange(of: query) { _ in debounceSearch() }
                     if !query.isEmpty {
                         Button { query = ""; res = nil } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.black.opacity(0.5)) }
@@ -682,6 +696,26 @@ struct SearchView: View {
                                 SectionHeader("Podcasts"); CardRows(cards: shs, isAlbum: false)
                             }
                         }.padding(.bottom, 130).padding(.top, 4)
+                    } else if !recentList.isEmpty {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            HStack {
+                                Text("Letzte Suchen").font(.title3.bold()).foregroundStyle(Theme.text)
+                                Spacer()
+                                Button("Löschen") { recentRaw = "" }.font(.system(size: 14)).foregroundStyle(Theme.sub)
+                            }.padding(.horizontal).padding(.top, 8).padding(.bottom, 4)
+                            ForEach(recentList, id: \.self) { q in
+                                Button { query = q; runSearch() } label: {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: "clock.arrow.circlepath").foregroundStyle(Theme.sub).frame(width: 28)
+                                        Text(q).font(.system(size: 16)).foregroundStyle(Theme.text).lineLimit(1)
+                                        Spacer()
+                                        Button { removeRecent(q) } label: {
+                                            Image(systemName: "xmark").font(.system(size: 13)).foregroundStyle(Theme.mute).frame(width: 30, height: 30)
+                                        }
+                                    }.padding(.vertical, 8).padding(.horizontal).contentShape(Rectangle())
+                                }.buttonStyle(.plain)
+                            }
+                        }.padding(.top, 6)
                     } else {
                         VStack(spacing: 10) {
                             Circle().fill(Theme.input).frame(width: 84, height: 84)
@@ -795,6 +829,7 @@ struct LibraryView: View {
     private func isRadioItem(_ uri: String) -> Bool {
         uri.hasPrefix("radio-name:") || uri.hasPrefix("radio:") || uri.hasPrefix("radio-id:")
     }
+    private func isLiked(_ uri: String) -> Bool { uri.contains("collection:tracks") }
     private var radioPlaylists: [Playlist] {
         var list = playlists.filter { isRadioItem($0.uri) }
         if !filter.isEmpty { list = list.filter { $0.name.localizedCaseInsensitiveContains(filter) } }
@@ -808,7 +843,7 @@ struct LibraryView: View {
     ]
 
     private var shown: [Playlist] {
-        var list = playlists.filter { !isRadioItem($0.uri) }   // Radios haben eigenen Filter
+        var list = playlists.filter { !isRadioItem($0.uri) && !isLiked($0.uri) }   // Radios + Liked Songs raus
         if tab == "subs" { list = list.filter { subs.contains($0.uri) } }
         if !filter.isEmpty { list = list.filter { $0.name.localizedCaseInsensitiveContains(filter) } }
         if tab == "alpha" { list.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending } }
