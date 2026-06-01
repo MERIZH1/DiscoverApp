@@ -1,5 +1,18 @@
 import SwiftUI
 import UIKit
+import AVKit
+
+/// AirPlay-Routen-Button (HomePod, AppleTV, AirPlay-Boxen).
+struct AirPlayButton: UIViewRepresentable {
+    func makeUIView(context: Context) -> AVRoutePickerView {
+        let v = AVRoutePickerView()
+        v.tintColor = UIColor(white: 1, alpha: 0.85)
+        v.activeTintColor = UIColor(red: 0.12, green: 0.84, blue: 0.38, alpha: 1)
+        v.prioritizesVideoDevices = false
+        return v
+    }
+    func updateUIView(_ uiView: AVRoutePickerView, context: Context) {}
+}
 
 // Wisch-zurueck-Geste IMMER erlauben — auch bei eigenem/verstecktem Back-Button.
 extension UINavigationController: UIGestureRecognizerDelegate {
@@ -75,6 +88,7 @@ struct MainView: View {
             .tint(Theme.text)
             if player.hasContent {
                 NowPlayingBar(showPlayer: $showPlayer).padding(.horizontal, 8).padding(.bottom, 50)
+                    .ignoresSafeArea(.keyboard, edges: .bottom)
             }
         }
         .onAppear(perform: configureAppearance)
@@ -937,14 +951,14 @@ struct LibraryRow: View {
     var body: some View {
         HStack(spacing: 12) {
             ZStack(alignment: .bottomLeading) {
-                Artwork(url: pl.image, size: 56, corner: 6)
+                Artwork(url: pl.image, size: 56, corner: 4)
                 if subscribed {
                     Image(systemName: "bell.fill").font(.system(size: 10)).foregroundStyle(.black)
                         .padding(5).background(Circle().fill(Theme.accent)).offset(x: -3, y: 3)
                 }
             }
-            VStack(alignment: .leading, spacing: 3) {
-                Text(pl.name).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(pl.name).font(.system(size: 15, weight: .medium)).foregroundStyle(Theme.text).lineLimit(1)
                 HStack(spacing: 4) {
                     Text(subscribed ? "Abo" : "Playlist").font(.system(size: 13))
                         .foregroundStyle(subscribed ? Theme.accent : Theme.sub)
@@ -952,7 +966,7 @@ struct LibraryRow: View {
                 }
             }
             Spacer(minLength: 0)
-        }.padding(.vertical, 6).padding(.horizontal).contentShape(Rectangle())
+        }.padding(.vertical, 8).padding(.horizontal).contentShape(Rectangle())
     }
 }
 
@@ -1436,8 +1450,9 @@ struct PlayerView: View {
                             }
                         }.foregroundStyle(Theme.text).padding(.horizontal, 8)
                     }
-                    HStack(spacing: 50) {
+                    HStack(spacing: 30) {
                         Button { showLyrics = true } label: { Label("Songtext", systemImage: "quote.bubble").font(.system(size: 15, weight: .semibold)) }
+                        AirPlayButton().frame(width: 30, height: 30)
                         Button { withAnimation { page = 1 } } label: { Label("Warteschlange", systemImage: "list.bullet").font(.system(size: 15, weight: .semibold)) }
                     }.foregroundStyle(Theme.sub).padding(.top, 4)
                 } else {
