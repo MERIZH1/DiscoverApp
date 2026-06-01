@@ -161,6 +161,7 @@ struct TrackMenu: View {
     var onShowArtist: (() -> Void)? = nil
     var onShowAlbum: (() -> Void)? = nil
     var onAddToPlaylist: (() -> Void)? = nil
+    var onSendToUser: (() -> Void)? = nil
     // WICHTIG: NICHT beobachten (kein @EnvironmentObject), sonst zeichnet das
     // offene Menue bei jedem Player-Tick neu (Flackern). Referenz nur lesen.
     private var app: AppState? { DiscoverServices.app }
@@ -183,6 +184,9 @@ struct TrackMenu: View {
         // restliche Optionen als Liste darunter
         if let onAdd = onAddToPlaylist {
             Button { onAdd() } label: { Label("Zu Playlist hinzufügen", systemImage: "plus.circle") }
+        }
+        if let onSend = onSendToUser {
+            Button { onSend() } label: { Label("An Nutzer senden", systemImage: "paperplane") }
         }
         Button { app?.downloads.toggle(track) } label: {
             let dl = app?.downloads.isDownloaded(track.uri) ?? false
@@ -944,6 +948,7 @@ private struct TrackNavSheets: ViewModifier {
     @Binding var showArtist: Bool
     @Binding var showAlbum: Bool
     @Binding var showAddPlaylist: Bool
+    @Binding var showSendUser: Bool
     func body(content: Content) -> some View {
         content
             .sheet(isPresented: $showArtist) {
@@ -961,11 +966,74 @@ private struct TrackNavSheets: ViewModifier {
                 }
             }
             .sheet(isPresented: $showAddPlaylist) { AddToPlaylistSheet(track: track) }
+            .sheet(isPresented: $showSendUser) { SendToUserSheet(track: track) }
     }
 }
 extension View {
-    func trackNavSheets(track: Track, showArtist: Binding<Bool>, showAlbum: Binding<Bool>, showAddPlaylist: Binding<Bool>) -> some View {
-        modifier(TrackNavSheets(track: track, showArtist: showArtist, showAlbum: showAlbum, showAddPlaylist: showAddPlaylist))
+    func trackNavSheets(track: Track, showArtist: Binding<Bool>, showAlbum: Binding<Bool>, showAddPlaylist: Binding<Bool>, showSendUser: Binding<Bool>) -> some View {
+        modifier(TrackNavSheets(track: track, showArtist: showArtist, showAlbum: showAlbum, showAddPlaylist: showAddPlaylist, showSendUser: showSendUser))
+    }
+}
+
+// MARK: - "An Nutzer senden" — Profil-Auswahl (cross-user queue_inject, erreicht auch PWA)
+struct SendToUserSheet: View {
+    let track: Track
+    @EnvironmentObject var app: AppState
+    @Environment(\.dismiss) private var dismiss
+    @State private var profiles: [Profile] = []
+    @State private var status = ""
+    private var others: [Profile] { profiles.filter { $0.id != app.profile?.id } }
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    Artwork(url: track.image, size: 44, corner: 4)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(track.name).font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.text).lineLimit(1)
+                        Text(track.artist).font(.system(size: 13)).foregroundStyle(Theme.sub).lineLimit(1)
+                    }
+                    Spacer()
+                }.padding()
+                if others.isEmpty {
+                    Text("Keine anderen Profile gefunden.").font(.system(size: 14)).foregroundStyle(Theme.mute).padding(.top, 40)
+                }
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(others) { p in
+                            Button { send(p) } label: {
+                                HStack(spacing: 12) {
+                                    AvatarCircle(name: p.name, size: 40)
+                                    Text(p.name).font(.system(size: 16)).foregroundStyle(Theme.text)
+                                    Spacer()
+                                    Image(systemName: "paperplane").foregroundStyle(Theme.sub)
+                                }.padding(.horizontal).padding(.vertical, 8).contentShape(Rectangle())
+                            }.buttonStyle(.plain)
+                        }
+                    }.padding(.top, 4)
+                }
+                Spacer()
+            }
+            .background(Theme.bg)
+            .navigationTitle("An Nutzer senden").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Abbrechen") { dismiss() }.foregroundStyle(Theme.accent) } }
+            .overlay(alignment: .bottom) {
+                if !status.isEmpty {
+                    Text(status).font(.system(size: 14, weight: .semibold)).foregroundStyle(.black)
+                        .padding(.horizontal, 18).padding(.vertical, 10)
+                        .background(Theme.accent).clipShape(Capsule()).padding(.bottom, 30)
+                }
+            }
+        }
+        .task { profiles = (try? await app.api.profiles()) ?? [] }
+    }
+    private func send(_ p: Profile) {
+        Task {
+            let ok = await app.api.pushToProfile(p.id, track: track)
+            status = ok ? "An \(p.name) gesendet ✓" : "Senden fehlgeschlagen"
+            Haptics.tap()
+            try? await Task.sleep(nanoseconds: 900_000_000)
+            if ok { dismiss() } else { status = "" }
+        }
     }
 }
 
@@ -1800,6 +1868,7 @@ struct NumberedTrackRow: View {
     @State private var showArtist = false
     @State private var showAlbum = false
     @State private var showAddPlaylist = false
+    @State private var showSendUser = false
     var body: some View {
         HStack(spacing: 12) {
             Text("\(n)").font(.system(size: 14).monospacedDigit()).foregroundStyle(playing ? Theme.accent : Theme.sub)
@@ -1815,7 +1884,7 @@ struct NumberedTrackRow: View {
                 Image(systemName: "checkmark").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.accent)
             }
             Menu {
-                TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true })
+                TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true })
             } label: {
                 Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
                     .frame(width: 46, height: 46).contentShape(Rectangle())
@@ -1824,8 +1893,8 @@ struct NumberedTrackRow: View {
             .background(playing ? Theme.accent.opacity(0.08) : .clear)
             .contentShape(Rectangle())
             .onTapGesture(perform: tap)
-            .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }) }
-            .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum, showAddPlaylist: $showAddPlaylist)
+            .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }) }
+            .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum, showAddPlaylist: $showAddPlaylist, showSendUser: $showSendUser)
     }
 }
 
@@ -1855,6 +1924,7 @@ struct TrackRow: View {
     @State private var showArtist = false
     @State private var showAlbum = false
     @State private var showAddPlaylist = false
+    @State private var showSendUser = false
     var body: some View {
         HStack(spacing: 12) {
             Artwork(url: track.image, size: 52, corner: 4)
@@ -1868,7 +1938,7 @@ struct TrackRow: View {
                 Image(systemName: "arrow.down.circle.fill").font(.system(size: 15)).foregroundStyle(Theme.accent.opacity(0.7))
             }
             Menu {
-                TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true })
+                TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true })
             } label: {
                 Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
                     .frame(width: 46, height: 46).contentShape(Rectangle())
@@ -1876,8 +1946,8 @@ struct TrackRow: View {
         }.padding(.vertical, 9).padding(.horizontal)
             .contentShape(Rectangle())
             .onTapGesture(perform: tap)
-            .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }) }
-            .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum, showAddPlaylist: $showAddPlaylist)
+            .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }) }
+            .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum, showAddPlaylist: $showAddPlaylist, showSendUser: $showSendUser)
     }
 }
 
@@ -1937,6 +2007,7 @@ struct PlayerView: View {
     @State private var showAddPlaylist = false
     @State private var showArtist = false
     @State private var showAlbum = false
+    @State private var showSendUser = false
 
     var body: some View {
         let p = player
@@ -1973,7 +2044,7 @@ struct PlayerView: View {
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle((p.sleepRemaining > 0 || p.sleepAtEnd) ? Theme.accent : Theme.text)
                     }.padding(.trailing, 14)
-                    Menu { if let t = p.current { TrackMenu(track: t, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }) } } label: {
+                    Menu { if let t = p.current { TrackMenu(track: t, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }) } } label: {
                         Image(systemName: "ellipsis").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
                     }.disabled(p.current == nil)
                 }.padding(.horizontal, 4).padding(.top, 8)
@@ -2085,6 +2156,7 @@ struct PlayerView: View {
         }
         .presentationDragIndicator(.hidden)
         .sheet(isPresented: $showAddPlaylist) { if let t = player.current { AddToPlaylistSheet(track: t) } }
+        .sheet(isPresented: $showSendUser) { if let t = player.current { SendToUserSheet(track: t) } }
         .sheet(isPresented: $showArtist) {
             if let t = player.current, let u = t.artists?.first?.uri {
                 NavigationStack { ArtistView(uri: u, name: t.artists?.first?.name ?? t.artist, image: t.image) }

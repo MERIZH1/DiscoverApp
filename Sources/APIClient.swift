@@ -94,6 +94,14 @@ final class APIClient: ObservableObject {
         if let target { body["target_device_id"] = target }
         _ = try? await data("/api/sync/command", method: "POST", json: body)
     }
+    /// Song an ein anderes Profil schicken (landet dort als "Als Naechstes" — auch in der PWA).
+    func pushToProfile(_ targetID: String, track: Track) async -> Bool {
+        let body: [String: Any] = ["name": track.name, "artist": track.artist,
+                                   "uri": track.uri, "image": track.image ?? ""]
+        guard let d = try? await data("/api/profiles/\(enc(targetID))/queue/push", method: "POST", json: body),
+              let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return false }
+        return (obj["ok"] as? Bool) ?? false
+    }
     func syncGetCommands(deviceID: String) async -> [[String: Any]] {
         guard let d = try? await data("/api/sync/commands?device_id=\(enc(deviceID))"),
               let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
