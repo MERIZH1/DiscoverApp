@@ -319,6 +319,8 @@ struct HomeView: View {
             if recents.isEmpty { recents = app.cacheGet("recents", [HomeItem].self) ?? [] }
             // 2) Frisch nachladen + Cache aktualisieren (taucht beim Zurueckkommen auf)
             if let h = try? await app.api.home() { home = h; app.cacheSet("home", h) }
+            // Offline ohne Cache: leeren Zustand setzen statt ewig "Lädt..."
+            if home == nil { home = HomeResponse(greeting: nil, user_name: nil, country: nil, quick: [], sections: []) }
             // Recents mit Retry — kann beim Start kurz 502 liefern (Token-Aufwaermung)
             for attempt in 0..<3 {
                 if let r = try? await app.api.recents(), !r.isEmpty {

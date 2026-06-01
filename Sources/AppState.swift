@@ -80,6 +80,7 @@ final class AppState: ObservableObject {
         profileId = p.id
         api.profileId = p.id
         player.profileScope = p.id
+        cacheSet("lastProfile", p)   // fuer Offline-Start
         player.restoreLast()   // letzten Song in den Mini-Player laden
     }
 
@@ -113,7 +114,13 @@ final class AppState: ObservableObject {
                 selectProfile(p)
             }
         } catch {
-            connected = false
+            // Offline: mit gecachtem Profil trotzdem in die App (Downloads abspielbar)
+            if let cached = cacheGet("lastProfile", Profile.self) {
+                connected = true
+                selectProfile(cached)
+            } else {
+                connected = false
+            }
         }
     }
 

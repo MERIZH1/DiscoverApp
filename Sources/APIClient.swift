@@ -34,8 +34,9 @@ final class APIClient: ObservableObject {
         self.baseURL = baseURL
         ImageBase.url = ImageBase.normalize(baseURL)
         let cfg = URLSessionConfiguration.default
-        cfg.timeoutIntervalForRequest = 20
-        cfg.waitsForConnectivity = true
+        cfg.timeoutIntervalForRequest = 15
+        cfg.timeoutIntervalForResource = 30
+        cfg.waitsForConnectivity = false   // offline sofort scheitern statt endlos warten
         self.session = URLSession(configuration: cfg)
     }
 

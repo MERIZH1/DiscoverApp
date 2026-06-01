@@ -71,6 +71,7 @@ final class PlayerController: ObservableObject {
     @Published private(set) var radioNowPlaying = ""   // ICY-StreamTitle (laufender Song im Radio)
     private let metaReader = ICYMetadataReader()
     private var primedNotLoaded = false   // letzter Song wiederhergestellt, aber noch nicht gestreamt
+    private var failedOffline: Set<String> = []   // Offline-Dateien, die diese Session nicht liefen -> streamen
     var profileScope = ""                 // fuer profil-spezifische Persistenz
     weak var downloads: DownloadManager?  // Offline-Wiedergabe
     @Published var sleepRemaining = 0     // Sekunden, 0 = aus
@@ -320,8 +321,8 @@ final class PlayerController: ObservableObject {
         loading = true; currentTime = 0; duration = track.durationSec; source = ""
         updateNowPlaying(title: track.name, artist: track.artist, album: track.album,
                          dur: track.durationSec, art: track.image, live: false)
-        // Offline vorhanden? -> lokal abspielen, kein Stream noetig
-        if let local = downloads?.localURL(for: track.uri) {
+        // Offline vorhanden (und diese Session nicht als fehlerhaft markiert)? -> lokal abspielen
+        if let local = downloads?.localURL(for: track.uri), !failedOffline.contains(track.uri) {
             source = "offline"
             let item = AVPlayerItem(url: local)
             attachItemObservers(item)
@@ -386,9 +387,10 @@ final class PlayerController: ObservableObject {
                     let d = CMTimeGetSeconds(it.duration)
                     if d.isFinite, d > 0 { self.duration = d }
                 } else if it.status == .failed {
-                    // Offline-Datei kaputt? -> loeschen und stattdessen streamen
+                    // Offline-Datei spielt gerade nicht -> NUR diese Session streamen.
+                    // Datei NICHT loeschen (bleibt in der Offline-Bibliothek).
                     if self.source == "offline", let t = self.current {
-                        self.downloads?.delete(t.uri)
+                        self.failedOffline.insert(t.uri)
                         self.source = ""
                         self.loadCurrent(autoplay: true)
                     }
