@@ -1618,15 +1618,16 @@ struct EpisodeRow: View {
                     .foregroundStyle(playing ? Theme.accent : Theme.text)
                 Text(durText).font(.system(size: 12)).foregroundStyle(Theme.sub)
                 Spacer()
-                Button { downloads.toggle(track) } label: {
-                    if downloads.isBusy(track.uri) {
-                        ProgressView().tint(Theme.accent)
-                    } else {
+                if downloads.isBusy(track.uri) {
+                    ProgressView(value: downloads.progress(for: track.uri))
+                        .progressViewStyle(.linear).tint(Theme.accent).frame(width: 70)
+                } else {
+                    Button { downloads.toggle(track) } label: {
                         Image(systemName: downloads.isDownloaded(track.uri) ? "checkmark.circle.fill" : "arrow.down.circle")
                             .font(.system(size: 22))
                             .foregroundStyle(downloads.isDownloaded(track.uri) ? Theme.accent : Theme.sub)
-                    }
-                }.buttonStyle(.plain).frame(width: 44, height: 44).contentShape(Rectangle())
+                    }.buttonStyle(.plain).frame(width: 44, height: 44).contentShape(Rectangle())
+                }
             }
         }.padding(.vertical, 12).padding(.horizontal)
         .contentShape(Rectangle())
