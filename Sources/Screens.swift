@@ -638,7 +638,7 @@ struct SearchView: View {
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(["all","tracks","playlists","albums","artists"], id: \.self) { s in
+                        ForEach(["all","tracks","playlists","albums","artists","shows"], id: \.self) { s in
                             Pill(text: label(s), active: scope == s) { scope = s }
                         }
                     }.padding(.horizontal)
@@ -665,6 +665,9 @@ struct SearchView: View {
                             if scope == "all" || scope == "artists", let ars = r.artists, !ars.isEmpty {
                                 SectionHeader("Künstler"); CardRows(cards: ars, isAlbum: false)
                             }
+                            if scope == "all" || scope == "shows", let shs = r.shows, !shs.isEmpty {
+                                SectionHeader("Podcasts"); CardRows(cards: shs, isAlbum: false)
+                            }
                         }.padding(.bottom, 130).padding(.top, 4)
                     } else {
                         VStack(spacing: 10) {
@@ -683,12 +686,16 @@ struct SearchView: View {
             .background(Theme.bg)
             .navigationTitle("Suchen")
             .navigationDestination(for: Card.self) { c in
-                TrackListView(uri: c.uri, title: c.name, image: c.image, isAlbum: c.uri.contains(":album:"))
+                if c.uri.contains(":show:") {
+                    PodcastView(uri: c.uri, title: c.name, image: c.image)
+                } else {
+                    TrackListView(uri: c.uri, title: c.name, image: c.image, isAlbum: c.uri.contains(":album:"))
+                }
             }
         }
     }
     private func label(_ s: String) -> String {
-        ["all":"Alle","tracks":"Songs","playlists":"Playlists","albums":"Alben","artists":"Künstler"][s] ?? s
+        ["all":"Alle","tracks":"Songs","playlists":"Playlists","albums":"Alben","artists":"Künstler","shows":"Podcasts"][s] ?? s
     }
     private func runSearch() {
         let q = query.trimmingCharacters(in: .whitespaces)
@@ -1076,10 +1083,10 @@ struct PodcastView: View {
                     .init(color: Theme.bg, location: 0.95)], startPoint: .top, endPoint: .bottom))
 
                 LazyVStack(spacing: 0) {
-                    ForEach(resp?.episodes ?? []) { ep in
+                    ForEach(Array((resp?.episodes ?? []).enumerated()), id: \.element.id) { i, ep in
                         EpisodeRow(ep: ep, playing: player.current?.uri == ep.uri) {
-                            player.play(tracks: [ep.track(podcast: showName, fallbackImage: showImage)],
-                                        contextName: showName, contextURI: uri)
+                            let q = (resp?.episodes ?? []).map { $0.track(podcast: showName, fallbackImage: showImage) }
+                            player.play(tracks: q, startAt: i, contextName: showName, contextURI: uri)
                         }
                     }
                 }.padding(.top, 6)
@@ -1274,24 +1281,40 @@ struct PlayerView: View {
                             Text(fmt(p.duration)).font(.caption2).foregroundStyle(Theme.sub)
                         }
                     }.padding(.horizontal)
-                    HStack {
-                        Button { p.toggleShuffle() } label: {
-                            Image(systemName: "shuffle").font(.title3).foregroundStyle(p.shuffle ? Theme.accent : Theme.text)
-                        }
-                        Spacer()
-                        Button { p.prev() } label: { Image(systemName: "backward.fill").font(.title) }
-                        Spacer()
-                        Button { p.toggle() } label: {
-                            Image(systemName: p.isPlaying ? "pause.circle.fill" : "play.circle.fill").font(.system(size: 72))
-                        }
-                        Spacer()
-                        Button { p.next() } label: { Image(systemName: "forward.fill").font(.title) }
-                        Spacer()
-                        Button { p.cycleRepeat() } label: {
-                            Image(systemName: p.repeatMode == .one ? "repeat.1" : "repeat")
-                                .font(.title3).foregroundStyle(p.repeatMode == .off ? Theme.text : Theme.accent)
-                        }
-                    }.foregroundStyle(Theme.text).padding(.horizontal, 8)
+                    if p.isEpisode {
+                        HStack {
+                            Button { p.skip(-10) } label: { Image(systemName: "gobackward.10").font(.title2) }
+                            Spacer()
+                            Button { p.prev() } label: { Image(systemName: "backward.fill").font(.title2) }
+                            Spacer()
+                            Button { p.toggle() } label: {
+                                Image(systemName: p.isPlaying ? "pause.circle.fill" : "play.circle.fill").font(.system(size: 72))
+                            }
+                            Spacer()
+                            Button { p.next() } label: { Image(systemName: "forward.fill").font(.title2) }
+                            Spacer()
+                            Button { p.skip(10) } label: { Image(systemName: "goforward.10").font(.title2) }
+                        }.foregroundStyle(Theme.text).padding(.horizontal, 8)
+                    } else {
+                        HStack {
+                            Button { p.toggleShuffle() } label: {
+                                Image(systemName: "shuffle").font(.title3).foregroundStyle(p.shuffle ? Theme.accent : Theme.text)
+                            }
+                            Spacer()
+                            Button { p.prev() } label: { Image(systemName: "backward.fill").font(.title) }
+                            Spacer()
+                            Button { p.toggle() } label: {
+                                Image(systemName: p.isPlaying ? "pause.circle.fill" : "play.circle.fill").font(.system(size: 72))
+                            }
+                            Spacer()
+                            Button { p.next() } label: { Image(systemName: "forward.fill").font(.title) }
+                            Spacer()
+                            Button { p.cycleRepeat() } label: {
+                                Image(systemName: p.repeatMode == .one ? "repeat.1" : "repeat")
+                                    .font(.title3).foregroundStyle(p.repeatMode == .off ? Theme.text : Theme.accent)
+                            }
+                        }.foregroundStyle(Theme.text).padding(.horizontal, 8)
+                    }
                     HStack(spacing: 50) {
                         Button { showLyrics = true } label: { Label("Songtext", systemImage: "quote.bubble").font(.system(size: 15, weight: .semibold)) }
                         Button { withAnimation { page = 1 } } label: { Label("Warteschlange", systemImage: "list.bullet").font(.system(size: 15, weight: .semibold)) }
@@ -1438,8 +1461,13 @@ struct Artwork: View {
     let url: String?
     var size: CGFloat = 48
     var corner: CGFloat = 6
+    private var resolved: URL? {
+        guard let s = url, !s.isEmpty else { return nil }
+        if s.hasPrefix("http") { return URL(string: s) }
+        return URL(string: ImageBase.url + (s.hasPrefix("/") ? s : "/" + s))
+    }
     var body: some View {
-        AsyncImage(url: URL(string: url ?? "")) { img in
+        AsyncImage(url: resolved) { img in
             img.resizable().scaledToFill()
         } placeholder: {
             RoundedRectangle(cornerRadius: corner).fill(Theme.card)

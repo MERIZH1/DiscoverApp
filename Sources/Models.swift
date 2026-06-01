@@ -129,6 +129,7 @@ struct SearchResponse: Codable {
     let playlists: [Card]?
     let albums: [Card]?
     let artists: [Card]?
+    let shows: [Card]?
 }
 
 // MARK: - Podcast

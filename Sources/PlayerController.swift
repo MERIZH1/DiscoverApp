@@ -24,6 +24,7 @@ final class PlayerController: ObservableObject {
 
     var current: Track? { queue.indices.contains(index) ? queue[index] : nil }
     var hasContent: Bool { current != nil || isRadio }
+    var isEpisode: Bool { !isRadio && (current?.uri.hasPrefix("spotify:episode:") ?? false) }
     var displayTitle: String { isRadio ? radioTitle : (current?.name ?? "") }
     var displayArtist: String { isRadio ? "Live-Radio" : (current?.artist ?? "") }
     var displayImage: String? { isRadio ? radioFavicon : current?.image }
@@ -93,6 +94,14 @@ final class PlayerController: ObservableObject {
     func toggleShuffle() { shuffle.toggle() }
     func cycleRepeat() { repeatMode = repeatMode == .off ? .all : (repeatMode == .all ? .one : .off) }
 
+    /// Relativ vor/zurueck springen (Podcast ±10s).
+    func skip(_ delta: Double) {
+        var t = currentTime + delta
+        if t < 0 { t = 0 }
+        if duration > 0 { t = min(t, duration) }
+        seek(t)
+    }
+
     /// Song direkt hinter dem aktuellen einreihen ("Als Naechstes spielen").
     func playNext(_ t: Track) {
         if !hasContent || isRadio { play(tracks: [t]); return }
@@ -125,6 +134,7 @@ final class PlayerController: ObservableObject {
 
     private func loadCurrent(autoplay: Bool) {
         guard let track = current else { return }
+        updateRemoteForContent()
         loading = true; currentTime = 0; duration = track.durationSec; source = ""
         updateNowPlaying(title: track.name, artist: track.artist, album: track.album,
                          dur: track.durationSec, art: track.image, live: false)
@@ -232,5 +242,20 @@ final class PlayerController: ObservableObject {
             guard let e = e as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
             Task { @MainActor in self?.seek(e.positionTime) }; return .success
         }
+        // Podcast: 10s vor/zurueck im Lock-Screen
+        c.skipForwardCommand.preferredIntervals = [NSNumber(value: 10)]
+        c.skipBackwardCommand.preferredIntervals = [NSNumber(value: 10)]
+        c.skipForwardCommand.addTarget { [weak self] _ in Task { @MainActor in self?.skip(10) }; return .success }
+        c.skipBackwardCommand.addTarget { [weak self] _ in Task { @MainActor in self?.skip(-10) }; return .success }
+    }
+
+    /// Lock-Screen: Podcast -> 10s-Skip, Musik -> Track vor/zurueck.
+    private func updateRemoteForContent() {
+        let c = MPRemoteCommandCenter.shared()
+        let ep = isEpisode
+        c.nextTrackCommand.isEnabled = !ep
+        c.previousTrackCommand.isEnabled = !ep
+        c.skipForwardCommand.isEnabled = ep
+        c.skipBackwardCommand.isEnabled = ep
     }
 }

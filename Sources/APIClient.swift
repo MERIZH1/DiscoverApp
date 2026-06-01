@@ -14,14 +14,25 @@ enum APIError: LocalizedError {
 
 /// Spricht das Discover-Backend an (gleiche /api/*-Endpoints wie die PWA).
 /// Profil via X-Profile-Id-Header.
+/// Globale Server-Basis, damit Artwork relative Bild-URLs aufloesen kann.
+enum ImageBase {
+    static var url = ""
+    static func normalize(_ s: String) -> String {
+        var t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        while t.hasSuffix("/") { t.removeLast() }
+        return t
+    }
+}
+
 @MainActor
 final class APIClient: ObservableObject {
-    @Published var baseURL: String
+    @Published var baseURL: String { didSet { ImageBase.url = ImageBase.normalize(baseURL) } }
     var profileId: String?
     private let session: URLSession
 
     init(baseURL: String = "") {
         self.baseURL = baseURL
+        ImageBase.url = ImageBase.normalize(baseURL)
         let cfg = URLSessionConfiguration.default
         cfg.timeoutIntervalForRequest = 20
         cfg.waitsForConnectivity = true
