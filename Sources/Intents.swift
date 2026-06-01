@@ -7,13 +7,26 @@ enum DiscoverServices {
     static weak var app: AppState?
 }
 
-/// Sucht einen Song/Kuenstler und spielt ihn in Discover.
-/// Frei diktierbar: Siri fragt nach -> z.B. "Last Resort von Papa Roach".
-struct PlayInDiscoverIntent: AppIntent {
-    static var title: LocalizedStringResource = "In Discover abspielen"
+/// VOICE: "Hey Siri, spiele etwas in Discover" -> oeffnet + spielt letzten Song.
+/// Kein Parameter -> Siri kann die Aktion zuverlaessig ausfuehren.
+struct ResumeDiscoverIntent: AppIntent {
+    static var title: LocalizedStringResource = "Weiter abspielen"
     static var openAppWhenRun: Bool = true
 
-    @Parameter(title: "Was abspielen?", requestValueDialog: "Was moechtest du hoeren?")
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        DiscoverServices.app?.player.resume()
+        return .result()
+    }
+}
+
+/// KURZBEFEHL: mit getipptem Song (in der Kurzbefehle-App nutzbar / als Automation).
+/// Sucht den Song und spielt ihn.
+struct SearchPlayDiscoverIntent: AppIntent {
+    static var title: LocalizedStringResource = "Song suchen & abspielen"
+    static var openAppWhenRun: Bool = true
+
+    @Parameter(title: "Titel / Suche")
     var query: String
 
     @MainActor
@@ -31,15 +44,15 @@ struct PlayInDiscoverIntent: AppIntent {
     }
 }
 
-/// Macht den Intent als Siri-Satz + in der Kurzbefehle-App verfuegbar.
+/// Nur der parameterlose Intent bekommt Siri-Saetze (zuverlaessig).
 struct DiscoverShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
-            intent: PlayInDiscoverIntent(),
+            intent: ResumeDiscoverIntent(),
             phrases: [
                 "Spiele etwas in \(.applicationName)",
                 "Spiele Musik in \(.applicationName)",
-                "Suche in \(.applicationName)",
+                "Weiter in \(.applicationName)",
             ],
             shortTitle: "Abspielen",
             systemImageName: "play.fill"
