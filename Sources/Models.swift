@@ -145,8 +145,15 @@ struct StreamURLResponse: Codable {
     let navidromeId: String?
     let error: String?
 }
+struct SmartCache: Codable {
+    var enabled: Bool?
+    var min_listened_sec: Int?
+    var min_listened_pct: Double?
+    var min_play_count: Int?
+}
 struct UserSettings: Codable {
     var bg_keepalive: Bool?
     var normalize_volume: Bool?
     var prebuffer_count: Int?
+    var smart_cache: SmartCache?
 }

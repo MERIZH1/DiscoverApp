@@ -326,14 +326,16 @@ struct AccountSheet: View {
                         Divider().background(Theme.input).padding(.vertical, 8)
                         AccountHeader("ADMIN — PROFILE")
                         ForEach(profiles) { p in
-                            HStack(spacing: 12) {
-                                AvatarCircle(name: p.name, size: 32)
-                                Text(p.name).font(.system(size: 15)).foregroundStyle(Theme.text)
-                                Spacer()
-                                Text(p.is_admin == true ? "Admin" : "User").font(.caption2).foregroundStyle(Theme.mute)
-                                Image(systemName: p.has_spotify_cookie == true ? "checkmark.seal.fill" : "xmark.seal")
-                                    .font(.caption).foregroundStyle(p.has_spotify_cookie == true ? Theme.accent : Theme.mute)
-                            }.padding(.vertical, 6).padding(.horizontal)
+                            let canPromote = p.is_admin != true
+                            let canDemote = p.is_admin == true && p.id != app.profile?.id
+                            if canPromote || canDemote {
+                                Menu {
+                                    if canPromote { Button { promote(p, true) } label: { Label("Zum Admin machen", systemImage: "crown") } }
+                                    if canDemote { Button(role: .destructive) { promote(p, false) } label: { Label("Admin-Rechte entfernen", systemImage: "crown") } }
+                                } label: { adminRow(p, showMenu: true) }
+                            } else {
+                                adminRow(p, showMenu: false)
+                            }
                         }
                     }
 
@@ -349,6 +351,26 @@ struct AccountSheet: View {
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
         .task { profiles = (try? await app.api.profiles()) ?? [] }
+    }
+
+    @ViewBuilder private func adminRow(_ p: Profile, showMenu: Bool) -> some View {
+        HStack(spacing: 12) {
+            AvatarCircle(name: p.name, size: 32)
+            Text(p.name).font(.system(size: 15)).foregroundStyle(Theme.text)
+            Spacer()
+            Text(p.is_admin == true ? "Admin" : "User").font(.caption2)
+                .foregroundStyle(p.is_admin == true ? Theme.accent : Theme.mute)
+            Image(systemName: p.has_spotify_cookie == true ? "checkmark.seal.fill" : "xmark.seal")
+                .font(.caption).foregroundStyle(p.has_spotify_cookie == true ? Theme.accent : Theme.mute)
+            if showMenu { Image(systemName: "ellipsis").font(.caption).foregroundStyle(Theme.sub) }
+        }.padding(.vertical, 6).padding(.horizontal).contentShape(Rectangle())
+    }
+
+    private func promote(_ p: Profile, _ admin: Bool) {
+        Task {
+            try? await app.api.updateProfile(p.id, fields: ["is_admin": admin])
+            profiles = (try? await app.api.profiles()) ?? profiles
+        }
     }
 }
 
@@ -370,9 +392,19 @@ struct SettingsView: View {
     @State private var prebuffer = 5
     @State private var normalize = false
     @State private var bgKeepalive = false
+    @State private var scEnabled = true
+    @State private var scSec = 45
+    @State private var scPct = 0
+    @State private var scPlays = 4
     @State private var cookie = ""
     @State private var cookieMsg = ""
     @State private var loaded = false
+
+    private let bufferOptions: [(Int, String)] = [
+        (0, "Aus"), (2, "2 Songs (~10 MB)"), (5, "5 Songs (~25 MB)"),
+        (10, "10 Songs (~50 MB)"), (20, "20 Songs (~100 MB)"),
+    ]
+    private func bufferLabel(_ n: Int) -> String { bufferOptions.first { $0.0 == n }?.1 ?? "\(n) Songs" }
 
     var body: some View {
         NavigationStack {
@@ -388,23 +420,35 @@ struct SettingsView: View {
                     }
                     // Wiedergabe
                     SettingsGroup("WIEDERGABE") {
-                        HStack {
-                            Text("Vorpuffer (Songs)").font(.system(size: 15)).foregroundStyle(Theme.text)
-                            Spacer()
-                            Stepper(value: $prebuffer, in: 0...50) { Text("\(prebuffer)").foregroundStyle(Theme.sub) }
-                                .labelsHidden().fixedSize()
-                                .onChange(of: prebuffer) { _ in if loaded { saveSettings() } }
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Offline-Buffer").font(.system(size: 15)).foregroundStyle(Theme.text)
+                            Text("Songs vorladen fuer unterbrochene Verbindung").font(.caption2).foregroundStyle(Theme.mute)
+                            Menu {
+                                ForEach(bufferOptions, id: \.0) { opt in
+                                    Button(opt.1) { prebuffer = opt.0; if loaded { saveSettings() } }
+                                }
+                            } label: {
+                                HStack {
+                                    Text(bufferLabel(prebuffer)).foregroundStyle(Theme.text)
+                                    Spacer()
+                                    Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(Theme.sub)
+                                }.padding(10).background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
                         }
                         Toggle(isOn: $normalize) {
                             Text("Lautstaerke normalisieren").font(.system(size: 15)).foregroundStyle(Theme.text)
                         }.tint(Theme.accent).onChange(of: normalize) { _ in if loaded { saveSettings() } }
-                        Toggle(isOn: $bgKeepalive) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Hintergrund-Wiedergabe").font(.system(size: 15)).foregroundStyle(Theme.text)
-                                Text("Bei der nativen App nicht noetig — Audio laeuft nativ weiter.")
-                                    .font(.caption2).foregroundStyle(Theme.mute)
-                            }
-                        }.tint(Theme.accent).onChange(of: bgKeepalive) { _ in if loaded { saveSettings() } }
+                    }
+
+                    // Auto-Download (Smart-Cache)
+                    SettingsGroup("AUTO-DOWNLOAD (SMART-CACHE)") {
+                        Toggle(isOn: $scEnabled) {
+                            Text("Oft gehoerte Songs automatisch auf den Server laden")
+                                .font(.system(size: 15)).foregroundStyle(Theme.text)
+                        }.tint(Theme.accent).onChange(of: scEnabled) { _ in if loaded { saveSmartCache() } }
+                        SCField(label: "...ab so vielen Sekunden gehoert (0 = aus)", value: $scSec) { if loaded { saveSmartCache() } }
+                        SCField(label: "...ODER ab so viel % der Songlaenge (0 = aus)", value: $scPct) { if loaded { saveSmartCache() } }
+                        SCField(label: "...ODER nach so vielen Wiedergaben (0 = aus)", value: $scPlays) { if loaded { saveSmartCache() } }
                     }
                     // Spotify-Cookie
                     SettingsGroup("SPOTIFY-COOKIE (sp_dc)") {
@@ -449,6 +493,12 @@ struct SettingsView: View {
                 prebuffer = s.prebuffer_count ?? 5
                 normalize = s.normalize_volume ?? false
                 bgKeepalive = s.bg_keepalive ?? false
+                if let sc = s.smart_cache {
+                    scEnabled = sc.enabled ?? true
+                    scSec = sc.min_listened_sec ?? 45
+                    scPct = Int(sc.min_listened_pct ?? 0)
+                    scPlays = sc.min_play_count ?? 4
+                }
             }
             loaded = true
         }
@@ -472,6 +522,29 @@ struct SettingsView: View {
                 "bg_keepalive": bgKeepalive,
             ])
         }
+    }
+    private func saveSmartCache() {
+        Task {
+            await app.api.saveSettings(["smart_cache": [
+                "enabled": scEnabled,
+                "min_listened_sec": scSec,
+                "min_listened_pct": scPct,
+                "min_play_count": scPlays,
+            ]])
+        }
+    }
+}
+
+struct SCField: View {
+    let label: String; @Binding var value: Int; let commit: () -> Void
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label).font(.system(size: 13)).foregroundStyle(Theme.sub)
+            TextField("0", value: $value, format: .number)
+                .keyboardType(.numberPad).foregroundStyle(Theme.text).padding(10)
+                .background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .onChange(of: value) { _ in commit() }
     }
 }
 
