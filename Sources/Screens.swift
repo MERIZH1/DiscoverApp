@@ -1075,6 +1075,7 @@ struct RadioView: View {
 struct TrackListView: View {
     @EnvironmentObject var app: AppState
     @EnvironmentObject var player: PlayerController
+    @EnvironmentObject var downloads: DownloadManager
     @Environment(\.dismiss) private var dismiss
     let uri: String; let title: String; let image: String?; let isAlbum: Bool
     @State private var tracks: [Track] = []
@@ -1082,6 +1083,8 @@ struct TrackListView: View {
     @State private var loading = true
     @State private var hero: Color = Theme.elev
     @State private var reload = 0
+    @State private var moreLoading = false
+    @State private var isSubscribed = false
 
     private var metaText: String {
         if isAlbum { return "Album · \(tracks.count) Songs" }
@@ -1094,6 +1097,25 @@ struct TrackListView: View {
         return s
     }
 
+    private func toggleSub() {
+        let was = isSubscribed
+        isSubscribed.toggle(); Haptics.tap()
+        Task { was ? await app.api.unsubscribe(uri: uri) : await app.api.subscribe(uri: uri, name: title) }
+    }
+
+    private func loadMoreRecs() {
+        guard !moreLoading else { return }
+        moreLoading = true
+        Task {
+            let skip = recs.compactMap { $0.uri.split(separator: ":").last.map(String.init) }
+            let more = (try? await app.api.recommendations(uri, n: 15, skip: skip)) ?? []
+            let existing = Set(recs.map { $0.uri })
+            let fresh = more.filter { !existing.contains($0.uri) }
+            recs = fresh.isEmpty ? ((try? await app.api.recommendations(uri, n: 15)) ?? recs) : recs + fresh
+            moreLoading = false
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
@@ -1102,11 +1124,21 @@ struct TrackListView: View {
                     Artwork(url: image, size: 210, corner: 6).shadow(color: .black.opacity(0.6), radius: 30, y: 8).padding(.top, 12)
                     Text(title).font(.system(size: 26, weight: .black)).foregroundStyle(Theme.text)
                         .multilineTextAlignment(.center).padding(.horizontal)
-                    Text(metaText)
-                        .font(.system(size: 13)).foregroundStyle(Theme.sub)
+                    HStack(spacing: 5) {
+                        Text(metaText).font(.system(size: 13)).foregroundStyle(Theme.sub)
+                        if isSubscribed && !isAlbum {
+                            Text("· 🔔 Abo").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.accent)
+                        }
+                    }
                     // Aktions-Reihe
                     HStack {
-                        Image(systemName: "arrow.down.circle").font(.title2).foregroundStyle(Theme.sub)
+                        Button {
+                            Task { for t in tracks { await downloads.download(t) } }
+                        } label: {
+                            let all = !tracks.isEmpty && tracks.allSatisfy { downloads.isDownloaded($0.uri) }
+                            Image(systemName: all ? "arrow.down.circle.fill" : "arrow.down.circle")
+                                .font(.title2).foregroundStyle(all ? Theme.accent : Theme.sub)
+                        }
                         Image(systemName: "ellipsis").font(.title3).foregroundStyle(Theme.sub).padding(.leading, 14)
                         Spacer()
                         Button { if !tracks.isEmpty { player.shuffle = true; player.play(tracks: tracks.shuffled(), contextName: title, contextURI: uri) } } label: {
@@ -1150,17 +1182,27 @@ struct TrackListView: View {
                     }.frame(maxWidth: .infinity).padding(.top, 40)
                 }
 
-                // Empfehlungen ("Discover")
+                // Empfehlungen ("Discover") — wie PWA: Refresh-Icon + "+"-Reihen
                 if !recs.isEmpty {
                     VStack(alignment: .leading, spacing: 2) {
-                        SectionHeader("Empfehlungen")
-                        Text(isAlbum ? "Ähnliche Songs" : "Basierend auf dieser Playlist")
+                        HStack {
+                            Text("Empfehlungen").font(.title3.bold()).foregroundStyle(Theme.text)
+                            Spacer()
+                            if moreLoading { ProgressView().tint(Theme.accent) }
+                            else {
+                                Button { loadMoreRecs() } label: {
+                                    Image(systemName: "arrow.triangle.2.circlepath")
+                                        .font(.system(size: 19, weight: .semibold)).foregroundStyle(Theme.text)
+                                }
+                            }
+                        }.padding(.horizontal).padding(.top, 8)
+                        Text(isAlbum ? "Ähnliche Songs" : "Basierend auf den Songs deiner Playlist")
                             .font(.system(size: 13)).foregroundStyle(Theme.sub)
                             .padding(.horizontal).padding(.bottom, 4)
                         ForEach(Array(recs.enumerated()), id: \.offset) { i, t in
-                            TrackRow(track: t, playing: player.current?.id == t.id) {
-                                player.shuffle = false; player.play(tracks: recs, startAt: i, contextName: "Empfehlungen", contextURI: uri)
-                            }
+                            RecRow(track: t, playing: player.current?.id == t.id,
+                                   add: { player.addToQueue(t); Haptics.tap() },
+                                   play: { player.shuffle = false; player.play(tracks: recs, startAt: i, contextName: "Empfehlungen", contextURI: uri) })
                         }
                     }.padding(.top, 14)
                 }
@@ -1177,10 +1219,20 @@ struct TrackListView: View {
                     Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
                 }
             }
+            if !isAlbum {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { toggleSub() } label: {
+                        Image(systemName: isSubscribed ? "bell.fill" : "bell")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(isSubscribed ? Theme.accent : Theme.text)
+                    }
+                }
+            }
         }
         .overlay { if loading { ProgressView().tint(Theme.accent) } }
         .task(id: reload) {
             loading = true; tracks = []
+            if !isAlbum { isSubscribed = (try? await app.api.subscriptions())?.contains { $0.uri == uri } ?? false }
             let absImg = image.flatMap { app.api.absoluteURL($0)?.absoluteString } ?? image
             if let c = await averageColor(absImg) { hero = c }
             var t = (isAlbum ? try? await app.api.albumTracks(uri) : try? await app.api.playlistTracks(uri, check: true))?.tracks ?? []
@@ -1313,6 +1365,26 @@ struct NumberedTrackRow: View {
                 .background(playing ? Theme.accent.opacity(0.08) : .clear)
         }.buttonStyle(.plain)
         .contextMenu { TrackMenu(track: track) }
+    }
+}
+
+struct RecRow: View {
+    let track: Track; let playing: Bool; let add: () -> Void; let play: () -> Void
+    var body: some View {
+        HStack(spacing: 12) {
+            Artwork(url: track.image, size: 50, corner: 4)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(track.name).font(.system(size: 15)).foregroundStyle(playing ? Theme.accent : Theme.text).lineLimit(1)
+                Text(track.artist).font(.system(size: 13)).foregroundStyle(Theme.sub).lineLimit(1)
+            }
+            Spacer()
+            Button(action: add) {
+                Image(systemName: "plus.circle").font(.system(size: 24)).foregroundStyle(Theme.text)
+                    .frame(width: 42, height: 42).contentShape(Rectangle())
+            }.buttonStyle(.plain)
+        }
+        .padding(.vertical, 8).padding(.horizontal).contentShape(Rectangle())
+        .onTapGesture(perform: play)
     }
 }
 

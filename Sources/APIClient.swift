@@ -103,8 +103,10 @@ final class APIClient: ObservableObject {
     }
 
     /// "Discover": Empfehlungen basierend auf einer Playlist/einem Album.
-    func recommendations(_ uri: String, n: Int = 15) async throws -> [Track] {
-        try await get("/api/recommendations/\(enc(uri))?n=\(n)")
+    /// skip = bereits gezeigte Track-IDs (fuer "Mehr laden").
+    func recommendations(_ uri: String, n: Int = 15, skip: [String] = []) async throws -> [Track] {
+        let s = skip.isEmpty ? "" : "&skip=" + skip.joined(separator: ",")
+        return try await get("/api/recommendations/\(enc(uri))?n=\(n)\(s)")
     }
 
     /// Podcast: Episoden einer Show.
@@ -195,6 +197,12 @@ final class APIClient: ObservableObject {
     func subscriptions() async throws -> [SubItem] {
         let r: SubsResponse = try await get("/api/subscriptions")
         return r.subs
+    }
+    func subscribe(uri: String, name: String) async {
+        _ = try? await data("/api/subscriptions", method: "POST", json: ["uri": uri, "name": name])
+    }
+    func unsubscribe(uri: String) async {
+        _ = try? await data("/api/subscriptions/\(enc(uri))", method: "DELETE")
     }
 
     /// Song-Radio: erstellt serverseitig eine Radio-Playlist (30 Songs) und gibt deren URI zurueck.
