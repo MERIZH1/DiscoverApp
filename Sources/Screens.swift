@@ -166,10 +166,6 @@ struct TrackMenu: View {
     // offene Menue bei jedem Player-Tick neu (Flackern). Referenz nur lesen.
     private var app: AppState? { DiscoverServices.app }
 
-    private var spotifyURL: URL? {
-        guard let id = track.uri.split(separator: ":").last else { return nil }
-        return URL(string: "https://open.spotify.com/track/\(id)")
-    }
     private var others: [Profile] {
         (app?.allProfiles ?? []).filter { $0.id != app?.profile?.id }
     }
@@ -183,9 +179,10 @@ struct TrackMenu: View {
         // Quick-Actions als Icon-Reihe oben — alle drei sind Controls (ShareLink + Buttons)
         // -> ControlGroup rendert sie gleich gross. ShareLink = natives Teilen-Menue.
         ControlGroup {
-            ShareLink(item: spotifyURL ?? URL(string: "https://open.spotify.com")!) {
-                Label("Teilen", systemImage: "square.and.arrow.up")
-            }
+            Menu {
+                Button { copySpotify() } label: { Label("Spotify-Link kopieren", systemImage: "link") }
+                Button { Task { await copyYouTube() } } label: { Label("YouTube-Link kopieren", systemImage: "play.rectangle") }
+            } label: { Label("Teilen", systemImage: "square.and.arrow.up") }
             Button { app?.player.playNext(track); Haptics.tap() } label: { Label("Als Nächstes", systemImage: "text.line.first.and.arrowtriangle.forward") }
             Menu {
                 if others.isEmpty {
@@ -213,7 +210,11 @@ struct TrackMenu: View {
             Button { onAlbum() } label: { Label("Album anzeigen", systemImage: "square.stack") }
         }
         Button { startRadio() } label: { Label("Song-Radio starten", systemImage: "dot.radiowaves.left.and.right") }
-        Button { Task { await copyYouTube() } } label: { Label("YouTube-Link kopieren", systemImage: "play.rectangle") }
+    }
+    private func copySpotify() {
+        if let id = track.uri.split(separator: ":").last {
+            UIPasteboard.general.string = "https://open.spotify.com/track/\(id)"; Haptics.tap()
+        }
     }
     private func copyYouTube() async {
         guard let api = app?.api else { return }
