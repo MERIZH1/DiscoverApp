@@ -80,6 +80,20 @@ final class APIClient: ObservableObject {
         return try JSONDecoder().decode(T.self, from: d)
     }
 
+    // MARK: - Admin-Konsole
+    func systemStatus() async -> SystemStatus? {
+        try? await get("/api/status")
+    }
+    func statusLog(limit: Int = 40) async -> [StatusLogItem] {
+        let r: StatusLogResponse? = try? await get("/api/status-log?limit=\(limit)")
+        return r?.items ?? []
+    }
+    func refreshCookies() async -> Bool {
+        guard let d = try? await data("/api/admin/cookie-refresh", method: "POST"),
+              let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return false }
+        return (obj["ok"] as? Bool) ?? false
+    }
+
     // MARK: - Cross-Device-Sync (/api/sync/*)
     func syncPushState(_ snapshot: [String: Any]) async {
         _ = try? await data("/api/sync/state", method: "POST", json: snapshot)

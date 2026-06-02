@@ -441,6 +441,7 @@ struct AccountSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var profiles: [Profile] = []
     @State private var showSettings = false
+    @State private var showConsole = false
 
     private var isAdmin: Bool { app.profile?.is_admin == true }
 
@@ -477,6 +478,9 @@ struct AccountSheet: View {
 
                     Divider().background(Theme.input).padding(.vertical, 8)
                     AccountAction(icon: "gearshape.fill", label: "Einstellungen") { showSettings = true }
+                    if isAdmin {
+                        AccountAction(icon: "wrench.and.screwdriver.fill", label: "Konsole (Status & Befehle)") { showConsole = true }
+                    }
                     AccountAction(icon: "person.2.fill", label: "Profil abmelden") { app.clearProfile(); dismiss() }
 
                     AccountHeader("SERVER")
@@ -520,6 +524,7 @@ struct AccountSheet: View {
             } }
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
+        .sheet(isPresented: $showConsole) { AdminConsoleView() }
         .task { profiles = (try? await app.api.profiles()) ?? [] }
     }
 
