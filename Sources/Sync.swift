@@ -61,38 +61,46 @@ final class SyncManager: ObservableObject {
         loop = Task { [weak self] in
             while !Task.isCancelled {
                 await self?.tick()
-                try? await Task.sleep(nanoseconds: 2_500_000_000)
+                try? await Task.sleep(nanoseconds: 1_000_000_000)   // 1s -> schnelle Reaktion
             }
         }
     }
     func stop() { loop?.cancel(); loop = nil }
 
     private var wasOwner = false
+    private var lastPush = 0.0
+    private var lastPoll = 0.0
 
     private func tick() async {
         guard let p = player else { return }
+        let now = Date().timeIntervalSince1970
         if p.isPlaying && p.current != nil {
-            // Owner: erst Commands (z.B. pause), DANN State pushen -> reflektiert die
-            // Aenderung sofort (sonst sieht die Remote die Pause nicht).
-            await consumeCommands(p)
-            if let snap = snapshot(p) { await api.syncPushState(snap) }
+            // Commands JEDE Sekunde abarbeiten -> schnelle Reaktion auf Remote-Tasten.
+            let did = await consumeCommands(p)
+            // State sofort pushen wenn ein Command kam, sonst Heartbeat alle 2.5s.
+            if did || now - lastPush >= 2.4 {
+                if let snap = snapshot(p) { await api.syncPushState(snap); lastPush = now }
+            }
             wasOwner = true
             if remote != nil { remote = nil }
         } else {
-            // Gerade von Playing -> Pause/Stop gewechselt? Einmal finalen State pushen,
-            // damit Remotes "pausiert" sehen statt in den Timeout zu laufen.
+            // Play -> Pause-Wechsel: finalen State sofort pushen.
             if wasOwner {
-                if let snap = snapshot(p) { await api.syncPushState(snap) }
+                if let snap = snapshot(p) { await api.syncPushState(snap); lastPush = now }
                 wasOwner = false
             }
-            await consumeCommands(p)   // play / queue_inject auch im Pausezustand annehmen
-            // Spielt ein anderes Geraet? (frischer State, egal ob play/pause -> Banner mit Play/Pause)
-            let s = await api.syncGetState()
-            let nowMs = Date().timeIntervalSince1970 * 1000
-            if let s, s.device_name != deviceName, let seen = s.owner_seen_at, (nowMs - seen) < 15000 {
-                remote = s
-            } else {
-                remote = nil
+            let did = await consumeCommands(p)   // play / queue_inject auch pausiert annehmen
+            if did, let snap = snapshot(p) { await api.syncPushState(snap); lastPush = now }
+            // Remote-State pollen (etwas gedrosselt)
+            if now - lastPoll >= 1.4 {
+                lastPoll = now
+                let s = await api.syncGetState()
+                let nowMs = now * 1000
+                if let s, s.device_name != deviceName, let seen = s.owner_seen_at, (nowMs - seen) < 15000 {
+                    remote = s
+                } else {
+                    remote = nil
+                }
             }
         }
     }
@@ -113,7 +121,8 @@ final class SyncManager: ObservableObject {
         ]
     }
 
-    private func consumeCommands(_ p: PlayerController) async {
+    @discardableResult
+    private func consumeCommands(_ p: PlayerController) async -> Bool {
         let cmds = await api.syncGetCommands(deviceID: deviceID)
         for c in cmds {
             switch c["cmd"] as? String ?? "" {
@@ -139,6 +148,7 @@ final class SyncManager: ObservableObject {
             default: break
             }
         }
+        return !cmds.isEmpty
     }
 
     // MARK: - Remote-Steuerung (dieses Geraet ist Fernbedienung)
