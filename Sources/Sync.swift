@@ -20,9 +20,10 @@ struct RemoteState: Codable {
     let queue_idx: Int?
     let queue_len: Int?
     let queue_tracks: [SyncTrack]?
+    let owner_seen_at: Double?   // vom Server gesetzt (ms) -> Frische-Check
     enum CodingKeys: String, CodingKey {
         case device_id, device_name, track, position, duration, playing, shuffle
-        case queue_idx, queue_len, queue_tracks
+        case queue_idx, queue_len, queue_tracks, owner_seen_at
         case repeatMode = "repeat"
     }
 }
@@ -66,23 +67,33 @@ final class SyncManager: ObservableObject {
     }
     func stop() { loop?.cancel(); loop = nil }
 
+    private var wasOwner = false
+
     private func tick() async {
         guard let p = player else { return }
         if p.isPlaying && p.current != nil {
-            // Owner: State pushen + Commands abarbeiten
-            if let snap = snapshot(p) { await api.syncPushState(snap) }
+            // Owner: erst Commands (z.B. pause), DANN State pushen -> reflektiert die
+            // Aenderung sofort (sonst sieht die Remote die Pause nicht).
             await consumeCommands(p)
+            if let snap = snapshot(p) { await api.syncPushState(snap) }
+            wasOwner = true
             if remote != nil { remote = nil }
         } else {
-            // Zuhoeren: spielt ein anderes Geraet?
+            // Gerade von Playing -> Pause/Stop gewechselt? Einmal finalen State pushen,
+            // damit Remotes "pausiert" sehen statt in den Timeout zu laufen.
+            if wasOwner {
+                if let snap = snapshot(p) { await api.syncPushState(snap) }
+                wasOwner = false
+            }
+            await consumeCommands(p)   // play / queue_inject auch im Pausezustand annehmen
+            // Spielt ein anderes Geraet? (frischer State, egal ob play/pause -> Banner mit Play/Pause)
             let s = await api.syncGetState()
-            if let s, s.device_name != deviceName, s.playing == true {
+            let nowMs = Date().timeIntervalSince1970 * 1000
+            if let s, s.device_name != deviceName, let seen = s.owner_seen_at, (nowMs - seen) < 15000 {
                 remote = s
             } else {
                 remote = nil
             }
-            // Auch wenn wir pausiert sind: Commands annehmen (z.B. queue_inject / play)
-            await consumeCommands(p)
         }
     }
 
