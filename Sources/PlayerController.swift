@@ -76,7 +76,7 @@ final class PlayerController: ObservableObject {
     weak var downloads: DownloadManager?  // Offline-Wiedergabe
     @Published var sleepRemaining = 0     // Sekunden, 0 = aus
     @Published var sleepAtEnd = false     // bis Songende
-    private var sleepTimer: Timer?
+    private var sleepDeadline: Date?      // absolute Deadline -> im Time-Observer geprueft (laeuft auch im Hintergrund)
 
     var current: Track? { queue.indices.contains(index) ? queue[index] : nil }
     var hasContent: Bool { current != nil || isRadio }
@@ -177,21 +177,37 @@ final class PlayerController: ObservableObject {
     private func saveMode() { Task { await api.savePlaymode(shuffle: shuffle, mode: repeatMode) } }
     func restoreMode() { Task { let m = await api.playmode(); shuffle = m.shuffle; repeatMode = m.mode } }
 
-    // MARK: - Sleep-Timer
+    // MARK: - Sleep-Timer (Deadline-basiert -> wird im Time-Observer geprueft und
+    // feuert dadurch auch bei gesperrtem Bildschirm zuverlaessig, anders als ein
+    // Main-Runloop-Timer. Mit sanftem Fade-out in den letzten Sekunden.)
     func setSleep(minutes: Int) {
         cancelSleep()
         guard minutes > 0 else { return }
+        sleepDeadline = Date().addingTimeInterval(Double(minutes) * 60)
         sleepRemaining = minutes * 60
-        sleepTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                self.sleepRemaining -= 1
-                if self.sleepRemaining <= 0 { self.cancelSleep(); self.pause() }
-            }
-        }
     }
     func setSleepEndOfTrack() { cancelSleep(); sleepAtEnd = true }
-    func cancelSleep() { sleepTimer?.invalidate(); sleepTimer = nil; sleepRemaining = 0; sleepAtEnd = false }
+    func cancelSleep() {
+        sleepDeadline = nil
+        sleepRemaining = 0
+        sleepAtEnd = false
+        player.volume = 1.0
+    }
+    /// Wird vom Time-Observer (~alle 0.5s waehrend der Wiedergabe) aufgerufen —
+    /// laeuft so auch im Hintergrund, solange Audio spielt.
+    private func checkSleep() {
+        guard let dl = sleepDeadline else { return }
+        let remaining = dl.timeIntervalSinceNow
+        sleepRemaining = max(0, Int(ceil(remaining)))
+        if remaining <= 0 {
+            sleepDeadline = nil
+            sleepRemaining = 0
+            pause()
+            player.volume = 1.0          // fuer die naechste Wiedergabe zuruecksetzen
+        } else if remaining <= 6 {
+            player.volume = Float(max(0, remaining / 6))   // sanfter Fade-out
+        }
+    }
 
     func next(auto: Bool = false) {
         if auto && sleepAtEnd { sleepAtEnd = false; pause(); return }
@@ -410,6 +426,7 @@ final class PlayerController: ObservableObject {
             Task { @MainActor in
                 let c = CMTimeGetSeconds(t)
                 if c.isFinite { self.currentTime = c; self.updateElapsed() }
+                self.checkSleep()
             }
         }
     }
