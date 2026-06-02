@@ -89,6 +89,7 @@ func averageColor(_ urlStr: String?) async -> Color? {
 // MARK: - Main
 struct MainView: View {
     @EnvironmentObject var player: PlayerController
+    @EnvironmentObject var sync: SyncManager
     @State private var showPlayer = false
 
     var body: some View {
@@ -108,6 +109,18 @@ struct MainView: View {
             }.padding(.horizontal, 8).padding(.bottom, 50)
                 .ignoresSafeArea(.keyboard, edges: .bottom)
         }
+        .overlay(alignment: .top) {
+            if !sync.injectToast.isEmpty {
+                Text(sync.injectToast)
+                    .font(.system(size: 14, weight: .semibold)).foregroundStyle(.black)
+                    .padding(.horizontal, 18).padding(.vertical, 10)
+                    .background(Theme.accent).clipShape(Capsule())
+                    .shadow(color: .black.opacity(0.4), radius: 8, y: 3)
+                    .padding(.top, 6)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: sync.injectToast)
         .onAppear(perform: configureAppearance)
         .sheet(isPresented: $showPlayer) { PlayerView() }
     }

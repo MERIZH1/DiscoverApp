@@ -65,6 +65,19 @@ jobs:
           export DATE=$(date +%Y-%m-%d)
           python3 - <<'PY'
           import json, os
+          # Changelog: obersten Abschnitt aus CHANGELOG.md ziehen (-> SideStore)
+          changelog = "Build " + os.environ["RUN"]
+          try:
+              sec, started = [], False
+              for ln in open("CHANGELOG.md", encoding="utf-8").read().splitlines():
+                  if ln.startswith("## "):
+                      if started: break
+                      started = True; continue
+                  if started: sec.append(ln)
+              body = "\n".join(sec).strip()
+              if body: changelog = body + "\n\n(Build " + os.environ["RUN"] + ")"
+          except Exception as e:
+              print("changelog read err:", e)
           data = {
             "name": "Discover (privat)",
             "identifier": "com.discover.source",
@@ -74,7 +87,7 @@ jobs:
               "developerName": "Maximilian",
               "version": os.environ["VER"],
               "versionDate": os.environ["DATE"],
-              "versionDescription": "Build " + os.environ["RUN"],
+              "versionDescription": changelog,
               "downloadURL": "https://github.com/%s/releases/latest/download/DiscoverApp.ipa" % os.environ["REPO"],
               "localizedDescription": "Native Discover-App — eigener Player, Lockscreen-Audio.",
               "iconURL": "https://raw.githubusercontent.com/%s/main/Sources/Assets.xcassets/AppIcon.appiconset/icon-1024.png" % os.environ["REPO"],
