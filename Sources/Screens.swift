@@ -556,6 +556,7 @@ struct AccountHeader: View {
 struct SettingsView: View {
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("syncDeviceName") private var syncDeviceName = ""
     @State private var name = ""
     @State private var country = ""
     @State private var hideForeign = false
@@ -596,6 +597,17 @@ struct SettingsView: View {
                                 Text("Durchscheinendes Glas-Design (iOS 26)").font(.caption2).foregroundStyle(Theme.mute)
                             }
                         }.tint(Theme.accent)
+                    }
+                    // Sync / Geraete-Name
+                    SettingsGroup("GERÄT (SYNC)") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Geräte-Name").font(.system(size: 15)).foregroundStyle(Theme.text)
+                            Text("So erscheint dieses Gerät bei anderen (Fernsteuerung/Senden).")
+                                .font(.caption2).foregroundStyle(Theme.mute)
+                            TextField(UIDevice.current.name, text: $syncDeviceName)
+                                .foregroundStyle(Theme.text).padding(10)
+                                .background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
                     }
                     // Wiedergabe
                     SettingsGroup("WIEDERGABE") {

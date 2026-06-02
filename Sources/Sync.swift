@@ -40,7 +40,12 @@ final class SyncManager: ObservableObject {
     private let api: APIClient
     private weak var player: PlayerController?
     let deviceID: String
-    let deviceName: String
+    private let fallbackName: String
+    /// Selbst gesetzter Geraete-Name (Einstellungen) — sonst der iOS-Geraetename.
+    var deviceName: String {
+        let custom = (UserDefaults.standard.string(forKey: "syncDeviceName") ?? "").trimmingCharacters(in: .whitespaces)
+        return custom.isEmpty ? fallbackName : custom
+    }
     private var loop: Task<Void, Never>?
 
     init(api: APIClient, player: PlayerController) {
@@ -53,7 +58,7 @@ final class SyncManager: ObservableObject {
             UserDefaults.standard.set(id, forKey: "syncDeviceID")
             deviceID = id
         }
-        deviceName = UIDevice.current.name
+        fallbackName = UIDevice.current.name
     }
 
     func start() {
