@@ -77,9 +77,9 @@ final class PlayerController: ObservableObject {
     @Published var sleepRemaining = 0     // Sekunden, 0 = aus
     @Published var sleepAtEnd = false     // bis Songende
     private var sleepDeadline: Date?      // absolute Deadline -> im Time-Observer geprueft (laeuft auch im Hintergrund)
-    // Crossfade/Fade-Transition (Sekunden, 0 = aus). Sanftes Aus-/Einblenden an
-    // den Track-Grenzen ueber player.volume — single-player, kein Risiko fuer den
-    // Normalpfad. (Echtes ueberlappendes Crossfade = spaeterer Zwei-Player-Schritt.)
+    // Crossfade (Sekunden, 0 = aus). v2: echtes ueberlappendes Crossfade ueber zwei
+    // Player (siehe applyFade/beginCrossfade/completeCrossfade). Bei 0 komplett
+    // inaktiv -> Normalpfad unberuehrt.
     @Published var crossfadeSeconds: Int = UserDefaults.standard.integer(forKey: "crossfadeSeconds") {
         didSet {
             UserDefaults.standard.set(crossfadeSeconds, forKey: "crossfadeSeconds")
@@ -112,7 +112,16 @@ final class PlayerController: ObservableObject {
         return a
     }
 
-    private let player = AVPlayer()
+    // Zwei Player fuer echtes ueberlappendes Crossfade (v2). `player` = aktiver/
+    // getrackter Player; `idlePlayer` = der andere (spielt den eingehenden Track
+    // waehrend der Ueberblende). Bei crossfade=0 wird der zweite nie benutzt.
+    private let playerA = AVPlayer()
+    private let playerB = AVPlayer()
+    private var activeIsA = true
+    private var player: AVPlayer { activeIsA ? playerA : playerB }
+    private var idlePlayer: AVPlayer { activeIsA ? playerB : playerA }
+    private var crossfading = false
+    private var xfTarget: Track?
     private var timeObserver: Any?
     private var statusObs: NSKeyValueObservation?
     private var endObs: NSObjectProtocol?
@@ -206,14 +215,104 @@ final class PlayerController: ObservableObject {
     /// Time-Observer aufgerufen, laeuft so auch bei gesperrtem Bildschirm.
     /// Laeuft VOR checkSleep -> der Sleep-Fade behaelt im Zweifel die Oberhand.
     private func applyFade() {
-        guard crossfadeSeconds > 0, !isRadio, isPlaying, duration > 0 else { return }
+        guard crossfadeSeconds > 0, !isRadio else { return }
         let cf = Double(crossfadeSeconds)
+        if crossfading {
+            // Ueberblende laeuft: Lautstaerken aus der Restzeit des AUSGEHENDEN
+            // (aktiven) Tracks ableiten -> funktioniert auch im Hintergrund.
+            let remaining = max(0, duration - currentTime)
+            let out = max(0, min(1, duration > 0 ? remaining / cf : 0))
+            player.volume = Float(out)
+            idlePlayer.volume = Float(1 - out)
+            return
+        }
+        guard isPlaying, duration > 0 else { return }
+        // Fade-in am Anfang
+        player.volume = currentTime < cf ? Float(max(0, min(1, currentTime / cf))) : 1
+        // Ueberblende ausloesen, wenn das Ende naht (nur einfache Faelle: manuelle
+        // Queue oder naechster Queue-Track; am Playlist-Ende normaler Schnitt).
         let remaining = duration - currentTime
-        let vol: Double
-        if currentTime < cf      { vol = currentTime / cf }       // Fade-in am Anfang
-        else if remaining <= cf  { vol = max(0, remaining / cf) }  // Fade-out am Ende
-        else                     { vol = 1 }
-        player.volume = Float(max(0, min(1, vol)))
+        if remaining <= cf, remaining > 0.4, repeatMode != .one, let nt = peekNext() {
+            beginCrossfade(to: nt)
+        }
+    }
+
+    private func peekNext() -> Track? {
+        if !manualQueue.isEmpty { return manualQueue.first }
+        if !queue.isEmpty, index < queue.count - 1 { return queue[index + 1] }
+        return nil
+    }
+
+    /// Startet den eingehenden Track leise auf dem Idle-Player; applyFade blendet dann ueber.
+    private func beginCrossfade(to nt: Track) {
+        crossfading = true
+        xfTarget = nt
+        let b = idlePlayer
+        b.volume = 0
+        if let local = downloads?.localURL(for: nt.uri), !failedOffline.contains(nt.uri) {
+            b.replaceCurrentItem(with: AVPlayerItem(url: local)); b.play()
+            return
+        }
+        Task {
+            do {
+                let r = try await api.streamURL(for: nt)
+                guard crossfading, xfTarget?.uri == nt.uri,
+                      r.ok, let rel = r.url, let url = api.absoluteURL(rel) else { abortCrossfade(); return }
+                b.replaceCurrentItem(with: AVPlayerItem(url: url)); b.play()
+            } catch { abortCrossfade() }
+        }
+    }
+
+    private func abortCrossfade() {
+        crossfading = false; xfTarget = nil
+        idlePlayer.pause(); idlePlayer.replaceCurrentItem(with: nil); idlePlayer.volume = 1
+        player.volume = 1
+    }
+
+    /// Ueberblende abschliessen: Idle-Player (eingehend) wird aktiv, Queue-Status nachziehen.
+    private func completeCrossfade() {
+        guard crossfading else { return }
+        // Eingehender Track noch nicht geladen (langsamer Stream)? -> normaler Schnitt.
+        guard idlePlayer.currentItem != nil else {
+            crossfading = false; xfTarget = nil
+            idlePlayer.volume = 1; player.volume = 1
+            next(auto: true)
+            return
+        }
+        crossfading = false
+        let wasOffline = (xfTarget.map { downloads?.localURL(for: $0.uri) != nil && !failedOffline.contains($0.uri) }) ?? false
+        xfTarget = nil
+        // Queue-Status wie next() (nur die einfachen Faelle, die peekNext liefert)
+        if !manualQueue.isEmpty {
+            let inj = manualQueue.removeFirst()
+            let at = min(index + 1, queue.count)
+            queue.insert(inj, at: at); index = at
+        } else if index < queue.count - 1 {
+            index += 1
+        }
+        // Player tauschen: Idle (eingehend) -> aktiv
+        detachTimeObserver(from: player)        // alter aktiver (ausgehend)
+        let old = player
+        activeIsA.toggle()                      // player = eingehender
+        player.volume = 1
+        addTimeObserver()                       // Observer auf neuen aktiven
+        if let item = player.currentItem { attachItemObservers(item) }
+        old.pause(); old.replaceCurrentItem(with: nil); old.volume = 1
+        // UI/State auf den neuen Track ziehen
+        primedNotLoaded = false
+        source = wasOffline ? "offline" : ""
+        let pos = CMTimeGetSeconds(player.currentTime())
+        currentTime = pos.isFinite ? pos : 0
+        if let t = current {
+            duration = t.durationSec
+            updateNowPlaying(title: t.name, artist: t.artist, album: t.album, dur: t.durationSec, art: t.image, live: false)
+            Task { await api.postHistory(t, contextName: ctxName, contextURI: ctxURI) }
+        }
+        persistSnapshot()
+    }
+
+    private func detachTimeObserver(from p: AVPlayer) {
+        if let t = timeObserver { p.removeTimeObserver(t); timeObserver = nil }
     }
     /// Wird vom Time-Observer (~alle 0.5s waehrend der Wiedergabe) aufgerufen —
     /// laeuft so auch im Hintergrund, solange Audio spielt.
@@ -232,6 +331,7 @@ final class PlayerController: ObservableObject {
     }
 
     func next(auto: Bool = false) {
+        if crossfading { completeCrossfade(); return }
         if auto && sleepAtEnd { sleepAtEnd = false; pause(); return }
         if isRadio { return }
         if auto && repeatMode == .one { seek(0); resume(); return }
@@ -283,6 +383,7 @@ final class PlayerController: ObservableObject {
         }
     }
     func seek(_ t: Double) {
+        if crossfading { abortCrossfade() }
         player.seek(to: CMTime(seconds: t, preferredTimescale: 600)) { [weak self] _ in
             Task { @MainActor in self?.currentTime = t; self?.updateElapsed() }
         }
@@ -353,6 +454,7 @@ final class PlayerController: ObservableObject {
 
     private func loadCurrent(autoplay: Bool) {
         guard let track = current else { return }
+        if crossfading { abortCrossfade() }
         primedNotLoaded = false
         persistSnapshot()
         updateRemoteForContent()
@@ -393,6 +495,7 @@ final class PlayerController: ObservableObject {
     // MARK: - Radio
     func playRadio(_ s: RadioStation) {
         guard let url = URL(string: s.url) else { return }
+        if crossfading { abortCrossfade() }
         isRadio = true; primedNotLoaded = false   // sonst leitet resume() faelschlich in loadCurrent um
         queue = []; index = 0; manualQueue = []; original = []
         radioTitle = s.name; radioFavicon = s.favicon; radioNowPlaying = ""
