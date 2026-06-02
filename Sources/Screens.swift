@@ -2415,22 +2415,45 @@ struct SourceBadge: View {
 }
 
 // MARK: - Cover
+/// In-Memory-Cache fuer dekodierte Bilder -> fluessiges Scrollen, kein Re-Download.
+final class ImageLoader {
+    static let shared = ImageLoader()
+    private let cache = NSCache<NSURL, UIImage>()
+    init() { cache.countLimit = 400 }   // NSCache ist thread-safe
+    func cached(_ url: URL) -> UIImage? { cache.object(forKey: url as NSURL) }
+    func load(_ url: URL) async -> UIImage? {
+        if let c = cached(url) { return c }
+        guard let (d, _) = try? await URLSession.shared.data(from: url), let img = UIImage(data: d) else { return nil }
+        cache.setObject(img, forKey: url as NSURL)
+        return img
+    }
+}
+
 struct Artwork: View {
     let url: String?
     var size: CGFloat = 48
     var corner: CGFloat = 6
+    @State private var image: UIImage?
     private var resolved: URL? {
         guard let s = url, !s.isEmpty else { return nil }
         if s.hasPrefix("http") { return URL(string: s) }
         return URL(string: ImageBase.url + (s.hasPrefix("/") ? s : "/" + s))
     }
     var body: some View {
-        AsyncImage(url: resolved) { img in
-            img.resizable().scaledToFill()
-        } placeholder: {
-            RoundedRectangle(cornerRadius: corner).fill(Theme.card)
-                .overlay(Image(systemName: "music.note").foregroundStyle(Theme.mute))
+        Group {
+            if let image {
+                Image(uiImage: image).resizable().scaledToFill()
+            } else {
+                RoundedRectangle(cornerRadius: corner).fill(Theme.card)
+                    .overlay(Image(systemName: "music.note").foregroundStyle(Theme.mute))
+            }
         }
         .frame(width: size, height: size).clipShape(RoundedRectangle(cornerRadius: corner))
+        .task(id: resolved) {
+            guard let u = resolved else { image = nil; return }
+            if let c = ImageLoader.shared.cached(u) { image = c; return }   // sofort aus Cache
+            image = nil
+            if let img = await ImageLoader.shared.load(u), u == resolved { image = img }
+        }
     }
 }

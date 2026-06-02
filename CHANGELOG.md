@@ -4,6 +4,7 @@ Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
 ## v1.0 — Audit & Stabilisierung
+- Fluessigeres Scrollen: Cover werden zwischengespeichert (kein Neu-Laden)
 - Fix: Lockscreen-Cover laedt jetzt auch bei relativen Bild-URLs
 - Sync schont Akku/Server (langsamer pollen wenn nichts laeuft)
 - Admin-Konsole (Account → Konsole): Status der Dienste, Spotify-Cookie erneuern, Verlauf
