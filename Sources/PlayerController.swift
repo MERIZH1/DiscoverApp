@@ -86,6 +86,15 @@ final class PlayerController: ObservableObject {
             if crossfadeSeconds == 0 { player.volume = 1 }
         }
     }
+    // Wiedergabe-Tempo (1.0 = normal). AVPlayer haelt die Tonhoehe konstant.
+    @Published var playbackRate: Double = {
+        let v = UserDefaults.standard.double(forKey: "playbackRate"); return v > 0 ? v : 1.0
+    }() {
+        didSet {
+            UserDefaults.standard.set(playbackRate, forKey: "playbackRate")
+            if isPlaying && !isRadio { player.rate = Float(playbackRate) }
+        }
+    }
 
     var current: Track? { queue.indices.contains(index) ? queue[index] : nil }
     var hasContent: Bool { current != nil || isRadio }
@@ -163,7 +172,9 @@ final class PlayerController: ObservableObject {
     }
     func resume() {
         if primedNotLoaded && !isRadio { loadCurrent(autoplay: true); return }
-        player.play(); isPlaying = true; updateRate()
+        player.play()
+        if !isRadio && playbackRate != 1.0 { player.rate = Float(playbackRate) }
+        isPlaying = true; updateRate()
     }
     func pause() { player.pause(); isPlaying = false; updateRate() }
 
@@ -565,7 +576,7 @@ final class PlayerController: ObservableObject {
         if let al = album { info[MPMediaItemPropertyAlbumTitle] = al }
         if dur > 0 { info[MPMediaItemPropertyPlaybackDuration] = dur }
         info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = 0.0
-        info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
+        info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? playbackRate : 0.0
         info[MPNowPlayingInfoPropertyIsLiveStream] = live
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
         // Relative Server-Bild-URLs aufloesen (sonst kein Cover am Lock-Screen)
@@ -586,12 +597,12 @@ final class PlayerController: ObservableObject {
         var i = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
         i[MPNowPlayingInfoPropertyElapsedPlaybackTime] = currentTime
         if duration > 0 { i[MPMediaItemPropertyPlaybackDuration] = duration }
-        i[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
+        i[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? playbackRate : 0.0
         MPNowPlayingInfoCenter.default().nowPlayingInfo = i
     }
     private func updateRate() {
         var i = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
-        i[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
+        i[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? playbackRate : 0.0
         MPNowPlayingInfoCenter.default().nowPlayingInfo = i
     }
     private func setupRemoteCommands() {

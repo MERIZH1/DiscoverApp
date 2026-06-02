@@ -587,6 +587,10 @@ struct SettingsView: View {
         (6, "6 Sekunden"), (8, "8 Sekunden"), (12, "12 Sekunden"),
     ]
     private func crossfadeLabel(_ n: Int) -> String { crossfadeOptions.first { $0.0 == n }?.1 ?? "\(n) s" }
+    private let rateOptions: [(Double, String)] = [
+        (1.0, "Normal (1x)"), (1.25, "1.25x"), (1.5, "1.5x"), (1.75, "1.75x"), (2.0, "2x"),
+    ]
+    private func rateLabel(_ r: Double) -> String { rateOptions.first { $0.0 == r }?.1 ?? "\(r)x" }
 
     var body: some View {
         NavigationStack {
@@ -647,6 +651,21 @@ struct SettingsView: View {
                             } label: {
                                 HStack {
                                     Text(crossfadeLabel(player.crossfadeSeconds)).foregroundStyle(Theme.text)
+                                    Spacer()
+                                    Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(Theme.sub)
+                                }.padding(10).background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                        }
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Wiedergabe-Tempo").font(.system(size: 15)).foregroundStyle(Theme.text)
+                            Text("Geschwindigkeit (Podcasts/Songs) — Tonhöhe bleibt").font(.caption2).foregroundStyle(Theme.mute)
+                            Menu {
+                                ForEach(rateOptions, id: \.0) { opt in
+                                    Button(opt.1) { player.playbackRate = opt.0 }
+                                }
+                            } label: {
+                                HStack {
+                                    Text(rateLabel(player.playbackRate)).foregroundStyle(Theme.text)
                                     Spacer()
                                     Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(Theme.sub)
                                 }.padding(10).background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8))
