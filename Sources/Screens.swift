@@ -2224,11 +2224,13 @@ struct PlayerView: View {
                             }
                         }.foregroundStyle(Theme.text).padding(.horizontal, 8)
                     }
-                    HStack(spacing: 30) {
+                    HStack(spacing: 0) {
                         Button { scrollToLyrics = true } label: { Label("Songtext", systemImage: "quote.bubble").font(.system(size: 15, weight: .semibold)) }
-                        AirPlayButton().frame(width: 30, height: 30)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        AirPlayButton().frame(width: 28, height: 28)
                         Button { withAnimation { page = 1 } } label: { Label("Warteschlange", systemImage: "list.bullet").font(.system(size: 15, weight: .semibold)) }
-                    }.foregroundStyle(Theme.sub).padding(.top, 4)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                    }.foregroundStyle(Theme.sub).padding(.top, 4).padding(.horizontal, 8)
                 } else {
                     HStack(spacing: 10) {
                         Image(systemName: "dot.radiowaves.left.and.right").foregroundStyle(Theme.accent)
