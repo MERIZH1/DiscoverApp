@@ -67,14 +67,14 @@ struct AdminConsoleView: View {
                             }.foregroundStyle(.black).padding(.vertical, 11).padding(.horizontal, 14)
                                 .background(Theme.accent).clipShape(RoundedRectangle(cornerRadius: 10))
                         }.buttonStyle(.plain).disabled(busy)
-                        Text("Stoesst die sp_dc-Erneuerung auf DIESEM Server an (cookie-keeper).")
+                        Text("Stößt die sp_dc-Erneuerung auf DIESEM Server an (cookie-keeper).")
                             .font(.caption2).foregroundStyle(Theme.mute)
                     }
 
                     // Log (letzte Statusaenderungen)
-                    SettingsGroup("VERLAUF (letzte Aenderungen)") {
+                    SettingsGroup("VERLAUF (letzte Änderungen)") {
                         if logItems.isEmpty {
-                            Text("Keine Eintraege.").font(.system(size: 14)).foregroundStyle(Theme.mute)
+                            Text("Keine Einträge.").font(.system(size: 14)).foregroundStyle(Theme.mute)
                         } else {
                             ForEach(logItems.prefix(20)) { it in
                                 VStack(alignment: .leading, spacing: 2) {
