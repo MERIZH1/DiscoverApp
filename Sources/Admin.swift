@@ -36,10 +36,10 @@ struct AdminConsoleView: View {
                     // Dienst-Status
                     SettingsGroup("STATUS") {
                         if let s = status {
-                            statusRow("Spotify", s.spotify)
-                            statusRow("Deezer", s.deezer)
-                            statusRow("Navidrome", s.navidrome)
-                            statusRow("YouTube", s.youtube)
+                            statusRow("Spotify", "spotify", s.spotify)
+                            statusRow("Deezer", "deezer", s.deezer)
+                            statusRow("Navidrome", "navidrome", s.navidrome)
+                            statusRow("YouTube", "youtube", s.youtube)
                         } else if loading {
                             LoadingView()
                         } else {
@@ -116,14 +116,35 @@ struct AdminConsoleView: View {
         logItems = await app.api.statusLog()
         loading = false
     }
-    @ViewBuilder private func statusRow(_ name: String, _ s: ServiceStatus) -> some View {
-        HStack(spacing: 10) {
-            Circle().fill(s.ok ? Theme.accent : Color(hex6: 0xFF3B30)).frame(width: 10, height: 10)
-            Text(name).font(.system(size: 15)).foregroundStyle(Theme.text)
-            Spacer()
-            Text(s.ok ? "OK" : (s.error ?? "Fehler")).font(.system(size: 12))
-                .foregroundStyle(s.ok ? Theme.sub : Color(hex6: 0xFF6B6B)).lineLimit(1)
+    @ViewBuilder private func statusRow(_ name: String, _ key: String, _ s: ServiceStatus) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 10) {
+                Circle().fill(s.ok ? Theme.accent : Color(hex6: 0xFF3B30)).frame(width: 10, height: 10)
+                Text(name).font(.system(size: 15)).foregroundStyle(Theme.text)
+                Spacer()
+                Text(s.ok ? "OK" : (s.error ?? "Fehler")).font(.system(size: 12))
+                    .foregroundStyle(s.ok ? Theme.sub : Color(hex6: 0xFF6B6B)).lineLimit(1)
+            }
+            if !s.ok {
+                Text(fixHint(key)).font(.system(size: 12)).foregroundStyle(Theme.accent)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 20).padding(.trailing, 4)
+            }
         }.padding(.vertical, 4)
+    }
+    /// Was tun, wenn ein Dienst rot ist (für Selfhoster — so einfach wie möglich).
+    private func fixHint(_ key: String) -> String {
+        switch key {
+        case "spotify":
+            return "→ sp_dc-Cookie erneuern: bei open.spotify.com einloggen, Entwicklertools (F12) → Application → Cookies → „sp_dc" kopieren → in Discover unter Einstellungen → Spotify-Cookie einfügen. (Oder unten „Cookie erneuern".)"
+        case "deezer":
+            return "→ Deezer-ARL abgelaufen: bei deezer.com einloggen, Cookie „arl" kopieren und serverseitig hinterlegen."
+        case "navidrome":
+            return "→ Navidrome nicht erreichbar: läuft der Navidrome-Container? NAVIDROME_URL/USER/PASS prüfen."
+        case "youtube":
+            return "→ YouTube-Cookies abgelaufen: cookies.txt neu exportieren (Browser-Erweiterung) und als YT_COOKIE_FILE hinterlegen."
+        default: return ""
+        }
     }
     @ViewBuilder private func logDot(_ l: String, _ ok: Bool?) -> some View {
         HStack(spacing: 3) {
