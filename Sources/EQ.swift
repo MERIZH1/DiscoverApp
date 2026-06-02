@@ -118,7 +118,7 @@ func makeEQAudioMix(for item: AVPlayerItem, preset: EQPreset) async -> AVAudioMi
         clientInfo: UnsafeMutableRawPointer(Unmanaged.passRetained(ctx).toOpaque()),
         init: eqTapInit, finalize: eqTapFinalize, prepare: eqTapPrepare,
         unprepare: eqTapUnprepare, process: eqTapProcess)
-    var tap: Unmanaged<MTAudioProcessingTap>?
+    var tap: MTAudioProcessingTap?
     let err = MTAudioProcessingTapCreate(kCFAllocatorDefault, &callbacks,
                                          kMTAudioProcessingTapCreationFlag_PostEffects, &tap)
     guard err == noErr, let tap else {
@@ -127,7 +127,7 @@ func makeEQAudioMix(for item: AVPlayerItem, preset: EQPreset) async -> AVAudioMi
         return nil
     }
     let params = AVMutableAudioMixInputParameters(track: track)
-    params.audioTapProcessor = tap.takeRetainedValue()
+    params.audioTapProcessor = tap
     let mix = AVMutableAudioMix()
     mix.inputParameters = [params]
     return mix
