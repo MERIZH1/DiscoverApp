@@ -95,6 +95,16 @@ final class PlayerController: ObservableObject {
             if isPlaying && !isRadio { player.rate = Float(playbackRate) }
         }
     }
+    // Equalizer-Preset (Index in EQPreset.all; 0 = Aus). Opt-in: bei "Aus" kein Tap.
+    @Published var eqPresetIndex: Int = UserDefaults.standard.integer(forKey: "eqPresetIndex") {
+        didSet {
+            UserDefaults.standard.set(eqPresetIndex, forKey: "eqPresetIndex")
+            applyEQToCurrent()
+        }
+    }
+    private var eqPreset: EQPreset {
+        EQPreset.all.indices.contains(eqPresetIndex) ? EQPreset.all[eqPresetIndex] : EQPreset.all[0]
+    }
 
     var current: Track? { queue.indices.contains(index) ? queue[index] : nil }
     var hasContent: Bool { current != nil || isRadio }
@@ -307,7 +317,7 @@ final class PlayerController: ObservableObject {
         activeIsA.toggle()                      // player = eingehender
         player.volume = 1
         addTimeObserver()                       // Observer auf neuen aktiven
-        if let item = player.currentItem { attachItemObservers(item) }
+        if let item = player.currentItem { attachItemObservers(item); applyEQ(to: item) }
         old.pause(); old.replaceCurrentItem(with: nil); old.volume = 1
         // UI/State auf den neuen Track ziehen
         primedNotLoaded = false
@@ -324,6 +334,19 @@ final class PlayerController: ObservableObject {
 
     private func detachTimeObserver(from p: AVPlayer) {
         if let t = timeObserver { p.removeTimeObserver(t); timeObserver = nil }
+    }
+
+    // MARK: - Equalizer
+    private func applyEQ(to item: AVPlayerItem) {
+        let preset = eqPreset
+        guard !preset.isFlat else { return }
+        Task { item.audioMix = await makeEQAudioMix(for: item, preset: preset) }
+    }
+    private func applyEQToCurrent() {
+        guard let item = player.currentItem else { return }
+        let preset = eqPreset
+        if preset.isFlat { item.audioMix = nil }
+        else { Task { item.audioMix = await makeEQAudioMix(for: item, preset: preset) } }
     }
     /// Wird vom Time-Observer (~alle 0.5s waehrend der Wiedergabe) aufgerufen —
     /// laeuft so auch im Hintergrund, solange Audio spielt.
@@ -479,6 +502,7 @@ final class PlayerController: ObservableObject {
             let item = AVPlayerItem(url: local)
             attachItemObservers(item)
             player.replaceCurrentItem(with: item)
+            applyEQ(to: item)
             if autoplay { resume() }
             loading = false
             Task { await api.postHistory(track, contextName: ctxName, contextURI: ctxURI) }
@@ -497,6 +521,7 @@ final class PlayerController: ObservableObject {
                 let item = AVPlayerItem(url: url)
                 attachItemObservers(item)
                 player.replaceCurrentItem(with: item)
+                applyEQ(to: item)
                 if autoplay { resume() }
                 loading = false
             } catch { loading = false }

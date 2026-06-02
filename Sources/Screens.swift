@@ -671,6 +671,21 @@ struct SettingsView: View {
                                 }.padding(10).background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8))
                             }
                         }
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Equalizer").font(.system(size: 15)).foregroundStyle(Theme.text)
+                            Text("Klang-Preset (experimentell)").font(.caption2).foregroundStyle(Theme.mute)
+                            Menu {
+                                ForEach(Array(EQPreset.all.enumerated()), id: \.offset) { idx, p in
+                                    Button(p.name) { player.eqPresetIndex = idx }
+                                }
+                            } label: {
+                                HStack {
+                                    Text(EQPreset.all.indices.contains(player.eqPresetIndex) ? EQPreset.all[player.eqPresetIndex].name : "Aus").foregroundStyle(Theme.text)
+                                    Spacer()
+                                    Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(Theme.sub)
+                                }.padding(10).background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                        }
                         Toggle(isOn: $normalize) {
                             Text("Lautstärke normalisieren").font(.system(size: 15)).foregroundStyle(Theme.text)
                         }.tint(Theme.accent).onChange(of: normalize) { _ in if loaded { saveSettings() } }
