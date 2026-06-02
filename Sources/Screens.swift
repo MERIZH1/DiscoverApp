@@ -560,6 +560,7 @@ struct AccountHeader: View {
 // MARK: - Einstellungen
 struct SettingsView: View {
     @EnvironmentObject var app: AppState
+    @EnvironmentObject var player: PlayerController
     @Environment(\.dismiss) private var dismiss
     @AppStorage("syncDeviceName") private var syncDeviceName = ""
     @State private var name = ""
@@ -581,6 +582,11 @@ struct SettingsView: View {
         (10, "10 Songs (~50 MB)"), (20, "20 Songs (~100 MB)"),
     ]
     private func bufferLabel(_ n: Int) -> String { bufferOptions.first { $0.0 == n }?.1 ?? "\(n) Songs" }
+    private let crossfadeOptions: [(Int, String)] = [
+        (0, "Aus"), (2, "2 Sekunden"), (4, "4 Sekunden"),
+        (6, "6 Sekunden"), (8, "8 Sekunden"), (12, "12 Sekunden"),
+    ]
+    private func crossfadeLabel(_ n: Int) -> String { crossfadeOptions.first { $0.0 == n }?.1 ?? "\(n) s" }
 
     var body: some View {
         NavigationStack {
@@ -626,6 +632,21 @@ struct SettingsView: View {
                             } label: {
                                 HStack {
                                     Text(bufferLabel(prebuffer)).foregroundStyle(Theme.text)
+                                    Spacer()
+                                    Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(Theme.sub)
+                                }.padding(10).background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                        }
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Crossfade").font(.system(size: 15)).foregroundStyle(Theme.text)
+                            Text("Sanftes Aus-/Einblenden zwischen Titeln").font(.caption2).foregroundStyle(Theme.mute)
+                            Menu {
+                                ForEach(crossfadeOptions, id: \.0) { opt in
+                                    Button(opt.1) { player.crossfadeSeconds = opt.0 }
+                                }
+                            } label: {
+                                HStack {
+                                    Text(crossfadeLabel(player.crossfadeSeconds)).foregroundStyle(Theme.text)
                                     Spacer()
                                     Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(Theme.sub)
                                 }.padding(10).background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8))

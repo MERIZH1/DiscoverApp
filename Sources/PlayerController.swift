@@ -77,6 +77,15 @@ final class PlayerController: ObservableObject {
     @Published var sleepRemaining = 0     // Sekunden, 0 = aus
     @Published var sleepAtEnd = false     // bis Songende
     private var sleepDeadline: Date?      // absolute Deadline -> im Time-Observer geprueft (laeuft auch im Hintergrund)
+    // Crossfade/Fade-Transition (Sekunden, 0 = aus). Sanftes Aus-/Einblenden an
+    // den Track-Grenzen ueber player.volume — single-player, kein Risiko fuer den
+    // Normalpfad. (Echtes ueberlappendes Crossfade = spaeterer Zwei-Player-Schritt.)
+    @Published var crossfadeSeconds: Int = UserDefaults.standard.integer(forKey: "crossfadeSeconds") {
+        didSet {
+            UserDefaults.standard.set(crossfadeSeconds, forKey: "crossfadeSeconds")
+            if crossfadeSeconds == 0 { player.volume = 1 }
+        }
+    }
 
     var current: Track? { queue.indices.contains(index) ? queue[index] : nil }
     var hasContent: Bool { current != nil || isRadio }
@@ -192,6 +201,19 @@ final class PlayerController: ObservableObject {
         sleepRemaining = 0
         sleepAtEnd = false
         player.volume = 1.0
+    }
+    /// Sanftes Aus-/Einblenden an den Track-Grenzen (Fade-Transition). Wird vom
+    /// Time-Observer aufgerufen, laeuft so auch bei gesperrtem Bildschirm.
+    /// Laeuft VOR checkSleep -> der Sleep-Fade behaelt im Zweifel die Oberhand.
+    private func applyFade() {
+        guard crossfadeSeconds > 0, !isRadio, isPlaying, duration > 0 else { return }
+        let cf = Double(crossfadeSeconds)
+        let remaining = duration - currentTime
+        let vol: Double
+        if currentTime < cf      { vol = currentTime / cf }       // Fade-in am Anfang
+        else if remaining <= cf  { vol = max(0, remaining / cf) }  // Fade-out am Ende
+        else                     { vol = 1 }
+        player.volume = Float(max(0, min(1, vol)))
     }
     /// Wird vom Time-Observer (~alle 0.5s waehrend der Wiedergabe) aufgerufen —
     /// laeuft so auch im Hintergrund, solange Audio spielt.
@@ -335,6 +357,7 @@ final class PlayerController: ObservableObject {
         persistSnapshot()
         updateRemoteForContent()
         loading = true; currentTime = 0; duration = track.durationSec; source = ""
+        player.volume = crossfadeSeconds > 0 ? 0 : 1        // Crossfade: aus Stille einblenden
         updateNowPlaying(title: track.name, artist: track.artist, album: track.album,
                          dur: track.durationSec, art: track.image, live: false)
         // Offline vorhanden (und diese Session nicht als fehlerhaft markiert)? -> lokal abspielen
@@ -374,6 +397,7 @@ final class PlayerController: ObservableObject {
         queue = []; index = 0; manualQueue = []; original = []
         radioTitle = s.name; radioFavicon = s.favicon; radioNowPlaying = ""
         currentTime = 0; duration = 0; loading = true
+        player.volume = 1                                   // Radio: volle Lautstaerke, kein Fade
         let item = AVPlayerItem(url: url)
         attachItemObservers(item)
         // ICY-StreamTitle (laufender Song) live mitlesen
@@ -426,6 +450,7 @@ final class PlayerController: ObservableObject {
             Task { @MainActor in
                 let c = CMTimeGetSeconds(t)
                 if c.isFinite { self.currentTime = c; self.updateElapsed() }
+                self.applyFade()
                 self.checkSleep()
             }
         }
