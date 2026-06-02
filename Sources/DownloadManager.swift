@@ -156,7 +156,8 @@ final class DownloadManager: ObservableObject {
             c.body = track.name + (track.artist.isEmpty ? "" : " — " + track.artist)
             c.sound = .default
             UNUserNotificationCenter.current().add(
-                UNNotificationRequest(identifier: "dl-" + key(uri), content: c, trigger: nil))
+                UNNotificationRequest(identifier: "dl-" + key(uri), content: c, trigger: nil),
+                withCompletionHandler: nil)
         }
     }
 
