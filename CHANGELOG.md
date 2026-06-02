@@ -4,6 +4,8 @@ Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
 ## v1.0 — Audit & Stabilisierung
+- Fix: Lockscreen-Cover laedt jetzt auch bei relativen Bild-URLs
+- Sync schont Akku/Server (langsamer pollen wenn nichts laeuft)
 - Admin-Konsole (Account → Konsole): Status der Dienste, Spotify-Cookie erneuern, Verlauf
 - Sicherheits-Audit Backend: Pfad-Traversal-Schutz + Request-Limit
 - Sync: Befehle ~1s statt ~5s, Play/Pause zurueck an Remote

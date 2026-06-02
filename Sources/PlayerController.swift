@@ -423,7 +423,9 @@ final class PlayerController: ObservableObject {
         info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
         info[MPNowPlayingInfoPropertyIsLiveStream] = live
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
-        if let a = art, let u = URL(string: a) {
+        // Relative Server-Bild-URLs aufloesen (sonst kein Cover am Lock-Screen)
+        if let a = art, !a.isEmpty,
+           let u = URL(string: a.hasPrefix("http") ? a : ImageBase.url + (a.hasPrefix("/") ? a : "/" + a)) {
             URLSession.shared.dataTask(with: u) { d, _, _ in
                 guard let d, let image = UIImage(data: d) else { return }
                 let art = MPMediaItemArtwork(boundsSize: image.size) { _ in image }

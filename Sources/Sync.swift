@@ -65,8 +65,8 @@ final class SyncManager: ObservableObject {
         guard loop == nil else { return }
         loop = Task { [weak self] in
             while !Task.isCancelled {
-                await self?.tick()
-                try? await Task.sleep(nanoseconds: 1_000_000_000)   // 1s -> schnelle Reaktion
+                let ns = (await self?.tick()) ?? 2_500_000_000
+                try? await Task.sleep(nanoseconds: ns)
             }
         }
     }
@@ -76,8 +76,12 @@ final class SyncManager: ObservableObject {
     private var lastPush = 0.0
     private var lastPoll = 0.0
 
-    private func tick() async {
-        guard let p = player else { return }
+    /// Fuehrt einen Sync-Schritt aus und gibt das naechste Poll-Intervall (ns) zurueck:
+    /// schnell (1s) wenn aktiv (spielt/Remote), sonst gemaechlich (2.5s) — schont Akku/Server.
+    @discardableResult
+    private func tick() async -> UInt64 {
+        let fast: UInt64 = 1_000_000_000, slow: UInt64 = 2_500_000_000
+        guard let p = player else { return slow }
         let now = Date().timeIntervalSince1970
         if p.isPlaying && p.current != nil {
             // Commands JEDE Sekunde abarbeiten -> schnelle Reaktion auf Remote-Tasten.
@@ -108,6 +112,8 @@ final class SyncManager: ObservableObject {
                 }
             }
         }
+        // aktiv (spielt selbst oder Remote sichtbar) -> schnell weiterpollen
+        return (p.isPlaying || remote != nil) ? fast : slow
     }
 
     private func snapshot(_ p: PlayerController) -> [String: Any]? {
