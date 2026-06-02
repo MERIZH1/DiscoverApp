@@ -136,9 +136,9 @@ struct AdminConsoleView: View {
     private func fixHint(_ key: String) -> String {
         switch key {
         case "spotify":
-            return "→ sp_dc-Cookie erneuern: bei open.spotify.com einloggen, Entwicklertools (F12) → Application → Cookies → „sp_dc" kopieren → in Discover unter Einstellungen → Spotify-Cookie einfügen. (Oder unten „Cookie erneuern".)"
+            return "→ sp_dc-Cookie erneuern: bei open.spotify.com einloggen, Entwicklertools (F12) → Application → Cookies → 'sp_dc' kopieren → in Discover unter Einstellungen → Spotify-Cookie einfügen. (Oder unten 'Cookie erneuern'.)"
         case "deezer":
-            return "→ Deezer-ARL abgelaufen: bei deezer.com einloggen, Cookie „arl" kopieren und serverseitig hinterlegen."
+            return "→ Deezer-ARL abgelaufen: bei deezer.com einloggen, Cookie 'arl' kopieren und serverseitig hinterlegen."
         case "navidrome":
             return "→ Navidrome nicht erreichbar: läuft der Navidrome-Container? NAVIDROME_URL/USER/PASS prüfen."
         case "youtube":
