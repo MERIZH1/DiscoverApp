@@ -293,10 +293,12 @@ final class PlayerController: ObservableObject {
     /// Ueberblende abschliessen: Idle-Player (eingehend) wird aktiv, Queue-Status nachziehen.
     private func completeCrossfade() {
         guard crossfading else { return }
-        // Eingehender Track noch nicht geladen (langsamer Stream)? -> normaler Schnitt.
-        guard idlePlayer.currentItem != nil else {
+        // Eingehender Track noch nicht BEREIT (langsamer Stream)? -> normaler Schnitt,
+        // statt zu einem ungepufferten Player zu wechseln (sonst Stutter/Haenger).
+        guard let inItem = idlePlayer.currentItem, inItem.status == .readyToPlay else {
             crossfading = false; xfTarget = nil
-            idlePlayer.volume = 1; player.volume = 1
+            idlePlayer.pause(); idlePlayer.replaceCurrentItem(with: nil); idlePlayer.volume = 1
+            player.volume = 1
             next(auto: true)
             return
         }
@@ -319,6 +321,8 @@ final class PlayerController: ObservableObject {
         addTimeObserver()                       // Observer auf neuen aktiven
         if let item = player.currentItem { attachItemObservers(item); applyEQ(to: item) }
         old.pause(); old.replaceCurrentItem(with: nil); old.volume = 1
+        player.play()                                       // sicherstellen, dass der neue Player laeuft
+        if !isRadio && playbackRate != 1.0 { player.rate = Float(playbackRate) }
         // UI/State auf den neuen Track ziehen
         primedNotLoaded = false
         source = wasOffline ? "offline" : ""

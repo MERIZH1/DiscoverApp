@@ -2061,8 +2061,13 @@ struct SectionHeader: View {
 // MARK: - Now-Playing-Bar
 struct NowPlayingBar: View {
     @EnvironmentObject var player: PlayerController
+    @EnvironmentObject var clock: PlaybackClock
     @Environment(\.liquidGlass) private var glass
     @Binding var showPlayer: Bool
+    private var progress: Double {
+        guard !player.isRadio, clock.duration > 0 else { return 0 }
+        return min(1, max(0, clock.time / clock.duration))
+    }
     var body: some View {
         if player.hasContent {
             HStack(spacing: 12) {
@@ -2085,6 +2090,15 @@ struct NowPlayingBar: View {
             }
             .padding(.horizontal, 10).padding(.vertical, 8)
             .glassSurface(glass, shape: RoundedRectangle(cornerRadius: 8), fallback: Color(hex6: 0x282828))
+            .overlay(alignment: .bottomLeading) {
+                GeometryReader { geo in
+                    Capsule().fill(Color.white)
+                        .frame(width: geo.size.width * CGFloat(progress), height: 2)
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                }
+                .allowsHitTesting(false)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 8))
             .shadow(color: .black.opacity(0.5), radius: 12, y: 4)
             .contentShape(Rectangle())   // ganze Leiste tippbar (auch ohne Songtext / mit Glas)
             .onTapGesture { showPlayer = true }
