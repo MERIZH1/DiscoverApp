@@ -103,8 +103,8 @@ struct MainView: View {
             }
             .tint(Theme.text)
             VStack(spacing: 8) {
-                SyncBanner()   // sichtbar nur wenn ein anderes Geraet spielt
-                if player.hasContent && !keyboardUp {
+                // EIN Player — zeigt lokal ODER das Remote-Geraet (kein doppelter Banner mehr)
+                if (player.hasContent || sync.remote?.track != nil) && !keyboardUp {
                     NowPlayingBar(showPlayer: $showPlayer)
                 }
             }.padding(.horizontal, 8).padding(.bottom, 50)
@@ -2386,7 +2386,14 @@ struct NowPlayingBar: View {
     @EnvironmentObject var clock: PlaybackClock
     @Environment(\.liquidGlass) private var glass
     @Binding var showPlayer: Bool
+    @EnvironmentObject var sync: SyncManager
+    @State private var showDevices = false
+    private var remote: RemoteState? { sync.remote }
+    private var showRemote: Bool { remote?.track != nil }
     private var progress: Double {
+        if showRemote, let d = remote?.duration, d > 0, let p = remote?.position {
+            return min(1, max(0, p / d))
+        }
         guard !player.isRadio, clock.duration > 0 else { return 0 }
         return min(1, max(0, clock.time / clock.duration))
     }
@@ -2399,13 +2406,17 @@ struct NowPlayingBar: View {
         }
     }
     var body: some View {
-        if player.hasContent {
+        if showRemote || player.hasContent {
             HStack(spacing: 12) {
-                Artwork(url: player.displayImage, size: 44, corner: 5)
+                Artwork(url: showRemote ? remote?.track?.image : player.displayImage, size: 44, corner: 5)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(player.displayTitle).font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.text).lineLimit(1)
+                    Text(showRemote ? (remote?.track?.name ?? "") : player.displayTitle)
+                        .font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.text).lineLimit(1)
                     HStack(spacing: 5) {
-                        if player.loading && !player.isRadio {
+                        if showRemote {
+                            Image(systemName: "wifi").font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.accent)
+                            Text("Auf \(remote?.device_name ?? "Gerät")").font(.caption).foregroundStyle(Theme.accent).lineLimit(1)
+                        } else if player.loading && !player.isRadio {
                             ProgressView().controlSize(.mini).tint(Theme.sub)
                             Text(bufferLabel).font(.caption).foregroundStyle(Theme.sub).lineLimit(1)
                         } else {
@@ -2418,10 +2429,19 @@ struct NowPlayingBar: View {
                     }
                 }
                 Spacer()
-                Button { player.toggle() } label: {
-                    Image(systemName: player.isPlaying ? "pause.fill" : "play.fill").font(.title3).foregroundStyle(.black)
+                // Connect-Icon (Geraet wechseln) — immer sichtbar
+                Button { showDevices = true } label: {
+                    Image(systemName: "hifispeaker.2.fill").font(.system(size: 15))
+                        .foregroundStyle(showRemote ? Theme.accent : Theme.sub)
+                        .frame(width: 32, height: 34).contentShape(Rectangle())
+                }.buttonStyle(.plain)
+                Button {
+                    if showRemote { sync.remotePlayPause() } else { player.toggle() }
+                } label: {
+                    Image(systemName: (showRemote ? (remote?.playing == true) : player.isPlaying) ? "pause.fill" : "play.fill")
+                        .font(.title3).foregroundStyle(.black)
                         .frame(width: 38, height: 38).background(.white).clipShape(Circle())
-                }
+                }.buttonStyle(.plain)
             }
             .padding(.horizontal, 10).padding(.vertical, 8)
             .glassSurface(glass, shape: RoundedRectangle(cornerRadius: 8), fallback: Color(hex6: 0x282828))
@@ -2435,8 +2455,9 @@ struct NowPlayingBar: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .shadow(color: .black.opacity(0.5), radius: 12, y: 4)
-            .contentShape(Rectangle())   // ganze Leiste tippbar (auch ohne Songtext / mit Glas)
-            .onTapGesture { showPlayer = true }
+            .contentShape(Rectangle())
+            .onTapGesture { if showRemote { showDevices = true } else { showPlayer = true } }
+            .sheet(isPresented: $showDevices) { DevicePickerSheet().environmentObject(sync) }
         }
     }
 }

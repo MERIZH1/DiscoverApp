@@ -3,6 +3,11 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.7 — Ein Player statt zwei (Connect)
+- Wenn auf einem anderen Geraet gespielt wird, zeigt jetzt EIN Mini-Player das aktive Geraet — kein zweiter Banner mehr obendrauf
+- Connect-Symbol im Mini-Player -> Geraet wechseln (wie Spotify Connect); Play/Pause steuert das aktive Geraet
+- Antippen im Remote-Modus oeffnet direkt die Geraete-Auswahl
+
 ## v1.6 — Glass-Feinschliff im Player
 - Player-Kopf-Icons (Schliessen / Sleep-Timer / Geraet / Menue) jetzt als Glas-Kreise — konsistent zur Playlist-Ansicht (Back/Glocke)
 
