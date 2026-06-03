@@ -1091,14 +1091,32 @@ struct SearchView: View {
     private func runSearch() {
         let q = query.trimmingCharacters(in: .whitespaces)
         guard !q.isEmpty else { return }
+        if isYouTubeURL(q) { addYTFind(q); return }
         busy = true
         Task { res = try? await app.api.search(q); busy = false }
+    }
+    private func isYouTubeURL(_ s: String) -> Bool {
+        let l = s.lowercased()
+        guard l.contains("youtube.com") || l.contains("youtu.be") else { return false }
+        return l.contains("watch?v=") || l.contains("/shorts/") || l.contains("youtu.be/") || l.contains("/embed/")
+    }
+    /// YouTube-Link als „YouTube-Fund" hinzufuegen, dann nach Interpret+Name suchen.
+    private func addYTFind(_ url: String) {
+        busy = true
+        Task {
+            if let t = await app.api.ytAddFind(url: url) {
+                query = (t.artist + " " + t.name).trimmingCharacters(in: .whitespaces)   // triggert Suche
+            } else {
+                busy = false
+            }
+        }
     }
     /// Tippen -> nach kurzer Pause automatisch suchen (wie PWA).
     private func debounceSearch() {
         debounce?.cancel()
         let q = query.trimmingCharacters(in: .whitespaces)
         if q.isEmpty { res = nil; busy = false; return }
+        if isYouTubeURL(q) { addYTFind(q); return }
         debounce = Task {
             try? await Task.sleep(nanoseconds: 350_000_000)
             if Task.isCancelled { return }

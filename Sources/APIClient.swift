@@ -271,6 +271,17 @@ final class APIClient: ObservableObject {
               let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return false }
         return (obj["ok"] as? Bool) ?? false
     }
+    /// YouTube-Link als „YouTube-Fund" hinzufuegen (eigene Playlist) -> Track zurueck.
+    func ytAddFind(url: String) async -> Track? {
+        let body: [String: Any] = ["url": url]
+        guard let d = try? await data("/api/yt/finds/add", method: "POST", json: body),
+              let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
+              (obj["ok"] as? Bool) == true,
+              let tdict = obj["track"] as? [String: Any],
+              let td = try? JSONSerialization.data(withJSONObject: tdict),
+              let track = try? JSONDecoder().decode(Track.self, from: td) else { return nil }
+        return track
+    }
 
     func settings() async throws -> UserSettings {
         try await get("/api/me/settings")
