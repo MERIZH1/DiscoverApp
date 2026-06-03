@@ -91,6 +91,7 @@ struct MainView: View {
     @EnvironmentObject var player: PlayerController
     @EnvironmentObject var sync: SyncManager
     @State private var showPlayer = false
+    @State private var keyboardUp = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -103,11 +104,13 @@ struct MainView: View {
             .tint(Theme.text)
             VStack(spacing: 8) {
                 SyncBanner()   // sichtbar nur wenn ein anderes Geraet spielt
-                if player.hasContent {
+                if player.hasContent && !keyboardUp {
                     NowPlayingBar(showPlayer: $showPlayer)
                 }
             }.padding(.horizontal, 8).padding(.bottom, 50)
                 .ignoresSafeArea(.keyboard, edges: .bottom)
+                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardUp = true }
+                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardUp = false }
         }
         .overlay(alignment: .top) {
             if !sync.injectToast.isEmpty {

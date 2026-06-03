@@ -141,6 +141,7 @@ final class PlayerController: ObservableObject {
     private var idlePlayer: AVPlayer { activeIsA ? playerB : playerA }
     private var crossfading = false
     private var xfTarget: Track?
+    private var prefetchedURI: String?    // naechster Track schon auf idlePlayer vorgepuffert
     private var timeObserver: Any?
     private var statusObs: NSKeyValueObservation?
     private var endObs: NSObjectProtocol?
@@ -271,6 +272,8 @@ final class PlayerController: ObservableObject {
         xfTarget = nt
         let b = idlePlayer
         b.volume = 0
+        // Schon vorgepuffert? -> direkt abspielen, kein Neuladen (kein Stutter).
+        if prefetchedURI == nt.uri, b.currentItem != nil { b.play(); return }
         if let local = downloads?.localURL(for: nt.uri), !failedOffline.contains(nt.uri) {
             b.replaceCurrentItem(with: AVPlayerItem(url: local)); b.play()
             return
@@ -286,9 +289,33 @@ final class PlayerController: ObservableObject {
     }
 
     private func abortCrossfade() {
-        crossfading = false; xfTarget = nil
+        crossfading = false; xfTarget = nil; prefetchedURI = nil
         idlePlayer.pause(); idlePlayer.replaceCurrentItem(with: nil); idlePlayer.volume = 1
         player.volume = 1
+    }
+
+    /// Puffert den naechsten Track schon auf dem Idle-Player vor (pausiert), damit
+    /// der Crossfade-Wechsel ohne Nachladen klappt (loest Stream-Stutter). Nur bei
+    /// aktivem Crossfade und nicht waehrend einer laufenden Ueberblende.
+    private func prefetchNext() {
+        guard crossfadeSeconds > 0, !isRadio, !crossfading else { return }
+        guard let nt = peekNext() else { prefetchedURI = nil; return }
+        guard nt.uri != prefetchedURI else { return }
+        prefetchedURI = nt.uri
+        let b = idlePlayer
+        b.pause(); b.volume = 0
+        if let local = downloads?.localURL(for: nt.uri), !failedOffline.contains(nt.uri) {
+            b.replaceCurrentItem(with: AVPlayerItem(url: local))   // lokal: sofort bereit
+            return
+        }
+        Task {
+            do {
+                let r = try await api.streamURL(for: nt)
+                guard prefetchedURI == nt.uri, !crossfading,
+                      r.ok, let rel = r.url, let url = api.absoluteURL(rel) else { return }
+                idlePlayer.replaceCurrentItem(with: AVPlayerItem(url: url))   // puffert pausiert vor
+            } catch { }
+        }
     }
 
     /// Ueberblende abschliessen: Idle-Player (eingehend) wird aktiv, Queue-Status nachziehen.
@@ -335,6 +362,8 @@ final class PlayerController: ObservableObject {
             Task { await api.postHistory(t, contextName: ctxName, contextURI: ctxURI) }
         }
         persistSnapshot()
+        prefetchedURI = nil
+        prefetchNext()                                      // uebernaechsten Track vorpuffern
     }
 
     private func detachTimeObserver(from p: AVPlayer) {
@@ -511,6 +540,7 @@ final class PlayerController: ObservableObject {
             if autoplay { resume() }
             loading = false
             Task { await api.postHistory(track, contextName: ctxName, contextURI: ctxURI) }
+            prefetchNext()
             return
         }
         let myIndex = index
@@ -529,6 +559,7 @@ final class PlayerController: ObservableObject {
                 applyEQ(to: item)
                 if autoplay { resume() }
                 loading = false
+                prefetchNext()
             } catch { loading = false }
         }
     }
