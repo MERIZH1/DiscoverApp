@@ -179,6 +179,7 @@ struct TrackMenu: View {
     var onAddToPlaylist: (() -> Void)? = nil
     var onSendToUser: (() -> Void)? = nil
     var onFixYTMatch: (() -> Void)? = nil
+    var onRemoveFromPlaylist: (() -> Void)? = nil
     // WICHTIG: NICHT beobachten (kein @EnvironmentObject), sonst zeichnet das
     // offene Menue bei jedem Player-Tick neu (Flackern). Referenz nur lesen.
     private var app: AppState? { DiscoverServices.app }
@@ -230,6 +231,9 @@ struct TrackMenu: View {
             Button { onFix() } label: { Label("YouTube-Match fixen", systemImage: "arrow.triangle.2.circlepath") }
         }
         Button { startRadio() } label: { Label("Song-Radio starten", systemImage: "dot.radiowaves.left.and.right") }
+        if let onRemove = onRemoveFromPlaylist {
+            Button(role: .destructive) { onRemove() } label: { Label("Aus Playlist entfernen", systemImage: "trash") }
+        }
     }
     private func copySpotify() {
         if let id = track.uri.split(separator: ":").last {
@@ -1708,6 +1712,23 @@ struct TrackListView: View {
         }
     }
 
+    // Track aus Playlist entfernen — nur Spotify-Playlists + YouTube-Funde, keine Alben.
+    private var canRemoveTracks: Bool {
+        !isAlbum && (uri.hasPrefix("spotify:playlist:") || uri == "yt:finds")
+    }
+    private func removeTrack(_ t: Track) {
+        Haptics.tap()
+        Task {
+            let ok = await app.api.removeFromPlaylist(playlistUri: uri, trackUri: t.uri)
+            await MainActor.run {
+                if ok { tracks.removeAll { $0.uri == t.uri } }
+                copyMsg = ok ? "Entfernt ✓" : "Entfernen fehlgeschlagen"
+            }
+            try? await Task.sleep(nanoseconds: 1_600_000_000)
+            await MainActor.run { copyMsg = "" }
+        }
+    }
+
     private var metaText: String {
         if isAlbum { return "Album · \(tracks.count) Songs" }
         let total = tracks.reduce(0) { $0 + Int($1.durationSec) }
@@ -1811,7 +1832,8 @@ struct TrackListView: View {
                 // Tracks (nummeriert)
                 LazyVStack(spacing: 0) {
                     ForEach(Array(tracks.enumerated()), id: \.element.id) { idx, t in
-                        NumberedTrackRow(n: idx + 1, track: t, showCover: !isAlbum, playing: player.current?.id == t.id) {
+                        NumberedTrackRow(n: idx + 1, track: t, showCover: !isAlbum, playing: player.current?.id == t.id,
+                                         onRemoveFromPlaylist: canRemoveTracks ? { removeTrack(t) } : nil) {
                             player.shuffle = false; player.play(tracks: tracks, startAt: idx, contextName: title, contextURI: uri)
                         }
                     }
@@ -2101,7 +2123,9 @@ struct EpisodeRow: View {
 }
 
 struct NumberedTrackRow: View {
-    let n: Int; let track: Track; var showCover: Bool = true; let playing: Bool; let tap: () -> Void
+    let n: Int; let track: Track; var showCover: Bool = true; let playing: Bool
+    var onRemoveFromPlaylist: (() -> Void)? = nil
+    let tap: () -> Void
     @State private var showArtist = false
     @State private var showAlbum = false
     @State private var showAddPlaylist = false
@@ -2122,7 +2146,7 @@ struct NumberedTrackRow: View {
                 Image(systemName: "checkmark").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.accent)
             }
             Menu {
-                TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true })
+                TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }, onRemoveFromPlaylist: onRemoveFromPlaylist)
             } label: {
                 Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
                     .frame(width: 46, height: 46).contentShape(Rectangle())
@@ -2131,7 +2155,7 @@ struct NumberedTrackRow: View {
             .background(playing ? Theme.accent.opacity(0.08) : .clear)
             .contentShape(Rectangle())
             .onTapGesture(perform: tap)
-            .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }) }
+            .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }, onRemoveFromPlaylist: onRemoveFromPlaylist) }
             .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum, showAddPlaylist: $showAddPlaylist, showSendUser: $showSendUser, showFixYT: $showFixYT)
     }
 }
@@ -2262,6 +2286,8 @@ struct PlayerView: View {
     @State private var showAlbum = false
     @State private var showSendUser = false
     @State private var showFixYT = false
+    @State private var showDevices = false
+    private var syncMgr: SyncManager? { DiscoverServices.app?.sync }
 
     var body: some View {
         let p = player
@@ -2297,6 +2323,10 @@ struct PlayerView: View {
                         Image(systemName: (p.sleepRemaining > 0 || p.sleepAtEnd) ? "moon.fill" : "moon")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle((p.sleepRemaining > 0 || p.sleepAtEnd) ? Theme.accent : Theme.text)
+                    }.padding(.trailing, 14)
+                    Button { showDevices = true } label: {
+                        Image(systemName: "hifispeaker.2.fill")
+                            .font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.text)
                     }.padding(.trailing, 14)
                     Menu { if let t = p.current { TrackMenu(track: t, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }) } } label: {
                         Image(systemName: "ellipsis").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
@@ -2414,6 +2444,7 @@ struct PlayerView: View {
         .sheet(isPresented: $showAddPlaylist) { if let t = player.current { AddToPlaylistSheet(track: t) } }
         .sheet(isPresented: $showSendUser) { if let t = player.current { SendToUserSheet(track: t) } }
         .sheet(isPresented: $showFixYT) { if let t = player.current { YTMatchSheet(track: t) } }
+        .sheet(isPresented: $showDevices) { if let s = syncMgr { DevicePickerSheet().environmentObject(s) } }
         .sheet(isPresented: $showArtist) {
             if let t = player.current, let u = t.artists?.first?.uri {
                 NavigationStack { ArtistView(uri: u, name: t.artists?.first?.name ?? t.artist, image: t.image) }

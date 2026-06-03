@@ -116,11 +116,18 @@ final class APIClient: ObservableObject {
               let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return false }
         return (obj["ok"] as? Bool) ?? false
     }
-    func syncGetCommands(deviceID: String) async -> [[String: Any]] {
-        guard let d = try? await data("/api/sync/commands?device_id=\(enc(deviceID))"),
+    func syncGetCommands(deviceID: String, name: String = "") async -> [[String: Any]] {
+        guard let d = try? await data("/api/sync/commands?device_id=\(enc(deviceID))&name=\(enc(name))"),
               let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
               let cmds = obj["commands"] as? [[String: Any]] else { return [] }
         return cmds
+    }
+
+    /// Aktive Geraete des Profils (fuer "Wiedergabe-Geraet wechseln").
+    func syncDevices() async -> [SyncDevice] {
+        guard let d = try? await data("/api/sync/devices"),
+              let r = try? JSONDecoder().decode(SyncDevicesResponse.self, from: d) else { return [] }
+        return r.devices
     }
 
     // MARK: - Endpoints
@@ -281,6 +288,21 @@ final class APIClient: ObservableObject {
               let td = try? JSONSerialization.data(withJSONObject: tdict),
               let track = try? JSONDecoder().decode(Track.self, from: td) else { return nil }
         return track
+    }
+
+    /// Track aus einer Playlist entfernen. Spotify-Playlist -> /api/remove-track,
+    /// YouTube-Funde (yt:finds) -> /api/yt/finds/remove.
+    func removeFromPlaylist(playlistUri: String, trackUri: String) async -> Bool {
+        let path: String
+        let body: [String: Any]
+        if playlistUri == "yt:finds" {
+            path = "/api/yt/finds/remove"; body = ["uri": trackUri]
+        } else {
+            path = "/api/remove-track"; body = ["playlist_uri": playlistUri, "track_uri": trackUri]
+        }
+        guard let d = try? await data(path, method: "POST", json: body),
+              let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return false }
+        return (obj["ok"] as? Bool) ?? false
     }
 
     func settings() async throws -> UserSettings {

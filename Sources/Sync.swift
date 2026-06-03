@@ -29,6 +29,14 @@ struct RemoteState: Codable {
 }
 struct SyncStateResponse: Codable { let state: RemoteState? }
 
+struct SyncDevice: Codable, Identifiable {
+    let device_id: String
+    let name: String
+    let is_owner: Bool
+    var id: String { device_id }
+}
+struct SyncDevicesResponse: Codable { let devices: [SyncDevice] }
+
 // MARK: - SyncManager
 // Owner = das Geraet, das gerade spielt -> pusht State + fuehrt eingehende Commands aus.
 // Remote = ein anderes Geraet spielt -> wir zeigen Banner + senden Commands.
@@ -134,7 +142,7 @@ final class SyncManager: ObservableObject {
 
     @discardableResult
     private func consumeCommands(_ p: PlayerController) async -> Bool {
-        let cmds = await api.syncGetCommands(deviceID: deviceID)
+        let cmds = await api.syncGetCommands(deviceID: deviceID, name: deviceName)
         for c in cmds {
             switch c["cmd"] as? String ?? "" {
             case "play":  p.resume()
@@ -156,6 +164,8 @@ final class SyncManager: ObservableObject {
                     injectToast = "📥 \(name) erhalten"
                     Task { try? await Task.sleep(nanoseconds: 2_500_000_000); injectToast = "" }
                 }
+            case "take_over":
+                await handleTakeOver(p, value: c["value"])
             default: break
             }
         }
@@ -171,6 +181,107 @@ final class SyncManager: ObservableObject {
     func remoteNext() { send("next") }
     func remotePrev() { send("prev") }
     func remoteSeek(_ t: Double) { send("seek", value: t) }
+
+    // MARK: - Wiedergabe-Geraet wechseln (Connect-Style)
+    func devices() async -> [SyncDevice] { await api.syncDevices() }
+
+    /// Verschiebt die laufende Wiedergabe auf ein anderes Geraet.
+    func switchPlaybackTo(_ targetID: String, name: String) {
+        guard targetID != deviceID else { return }
+        let ownerID = remote?.device_id ?? ((player?.isPlaying ?? false) ? deviceID : nil)
+        Task {
+            // Falls wir selbst Owner sind: State frisch pushen, damit das Ziel ihn holen kann.
+            if remote == nil, let p = player, let snap = snapshot(p) { await api.syncPushState(snap) }
+            await api.syncSendCommand("take_over", value: nil, target: targetID, fromID: deviceID)
+            if let ownerID, ownerID != targetID {
+                if ownerID == deviceID { player?.pause() }
+                else { await api.syncSendCommand("pause", value: nil, target: ownerID, fromID: deviceID) }
+            }
+        }
+    }
+
+    /// Dieses Geraet uebernimmt die Wiedergabe (track + position + queue) vom aktuellen Owner.
+    private func handleTakeOver(_ p: PlayerController, value: Any?) async {
+        var snap: RemoteState? = nil
+        if let dict = value as? [String: Any],
+           let data = try? JSONSerialization.data(withJSONObject: dict) {
+            snap = try? JSONDecoder().decode(RemoteState.self, from: data)
+        }
+        if snap == nil || (snap?.queue_tracks?.isEmpty ?? true) {
+            snap = await api.syncGetState()
+        }
+        guard let s = snap else { return }
+        let qt = s.queue_tracks ?? []
+        let tracks = qt.map { Track(uri: $0.uri, name: $0.name, artist: $0.artist, image: $0.image) }
+        // Snapshot-Reihenfolge exakt uebernehmen -> vor play() shuffle AUS, sonst
+        // mischt play() die Queue neu (fisherYates) und Index/Position passen nicht.
+        p.shuffle = false
+        p.repeatMode = (s.repeatMode == "one" ? .one : (s.repeatMode == "all" ? .all : .off))
+        if !tracks.isEmpty {
+            let idx = max(0, min(tracks.count - 1, s.queue_idx ?? 0))
+            p.play(tracks: tracks, startAt: idx, contextName: "Wiedergabe", contextURI: "connect:transfer")
+        } else if let t = s.track {
+            p.play(tracks: [Track(uri: t.uri, name: t.name, artist: t.artist, image: t.image)],
+                   startAt: 0, contextName: "Wiedergabe", contextURI: "connect:transfer")
+        } else { return }
+        p.shuffle = (s.shuffle == "on")   // UI-Flag nachziehen (mischt nicht neu)
+        let pos = s.position ?? 0
+        if pos > 1 {
+            Task { try? await Task.sleep(nanoseconds: 900_000_000); p.seek(pos) }
+        }
+        remote = nil
+    }
+}
+
+// MARK: - Wiedergabe-Geraet-Picker (Connect-Style Geraetewechsel)
+struct DevicePickerSheet: View {
+    @EnvironmentObject var sync: SyncManager
+    @Environment(\.dismiss) private var dismiss
+    @State private var devices: [SyncDevice] = []
+    @State private var loading = true
+    var body: some View {
+        NavigationStack {
+            List {
+                if loading {
+                    HStack { Spacer(); ProgressView().tint(Theme.accent); Spacer() }
+                        .listRowBackground(Color.clear)
+                } else if devices.isEmpty {
+                    Text("Keine aktiven Geräte gefunden. Öffne Discover auf einem anderen Gerät im selben Profil.")
+                        .font(.system(size: 14)).foregroundStyle(Theme.sub)
+                        .listRowBackground(Color.clear)
+                } else {
+                    ForEach(devices) { dev in
+                        Button {
+                            if dev.is_owner { dismiss(); return }
+                            sync.switchPlaybackTo(dev.device_id, name: dev.name)
+                            Haptics.tap(); dismiss()
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: (dev.name.lowercased().contains("phone") || dev.name.lowercased().contains("pad")) ? "iphone" : "desktopcomputer")
+                                    .font(.system(size: 18)).foregroundStyle(dev.is_owner ? Theme.accent : Theme.text)
+                                    .frame(width: 26)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(dev.name + (dev.device_id == sync.deviceID ? " (dieses Gerät)" : ""))
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .foregroundStyle(dev.is_owner ? Theme.accent : Theme.text)
+                                    Text(dev.is_owner ? "● spielt gerade" : "bereit")
+                                        .font(.system(size: 12)).foregroundStyle(Theme.sub)
+                                }
+                                Spacer()
+                                if dev.is_owner { Image(systemName: "speaker.wave.2.fill").foregroundStyle(Theme.accent) }
+                            }.contentShape(Rectangle())
+                        }.buttonStyle(.plain)
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(Theme.bg.ignoresSafeArea())
+            .navigationTitle("Wiedergabe-Gerät")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Fertig") { dismiss() } } }
+        }
+        .task { loading = true; devices = await sync.devices(); loading = false }
+    }
 }
 
 // MARK: - Remote-Banner (erscheint, wenn ein anderes Geraet spielt)

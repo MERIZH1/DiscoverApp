@@ -3,6 +3,11 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1 — Wiedergabe-Geraet wechseln + Playlist-Cleanup
+- Wiedergabe-Geraet wechseln (Connect-Style): im Player aufs Lautsprecher-Symbol tippen -> ein anderes Geraet uebernimmt Song + Warteschlange an der aktuellen Position
+- Songs aus Playlists entfernen — im Song-Menue, fuer eigene Spotify-Playlists + YouTube-Funde
+- Playback-Fix: nicht-heruntergeladene Songs blieben in der App bei 0:00 haengen (WebM/Opus) -> Server liefert jetzt AAC/m4a
+
 ## v1.0 — Audit & Stabilisierung
 - Fluessigeres Scrollen: Cover werden zwischengespeichert (kein Neu-Laden)
 - Fix: Lockscreen-Cover laedt jetzt auch bei relativen Bild-URLs
