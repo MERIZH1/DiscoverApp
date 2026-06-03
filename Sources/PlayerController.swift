@@ -247,11 +247,12 @@ final class PlayerController: ObservableObject {
             idlePlayer.volume = Float(1 - out)
             return
         }
-        guard isPlaying, duration > 0 else { return }
-        // Fade-in am Anfang
-        player.volume = currentTime < cf ? Float(max(0, min(1, currentTime / cf))) : 1
+        // Nicht am Ueberblenden -> aktiver Track immer voll (KEIN Fade-in beim Start;
+        // das verhinderte sonst bei duration-losen Tracks das Hochziehen -> stumm).
+        if player.volume < 1 { player.volume = 1 }
         // Ueberblende ausloesen, wenn das Ende naht (nur einfache Faelle: manuelle
         // Queue oder naechster Queue-Track; am Playlist-Ende normaler Schnitt).
+        guard isPlaying, duration > 0 else { return }
         let remaining = duration - currentTime
         if remaining <= cf, remaining > 0.4, repeatMode != .one, let nt = peekNext() {
             beginCrossfade(to: nt)
@@ -497,7 +498,7 @@ final class PlayerController: ObservableObject {
         persistSnapshot()
         updateRemoteForContent()
         loading = true; currentTime = 0; duration = track.durationSec; source = ""
-        player.volume = crossfadeSeconds > 0 ? 0 : 1        // Crossfade: aus Stille einblenden
+        player.volume = 1                                   // aktiver Track immer voll (Einblenden nur in der Ueberblende)
         updateNowPlaying(title: track.name, artist: track.artist, album: track.album,
                          dur: track.durationSec, art: track.image, live: false)
         // Offline vorhanden (und diese Session nicht als fehlerhaft markiert)? -> lokal abspielen
