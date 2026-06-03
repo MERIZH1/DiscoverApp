@@ -20,6 +20,13 @@ struct Playlist: Codable, Identifiable, Hashable {
     let image: String?
 }
 
+// Eine Seite der paginierten /api/playlists?paged=1 Antwort
+struct PlaylistsPage: Codable {
+    let items: [Playlist]
+    let next_offset: Int?
+    let has_more: Bool?
+}
+
 struct HomeItem: Codable, Identifiable, Hashable {
     var id: String { uri }
     let uri: String

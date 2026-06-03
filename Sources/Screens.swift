@@ -1412,6 +1412,7 @@ struct LibraryView: View {
     @EnvironmentObject var app: AppState
     @EnvironmentObject var player: PlayerController
     @EnvironmentObject var downloads: DownloadManager
+    @Environment(\.liquidGlass) private var glass
     @State private var playlists: [Playlist] = []
     @State private var subs: Set<String> = []
     @State private var subSync: [String: String] = [:]
@@ -1453,8 +1454,9 @@ struct LibraryView: View {
                 HStack(spacing: 10) {
                     Image(systemName: "magnifyingglass").foregroundStyle(Theme.mute)
                     TextField("In Bibliothek suchen", text: $filter).foregroundStyle(Theme.text)
-                }.padding(.horizontal, 14).padding(.vertical, 12).background(Theme.input)
-                    .clipShape(RoundedRectangle(cornerRadius: 8)).padding(.horizontal).padding(.top, 10)
+                }.padding(.horizontal, 14).padding(.vertical, 12)
+                    .glassSurface(glass, shape: RoundedRectangle(cornerRadius: 8), fallback: Theme.input)
+                    .padding(.horizontal).padding(.top, 10)
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -1530,10 +1532,23 @@ struct LibraryView: View {
         // Cache sofort (Playlists + Abos) -> Sortierung gleich korrekt, kein Hochschnellen
         if playlists.isEmpty { playlists = app.cacheGet("playlists", [Playlist].self) ?? [] }
         if subs.isEmpty, let cs = app.cacheGet("subs", [SubItem].self) { applySubs(cs) }
-        // Sequenziell (nicht parallel) — vermeidet gleichzeitige Spotify-Token-Fetches
-        if let p = try? await app.api.playlists() {
-            playlists = p; app.cacheSet("playlists", p)
-            indexPlaylistsInSpotlight(p)   // iOS-Suche
+        // ALLE Seiten paginiert nachladen (wie PWA): Seite 1 zeigt sofort, der
+        // Rest fuellt sich inkrementell — sonst brach die Liste nach ~50 ab.
+        var all: [Playlist] = []
+        var offset = 0
+        for i in 0..<40 {
+            guard let page = try? await app.api.playlistsPage(offset: offset) else {
+                if i == 0 { break }   // erste Seite fehlgeschlagen -> Cache behalten
+                break
+            }
+            all.append(contentsOf: page.items)
+            playlists = all           // inkrementelles UI-Update
+            if !(page.has_more ?? false) || page.items.isEmpty { break }
+            offset = page.next_offset ?? (offset + page.items.count)
+        }
+        if !all.isEmpty {
+            app.cacheSet("playlists", all)
+            indexPlaylistsInSpotlight(all)   // iOS-Suche
         }
         if let s = try? await app.api.subscriptions() { applySubs(s); app.cacheSet("subs", s) }
         loaded = true
@@ -1663,6 +1678,7 @@ struct RadioView: View {
 struct RadioSearchSheet: View {
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.liquidGlass) private var glass
     var onAdded: () async -> Void
     @State private var query = ""
     @State private var results: [RadioStation] = []
@@ -1682,7 +1698,7 @@ struct RadioSearchSheet: View {
                         Button { query = ""; results = [] } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.sub) }
                     }
                 }
-                .padding(10).background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 10)).padding()
+                .padding(10).glassSurface(glass, shape: RoundedRectangle(cornerRadius: 10), fallback: Theme.input).padding()
                 List {
                     if searching {
                         HStack { Spacer(); ProgressView().tint(Theme.accent); Spacer() }.listRowBackground(Color.clear)

@@ -136,8 +136,26 @@ final class APIClient: ObservableObject {
         return r.profiles
     }
 
+    /// Eine Seite der Playlists (paged=1).
+    func playlistsPage(offset: Int, limit: Int = 50) async throws -> PlaylistsPage {
+        try await get("/api/playlists?paged=1&limit=\(limit)&offset=\(offset)")
+    }
+    /// Alle Playlists paginiert holen — sonst bricht die Liste nach ~50 ab.
     func playlists() async throws -> [Playlist] {
-        try await get("/api/playlists")
+        var all: [Playlist] = []
+        var offset = 0
+        for i in 0..<40 {   // Sicherheitsdeckel: max 2000
+            do {
+                let page = try await playlistsPage(offset: offset)
+                all.append(contentsOf: page.items)
+                if !(page.has_more ?? false) || page.items.isEmpty { break }
+                offset = page.next_offset ?? (offset + page.items.count)
+            } catch {
+                if i == 0 { throw error }   // erste Seite fehlgeschlagen -> Caller behaelt Cache
+                break
+            }
+        }
+        return all
     }
 
     func home() async throws -> HomeResponse {

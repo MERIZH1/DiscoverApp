@@ -3,6 +3,11 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.4 — Alle Playlists + Liquid-Glass-Pass
+- Bibliothek laedt jetzt ALLE Playlists (paginiert + inkrementell) — brach vorher nach ~50 ab und lud beim Runterscrollen nicht nach
+- Schnelleres Gefuehl: Seite 1 erscheint sofort, der Rest fuellt sich im Hintergrund
+- Liquid Glass (iOS 26, optional per Einstellung) auf mehr Flaechen: Bibliotheks-Suche + Radio-Suche
+
 ## v1.3 — Suche & Player-Politur
 - Suche: YouTube-Funde mit rotem "YT"-Badge gekennzeichnet
 - Suche: Pfeil zum Einklappen der Tastatur (wie in der PWA)
