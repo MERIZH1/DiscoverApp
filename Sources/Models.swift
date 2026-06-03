@@ -27,6 +27,16 @@ struct PlaylistsPage: Codable {
     let has_more: Bool?
 }
 
+// Aufgeloester Spotify-Share-Link
+struct SpotifyResolve: Codable {
+    let ok: Bool
+    let type: String?
+    let uri: String?
+    let name: String?
+    let artist: String?
+    let image: String?
+}
+
 struct HomeItem: Codable, Identifiable, Hashable {
     var id: String { uri }
     let uri: String

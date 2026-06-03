@@ -162,6 +162,12 @@ final class APIClient: ObservableObject {
         try await get("/api/home")
     }
 
+    /// Spotify-Share-Link aufloesen (Track/Playlist/Album/Artist).
+    func spotifyResolve(_ url: String) async -> SpotifyResolve? {
+        guard let d = try? await data("/api/spotify/resolve?url=\(enc(url))") else { return nil }
+        return try? JSONDecoder().decode(SpotifyResolve.self, from: d)
+    }
+
     func playlistTracks(_ uri: String, check: Bool = false) async throws -> PlaylistTracksResponse {
         let q = check ? "?check=1" : ""
         return try await get("/api/playlist/\(enc(uri))\(q)")

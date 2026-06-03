@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.8 — Spotify-Link in der Suche
+- Spotify-Link (Track / Playlist / Album / Künstler) in die Suche einfuegen -> Track spielt direkt, der Rest oeffnet sich in der jeweiligen Ansicht (genau wie der YouTube-Link-Import)
+
 ## v1.7 — Ein Player statt zwei (Connect)
 - Wenn auf einem anderen Geraet gespielt wird, zeigt jetzt EIN Mini-Player das aktive Geraet — kein zweiter Banner mehr obendrauf
 - Connect-Symbol im Mini-Player -> Geraet wechseln (wie Spotify Connect); Play/Pause steuert das aktive Geraet

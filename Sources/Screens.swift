@@ -981,6 +981,7 @@ struct SearchView: View {
     @AppStorage("recentSearchItems") private var recentItemsRaw = ""
     @FocusState private var searchFocused: Bool
     @Environment(\.liquidGlass) private var glass
+    @State private var navPath = NavigationPath()
 
     private var recentItems: [RecentSearchItem] {
         (try? JSONDecoder().decode([RecentSearchItem].self, from: Data(recentItemsRaw.utf8))) ?? []
@@ -1013,7 +1014,7 @@ struct SearchView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navPath) {
             VStack(spacing: 12) {
                 HStack(spacing: 10) {
                     Image(systemName: "magnifyingglass").foregroundStyle(glass ? Theme.text : .black).font(.system(size: 18, weight: .semibold))
@@ -1139,6 +1140,7 @@ struct SearchView: View {
         let q = query.trimmingCharacters(in: .whitespaces)
         guard !q.isEmpty else { return }
         if isYouTubeURL(q) { addYTFind(q); return }
+        if isSpotifyURL(q) { handleSpotifyLink(q); return }
         busy = true
         Task { res = try? await app.api.search(q); busy = false }
     }
@@ -1158,12 +1160,33 @@ struct SearchView: View {
             }
         }
     }
+    private func isSpotifyURL(_ s: String) -> Bool {
+        let l = s.lowercased()
+        return l.contains("open.spotify.com/") || l.hasPrefix("spotify:")
+    }
+    /// Spotify-Link aufloesen: Track abspielen, Playlist/Album/Künstler oeffnen.
+    private func handleSpotifyLink(_ url: String) {
+        busy = true
+        Task {
+            let r = await app.api.spotifyResolve(url)
+            busy = false
+            guard let r, r.ok, let type = r.type, let uri = r.uri else { return }
+            query = ""
+            if type == "track", let name = r.name, !name.isEmpty {
+                player.play(tracks: [Track(uri: uri, name: name, artist: r.artist ?? "", image: r.image)],
+                            contextName: "Spotify-Link", contextURI: "")
+            } else {
+                navPath.append(Card(uri: uri, name: r.name ?? "", image: r.image, artist: nil, owner: nil, desc: nil))
+            }
+        }
+    }
     /// Tippen -> nach kurzer Pause automatisch suchen (wie PWA).
     private func debounceSearch() {
         debounce?.cancel()
         let q = query.trimmingCharacters(in: .whitespaces)
         if q.isEmpty { res = nil; busy = false; return }
         if isYouTubeURL(q) { addYTFind(q); return }
+        if isSpotifyURL(q) { handleSpotifyLink(q); return }
         debounce = Task {
             try? await Task.sleep(nanoseconds: 350_000_000)
             if Task.isCancelled { return }
