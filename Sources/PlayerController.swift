@@ -141,7 +141,11 @@ final class PlayerController: ObservableObject {
     private var idlePlayer: AVPlayer { activeIsA ? playerB : playerA }
     private var crossfading = false
     private var xfTarget: Track?
-    private var prefetchedURI: String?    // naechster Track schon auf idlePlayer vorgepuffert
+    // Prebuffer: die naechsten N Tracks (N = Offline-Buffer-Einstellung) werden als
+    // Temp-Dateien vorgeladen -> sofort/offline bereit, smoothes Crossfade.
+    var prebufferCount = UserDefaults.standard.integer(forKey: "prebufferCount")
+    private var prebuf: [String: URL] = [:]
+    private var prebufBusy: Set<String> = []
     private var timeObserver: Any?
     private var statusObs: NSKeyValueObservation?
     private var endObs: NSObjectProtocol?
@@ -215,7 +219,15 @@ final class PlayerController: ObservableObject {
     }
     // Play-Modi (Shuffle/Repeat) serverseitig sichern/laden — wie PWA
     private func saveMode() { Task { await api.savePlaymode(shuffle: shuffle, mode: repeatMode) } }
-    func restoreMode() { Task { let m = await api.playmode(); shuffle = m.shuffle; repeatMode = m.mode } }
+    func restoreMode() {
+        Task {
+            let m = await api.playmode(); shuffle = m.shuffle; repeatMode = m.mode
+            if let s = try? await api.settings() {
+                prebufferCount = s.prebuffer_count ?? 0
+                UserDefaults.standard.set(prebufferCount, forKey: "prebufferCount")
+            }
+        }
+    }
 
     // MARK: - Sleep-Timer (Deadline-basiert -> wird im Time-Observer geprueft und
     // feuert dadurch auch bei gesperrtem Bildschirm zuverlaessig, anders als ein
@@ -272,9 +284,8 @@ final class PlayerController: ObservableObject {
         xfTarget = nt
         let b = idlePlayer
         b.volume = 0
-        // Schon vorgepuffert? -> direkt abspielen, kein Neuladen (kein Stutter).
-        if prefetchedURI == nt.uri, b.currentItem != nil { b.play(); return }
-        if let local = downloads?.localURL(for: nt.uri), !failedOffline.contains(nt.uri) {
+        // Lokal vorhanden (offline oder vorgepuffert)? -> sofort, kein Streamen.
+        if let local = localOrPrebuffered(nt) {
             b.replaceCurrentItem(with: AVPlayerItem(url: local)); b.play()
             return
         }
@@ -289,33 +300,66 @@ final class PlayerController: ObservableObject {
     }
 
     private func abortCrossfade() {
-        crossfading = false; xfTarget = nil; prefetchedURI = nil
+        crossfading = false; xfTarget = nil
         idlePlayer.pause(); idlePlayer.replaceCurrentItem(with: nil); idlePlayer.volume = 1
         player.volume = 1
     }
 
-    /// Puffert den naechsten Track schon auf dem Idle-Player vor (pausiert), damit
-    /// der Crossfade-Wechsel ohne Nachladen klappt (loest Stream-Stutter). Nur bei
-    /// aktivem Crossfade und nicht waehrend einer laufenden Ueberblende.
-    private func prefetchNext() {
-        guard crossfadeSeconds > 0, !isRadio, !crossfading else { return }
-        guard let nt = peekNext() else { prefetchedURI = nil; return }
-        guard nt.uri != prefetchedURI else { return }
-        prefetchedURI = nt.uri
-        let b = idlePlayer
-        b.pause(); b.volume = 0
-        if let local = downloads?.localURL(for: nt.uri), !failedOffline.contains(nt.uri) {
-            b.replaceCurrentItem(with: AVPlayerItem(url: local))   // lokal: sofort bereit
-            return
+    private var prebufDir: URL {
+        let d = FileManager.default.temporaryDirectory.appendingPathComponent("prebuffer", isDirectory: true)
+        try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+        return d
+    }
+    private func prebufKey(_ uri: String) -> String {
+        uri.map { ($0.isLetter || $0.isNumber) ? String($0) : "_" }.joined()
+    }
+    /// Lokale Datei fuer einen Track (Offline-Bibliothek ODER Prebuffer-Cache), falls da.
+    private func localOrPrebuffered(_ t: Track) -> URL? {
+        if let off = downloads?.localURL(for: t.uri), !failedOffline.contains(t.uri) { return off }
+        if let pre = prebuf[t.uri], FileManager.default.fileExists(atPath: pre.path) { return pre }
+        return nil
+    }
+    /// Laedt die naechsten N Tracks (Offline-Buffer) als Temp-Dateien vor; raeumt
+    /// nicht mehr benoetigte Eintraege weg.
+    private func prefetchUpcoming() {
+        guard prebufferCount > 0, !isRadio else { return }
+        let upcoming = Array(upNext.prefix(prebufferCount)).filter { !$0.uri.isEmpty }
+        var keep = Set(upcoming.map { $0.uri })
+        if let cur = current?.uri { keep.insert(cur) }      // laufende Datei nicht loeschen
+        for (uri, url) in prebuf where !keep.contains(uri) {
+            try? FileManager.default.removeItem(at: url); prebuf[uri] = nil
         }
-        Task {
-            do {
-                let r = try await api.streamURL(for: nt)
-                guard prefetchedURI == nt.uri, !crossfading,
-                      r.ok, let rel = r.url, let url = api.absoluteURL(rel) else { return }
-                idlePlayer.replaceCurrentItem(with: AVPlayerItem(url: url))   // puffert pausiert vor
-            } catch { }
+        for t in upcoming where prebuf[t.uri] == nil && !prebufBusy.contains(t.uri) {
+            if downloads?.localURL(for: t.uri) != nil { continue }    // schon dauerhaft offline
+            prebufBusy.insert(t.uri)
+            Task { await prebufferOne(t) }
         }
+    }
+    private func prebufferOne(_ t: Track) async {
+        defer { prebufBusy.remove(t.uri) }
+        guard let r = try? await api.streamURL(for: t), r.ok, let rel = r.url,
+              let url = api.absoluteURL(rel) else { return }
+        var req = URLRequest(url: url)
+        if let pid = api.profileId { req.setValue(pid, forHTTPHeaderField: "X-Profile-Id") }
+        req.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15",
+                     forHTTPHeaderField: "User-Agent")
+        guard let (data, resp) = try? await URLSession.shared.data(for: req),
+              let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode),
+              data.count > 1000 else { return }
+        let ext = prebufExt(mime: resp.mimeType, urlExt: resp.url?.pathExtension)
+        let dest = prebufDir.appendingPathComponent(prebufKey(t.uri) + "." + ext)
+        guard (try? data.write(to: dest)) != nil else { return }
+        prebuf[t.uri] = dest
+    }
+    private func prebufExt(mime: String?, urlExt: String?) -> String {
+        if let m = mime?.lowercased() {
+            if m.contains("mpeg") || m.contains("mp3") { return "mp3" }
+            if m.contains("mp4") || m.contains("m4a") || m.contains("aac") { return "m4a" }
+            if m.contains("ogg") || m.contains("opus") { return "ogg" }
+            if m.contains("wav") { return "wav" }
+        }
+        let p = (urlExt ?? "").lowercased()
+        return ["m4a", "mp3", "aac", "mp4", "ogg", "opus", "wav"].contains(p) ? p : "m4a"
     }
 
     /// Ueberblende abschliessen: Idle-Player (eingehend) wird aktiv, Queue-Status nachziehen.
@@ -362,8 +406,7 @@ final class PlayerController: ObservableObject {
             Task { await api.postHistory(t, contextName: ctxName, contextURI: ctxURI) }
         }
         persistSnapshot()
-        prefetchedURI = nil
-        prefetchNext()                                      // uebernaechsten Track vorpuffern
+        prefetchUpcoming()
     }
 
     private func detachTimeObserver(from p: AVPlayer) {
@@ -540,7 +583,20 @@ final class PlayerController: ObservableObject {
             if autoplay { resume() }
             loading = false
             Task { await api.postHistory(track, contextName: ctxName, contextURI: ctxURI) }
-            prefetchNext()
+            prefetchUpcoming()
+            return
+        }
+        // Vorgepuffert (Offline-Buffer)? -> lokale Temp-Datei sofort spielen.
+        if let pre = prebuf[track.uri], FileManager.default.fileExists(atPath: pre.path) {
+            source = "buffer"
+            let item = AVPlayerItem(url: pre)
+            attachItemObservers(item)
+            player.replaceCurrentItem(with: item)
+            applyEQ(to: item)
+            if autoplay { resume() }
+            loading = false
+            Task { await api.postHistory(track, contextName: ctxName, contextURI: ctxURI) }
+            prefetchUpcoming()
             return
         }
         let myIndex = index
@@ -559,7 +615,7 @@ final class PlayerController: ObservableObject {
                 applyEQ(to: item)
                 if autoplay { resume() }
                 loading = false
-                prefetchNext()
+                prefetchUpcoming()
             } catch { loading = false }
         }
     }

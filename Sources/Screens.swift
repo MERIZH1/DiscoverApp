@@ -634,7 +634,7 @@ struct SettingsView: View {
                             Text("Songs vorladen für unterbrochene Verbindung").font(.caption2).foregroundStyle(Theme.mute)
                             Menu {
                                 ForEach(bufferOptions, id: \.0) { opt in
-                                    Button(opt.1) { prebuffer = opt.0; if loaded { saveSettings() } }
+                                    Button(opt.1) { prebuffer = opt.0; player.prebufferCount = opt.0; UserDefaults.standard.set(opt.0, forKey: "prebufferCount"); if loaded { saveSettings() } }
                                 }
                             } label: {
                                 HStack {
@@ -744,7 +744,7 @@ struct SettingsView: View {
             country = app.profile?.country ?? "DE"
             hideForeign = app.profile?.hide_foreign_lang_playlists ?? false
             if let s = try? await app.api.settings() {
-                prebuffer = s.prebuffer_count ?? 5
+                prebuffer = s.prebuffer_count ?? 5; player.prebufferCount = prebuffer; UserDefaults.standard.set(prebuffer, forKey: "prebufferCount")
                 normalize = s.normalize_volume ?? false
                 bgKeepalive = s.bg_keepalive ?? false
                 if let sc = s.smart_cache {
