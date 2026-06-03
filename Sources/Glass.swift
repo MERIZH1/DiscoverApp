@@ -34,4 +34,12 @@ extension View {
             self.background(fallback, in: shape)
         }
     }
+
+    /// Runder Icon-Button im iOS-26-Stil (Glas-Kreis), sonst nur das Icon.
+    /// Fuer die kleinen Kopf-Icons im Player (Chevron/Mond/Geraet/⋯).
+    func glassIconCircle(_ on: Bool, size: CGFloat = 36) -> some View {
+        self.frame(width: size, height: size)
+            .glassButton(on, shape: Circle(), fallback: .clear)
+            .contentShape(Circle())
+    }
 }

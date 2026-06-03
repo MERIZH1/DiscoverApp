@@ -2475,6 +2475,7 @@ struct PlayerView: View {
                 HStack {
                     Button { dismiss() } label: {
                         Image(systemName: "chevron.down").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
+                            .glassIconCircle(glass)
                     }
                     Spacer()
                     VStack(spacing: 2) {
@@ -2495,13 +2496,16 @@ struct PlayerView: View {
                         Image(systemName: (p.sleepRemaining > 0 || p.sleepAtEnd) ? "moon.fill" : "moon")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle((p.sleepRemaining > 0 || p.sleepAtEnd) ? Theme.accent : Theme.text)
-                    }.padding(.trailing, 14)
+                            .glassIconCircle(glass)
+                    }.padding(.trailing, 10)
                     Button { showDevices = true } label: {
                         Image(systemName: "hifispeaker.2.fill")
                             .font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.text)
-                    }.padding(.trailing, 14)
+                            .glassIconCircle(glass)
+                    }.padding(.trailing, 10)
                     Menu { if let t = p.current { TrackMenu(track: t, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }) } } label: {
                         Image(systemName: "ellipsis").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
+                            .glassIconCircle(glass)
                     }.disabled(p.current == nil)
                 }.padding(.horizontal, 4).padding(.top, 8)
                 Spacer()

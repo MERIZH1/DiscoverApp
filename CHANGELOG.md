@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.6 — Glass-Feinschliff im Player
+- Player-Kopf-Icons (Schliessen / Sleep-Timer / Geraet / Menue) jetzt als Glas-Kreise — konsistent zur Playlist-Ansicht (Back/Glocke)
+
 ## v1.5 — iOS-26-Look ab Werk
 - Liquid Glass ist jetzt standardmaessig AN (auf iOS 26) — die App sieht ab Werk nach iOS 26 aus (per Einstellung abschaltbar)
 - Such- + Filterfelder (Suche, Bibliothek, Radio) durchgaengig im Glass-Look mit adaptivem Text
