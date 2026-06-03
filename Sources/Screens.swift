@@ -326,13 +326,14 @@ struct YTMatchSheet: View {
                     Text(c.isSong ? "Song" : "Video").font(.system(size: 10)).foregroundStyle(Theme.sub)
                         .padding(.horizontal, 5).padding(.vertical, 1).background(Theme.input).clipShape(Capsule())
                 }
-                Text(c.artistsLine + (c.duration != nil ? " · " + fmt(Double(c.duration!)) : ""))
+                Text(c.artistsLine + (c.duration != nil ? " · " + durStr(c.duration!) : ""))
                     .font(.system(size: 12)).foregroundStyle(Theme.sub).lineLimit(1)
             }
             Spacer()
         }.padding(.vertical, 8).padding(.horizontal).contentShape(Rectangle())
     }
 
+    private func durStr(_ s: Int) -> String { String(format: "%d:%02d", s / 60, s % 60) }
     private func scheduleSearch() {
         searchTask?.cancel()
         let q = query.trimmingCharacters(in: .whitespaces)
