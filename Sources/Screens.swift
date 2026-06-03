@@ -980,6 +980,7 @@ struct SearchView: View {
     @AppStorage("recentSearches") private var recentRaw = ""
     @AppStorage("recentSearchItems") private var recentItemsRaw = ""
     @FocusState private var searchFocused: Bool
+    @Environment(\.liquidGlass) private var glass
 
     private var recentItems: [RecentSearchItem] {
         (try? JSONDecoder().decode([RecentSearchItem].self, from: Data(recentItemsRaw.utf8))) ?? []
@@ -1015,20 +1016,20 @@ struct SearchView: View {
         NavigationStack {
             VStack(spacing: 12) {
                 HStack(spacing: 10) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(.black).font(.system(size: 18, weight: .semibold))
-                    TextField("", text: $query, prompt: Text("Songs, Künstler suchen…").foregroundColor(Color.black.opacity(0.55)))
-                        .foregroundStyle(.black).tint(.black)
+                    Image(systemName: "magnifyingglass").foregroundStyle(glass ? Theme.text : .black).font(.system(size: 18, weight: .semibold))
+                    TextField("", text: $query, prompt: Text("Songs, Künstler suchen…").foregroundColor(glass ? Theme.sub : Color.black.opacity(0.55)))
+                        .foregroundStyle(glass ? Theme.text : .black).tint(glass ? Theme.accent : .black)
                         .autocorrectionDisabled().textInputAutocapitalization(.never)
                         .submitLabel(.search)
                         .focused($searchFocused)
                         .onSubmit { runSearch(); saveRecent() }
                         .onChange(of: query) { _ in debounceSearch() }
                     if !query.isEmpty {
-                        Button { query = ""; res = nil } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.black.opacity(0.5)) }
+                        Button { query = ""; res = nil } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(glass ? Theme.sub : .black.opacity(0.5)) }
                     }
                 }
                 .padding(.horizontal, 14).padding(.vertical, 13)
-                .background(Color.white).clipShape(RoundedRectangle(cornerRadius: 10))
+                .glassSurface(glass, shape: RoundedRectangle(cornerRadius: 10), fallback: .white)
                 .padding(.horizontal)
 
                 ScrollView(.horizontal, showsIndicators: false) {

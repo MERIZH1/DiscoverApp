@@ -26,7 +26,9 @@ final class AppState: ObservableObject {
     @Published var allProfiles: [Profile] = []   // fuer "An Nutzer senden"
 
     /// Liquid-Glass-Design (iOS 26) — nur in der App umschaltbar.
-    @Published var liquidGlass: Bool = UserDefaults.standard.bool(forKey: "liquidGlass") {
+    /// Standard: AN (wenn nie gesetzt) -> die App sieht ab Werk nach iOS 26 aus.
+    /// Auf iOS < 26 faellt jede Glass-Flaeche eh automatisch auf solide Farbe zurueck.
+    @Published var liquidGlass: Bool = (UserDefaults.standard.object(forKey: "liquidGlass") as? Bool) ?? true {
         didSet { UserDefaults.standard.set(liquidGlass, forKey: "liquidGlass") }
     }
 
