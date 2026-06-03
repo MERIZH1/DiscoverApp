@@ -964,6 +964,11 @@ struct AccountAction: View {
 }
 
 // MARK: - Suche
+struct RecentSearchItem: Codable, Identifiable {
+    let uri: String; let name: String; let image: String; let sub: String
+    var id: String { uri }
+}
+
 struct SearchView: View {
     @EnvironmentObject var app: AppState
     @EnvironmentObject var player: PlayerController
@@ -973,6 +978,26 @@ struct SearchView: View {
     @State private var busy = false
     @State private var debounce: Task<Void, Never>?
     @AppStorage("recentSearches") private var recentRaw = ""
+    @AppStorage("recentSearchItems") private var recentItemsRaw = ""
+    @FocusState private var searchFocused: Bool
+
+    private var recentItems: [RecentSearchItem] {
+        (try? JSONDecoder().decode([RecentSearchItem].self, from: Data(recentItemsRaw.utf8))) ?? []
+    }
+    private func pushRecentItem(_ it: RecentSearchItem) {
+        guard !it.uri.isEmpty, !it.name.isEmpty else { return }
+        var list = recentItems.filter { $0.uri != it.uri }
+        list.insert(it, at: 0)
+        list = Array(list.prefix(12))
+        if let d = try? JSONEncoder().encode(list) { recentItemsRaw = String(decoding: d, as: UTF8.self) }
+    }
+    private func cardSub(_ uri: String) -> String {
+        if uri.contains(":album:") { return "Album" }
+        if uri.contains(":playlist:") { return "Playlist" }
+        if uri.contains(":artist:") { return "Künstler" }
+        if uri.contains(":show:") { return "Podcast" }
+        return ""
+    }
 
     private var recentList: [String] { recentRaw.split(separator: "\n").map(String.init) }
     private func saveRecent() {
@@ -995,6 +1020,7 @@ struct SearchView: View {
                         .foregroundStyle(.black).tint(.black)
                         .autocorrectionDisabled().textInputAutocapitalization(.never)
                         .submitLabel(.search)
+                        .focused($searchFocused)
                         .onSubmit { runSearch(); saveRecent() }
                         .onChange(of: query) { _ in debounceSearch() }
                     if !query.isEmpty {
@@ -1025,6 +1051,7 @@ struct SearchView: View {
                                 SectionHeader("Songs")
                                 ForEach(Array(tracks.prefix(scope == "tracks" ? 50 : 6).enumerated()), id: \.offset) { i, t in
                                     TrackRow(track: t, playing: player.current?.id == t.id) {
+                                        pushRecentItem(RecentSearchItem(uri: t.uri, name: t.name, image: t.image ?? "", sub: t.artist))
                                         player.play(tracks: tracks, startAt: i, contextName: "Suche", contextURI: "")
                                     }
                                 }
@@ -1042,23 +1069,26 @@ struct SearchView: View {
                                 SectionHeader("Podcasts"); CardRows(cards: shs, isAlbum: false)
                             }
                         }.padding(.bottom, 130).padding(.top, 4)
-                    } else if !recentList.isEmpty {
+                    } else if !recentItems.isEmpty {
                         LazyVStack(alignment: .leading, spacing: 0) {
                             HStack {
-                                Text("Letzte Suchen").font(.title3.bold()).foregroundStyle(Theme.text)
+                                Text("Letzte Suchanfragen").font(.title3.bold()).foregroundStyle(Theme.text)
                                 Spacer()
-                                Button("Löschen") { recentRaw = "" }.font(.system(size: 14)).foregroundStyle(Theme.sub)
+                                Button("Löschen") { recentItemsRaw = "" }.font(.system(size: 14)).foregroundStyle(Theme.sub)
                             }.padding(.horizontal).padding(.top, 8).padding(.bottom, 4)
-                            ForEach(recentList, id: \.self) { q in
-                                Button { query = q; runSearch() } label: {
+                            ForEach(recentItems) { it in
+                                Button { query = it.name; runSearch() } label: {
                                     HStack(spacing: 12) {
-                                        Image(systemName: "clock.arrow.circlepath").foregroundStyle(Theme.sub).frame(width: 28)
-                                        Text(q).font(.system(size: 16)).foregroundStyle(Theme.text).lineLimit(1)
-                                        Spacer()
-                                        Button { removeRecent(q) } label: {
-                                            Image(systemName: "xmark").font(.system(size: 13)).foregroundStyle(Theme.mute).frame(width: 30, height: 30)
+                                        Artwork(url: it.image, size: 48, corner: 4)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(it.name).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
+                                            if !it.sub.isEmpty {
+                                                Text(it.sub).font(.system(size: 13)).foregroundStyle(Theme.sub).lineLimit(1)
+                                            }
                                         }
-                                    }.padding(.vertical, 8).padding(.horizontal).contentShape(Rectangle())
+                                        Spacer()
+                                        Image(systemName: "arrow.up.backward").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.mute).frame(width: 30, height: 30)
+                                    }.padding(.vertical, 6).padding(.horizontal).contentShape(Rectangle())
                                 }.buttonStyle(.plain)
                             }
                         }.padding(.top, 6)
@@ -1078,14 +1108,26 @@ struct SearchView: View {
             .padding(.top, 6)
             .background(Theme.bg)
             .navigationTitle("Suchen")
-            .navigationDestination(for: Card.self) { c in
-                if c.uri.contains(":show:") {
-                    PodcastView(uri: c.uri, title: c.name, image: c.image)
-                } else if c.uri.contains(":artist:") {
-                    ArtistView(uri: c.uri, name: c.name, image: c.image)
-                } else {
-                    TrackListView(uri: c.uri, title: c.name, image: c.image, isAlbum: c.uri.contains(":album:"))
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button { searchFocused = false } label: {
+                        Image(systemName: "keyboard.chevron.compact.down")
+                            .font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
+                    }
                 }
+            }
+            .navigationDestination(for: Card.self) { c in
+                Group {
+                    if c.uri.contains(":show:") {
+                        PodcastView(uri: c.uri, title: c.name, image: c.image)
+                    } else if c.uri.contains(":artist:") {
+                        ArtistView(uri: c.uri, name: c.name, image: c.image)
+                    } else {
+                        TrackListView(uri: c.uri, title: c.name, image: c.image, isAlbum: c.uri.contains(":album:"))
+                    }
+                }
+                .onAppear { pushRecentItem(RecentSearchItem(uri: c.uri, name: c.name, image: c.image ?? "", sub: cardSub(c.uri))) }
             }
         }
     }
@@ -2269,6 +2311,15 @@ struct RecRow: View {
     }
 }
 
+struct YTBadge: View {
+    var body: some View {
+        Text("YT")
+            .font(.system(size: 9, weight: .heavy)).foregroundStyle(.white)
+            .padding(.horizontal, 4).padding(.vertical, 1)
+            .background(Color(hex6: 0xFF0000)).clipShape(RoundedRectangle(cornerRadius: 3))
+    }
+}
+
 struct TrackRow: View {
     let track: Track; let playing: Bool; let tap: () -> Void
     @State private var showArtist = false
@@ -2280,8 +2331,11 @@ struct TrackRow: View {
         HStack(spacing: 12) {
             Artwork(url: track.image, size: 52, corner: 4)
             VStack(alignment: .leading, spacing: 2) {
-                Text(track.name).font(.system(size: 16))
-                    .foregroundStyle(playing ? Theme.accent : Theme.text).lineLimit(1)
+                HStack(spacing: 5) {
+                    Text(track.name).font(.system(size: 16))
+                        .foregroundStyle(playing ? Theme.accent : Theme.text).lineLimit(1)
+                    if track.uri.hasPrefix("yt:") { YTBadge() }
+                }
                 Text(track.artist).font(.system(size: 14)).foregroundStyle(Theme.sub).lineLimit(1)
             }
             Spacer()
@@ -2319,6 +2373,14 @@ struct NowPlayingBar: View {
         guard !player.isRadio, clock.duration > 0 else { return 0 }
         return min(1, max(0, clock.time / clock.duration))
     }
+    private var bufferLabel: String {
+        switch player.source {
+        case "youtube":   return "Lädt von YouTube…"
+        case "navidrome": return "Lädt aus Bibliothek…"
+        case "offline":   return "Lädt offline…"
+        default:          return "Lädt…"
+        }
+    }
     var body: some View {
         if player.hasContent {
             HStack(spacing: 12) {
@@ -2326,11 +2388,16 @@ struct NowPlayingBar: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(player.displayTitle).font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.text).lineLimit(1)
                     HStack(spacing: 5) {
-                        if !player.isRadio && !player.source.isEmpty {
-                            Circle().fill(player.source == "youtube" ? Color(hex6: 0xFF3B30) : Theme.accent)
-                                .frame(width: 6, height: 6)
+                        if player.loading && !player.isRadio {
+                            ProgressView().controlSize(.mini).tint(Theme.sub)
+                            Text(bufferLabel).font(.caption).foregroundStyle(Theme.sub).lineLimit(1)
+                        } else {
+                            if !player.isRadio && !player.source.isEmpty {
+                                Circle().fill(player.source == "youtube" ? Color(hex6: 0xFF3B30) : Theme.accent)
+                                    .frame(width: 6, height: 6)
+                            }
+                            Text(player.displayArtist).font(.caption).foregroundStyle(Theme.sub).lineLimit(1)
                         }
-                        Text(player.displayArtist).font(.caption).foregroundStyle(Theme.sub).lineLimit(1)
                     }
                 }
                 Spacer()
@@ -2498,10 +2565,10 @@ struct PlayerView: View {
                     }
                     HStack(spacing: 0) {
                         Button { scrollToLyrics = true } label: { Label("Songtext", systemImage: "quote.bubble").font(.system(size: 15, weight: .semibold)) }
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(maxWidth: .infinity)
                         AirPlayButton().frame(width: 28, height: 28)
                         Button { withAnimation { page = 1 } } label: { Label("Warteschlange", systemImage: "list.bullet").font(.system(size: 15, weight: .semibold)) }
-                            .frame(maxWidth: .infinity, alignment: .trailing)
+                            .frame(maxWidth: .infinity)
                     }.foregroundStyle(Theme.sub).padding(.top, 4).padding(.horizontal, 8)
                 } else {
                     HStack(spacing: 10) {

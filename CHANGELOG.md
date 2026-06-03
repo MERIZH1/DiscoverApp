@@ -3,6 +3,13 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.3 — Suche & Player-Politur
+- Suche: YouTube-Funde mit rotem "YT"-Badge gekennzeichnet
+- Suche: Pfeil zum Einklappen der Tastatur (wie in der PWA)
+- Suche: "Letzte Suchanfragen" jetzt mit Cover + Titel + Typ (wie auf der Webseite)
+- Player: "Songtext"-Button symmetrisch zur Mitte ausgerichtet (passend zu AirPlay + Warteschlange)
+- Mini-Player: beim Buffern zeigt er jetzt an, ob der Song von YouTube oder aus der Bibliothek laedt
+
 ## v1.2 — Radiosender hinzufuegen + EQ-Ruckler-Fix
 - Radio: + oben rechts -> Sender suchen & zu den Favoriten hinzufuegen (ging vorher gar nicht)
 - Fix: kurzer Ruckler/komischer Klang beim Songwechsel bei aktivem EQ — der Audio-Mix wird jetzt VOR dem Start gesetzt statt mitten rein
