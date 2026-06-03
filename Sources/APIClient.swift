@@ -249,6 +249,29 @@ final class APIClient: ObservableObject {
         return try JSONDecoder().decode(StreamURLResponse.self, from: d)
     }
 
+    // MARK: - YouTube-Match (Match fixen / andere Version)
+    func ytLookup(_ t: Track) async -> [YTCandidate] {
+        let body: [String: Any] = ["spotify_uri": t.uri, "name": t.name,
+                                   "artist": t.artist, "album": t.album ?? ""]
+        guard let d = try? await data("/api/yt/lookup", method: "POST", json: body),
+              let r = try? JSONDecoder().decode(YTCandidatesResponse.self, from: d) else { return [] }
+        return r.candidates ?? []
+    }
+    func ytSearch(_ query: String, uri: String?) async -> [YTCandidate] {
+        var path = "/api/yt/search?q=" + enc(query)
+        if let uri, !uri.isEmpty { path += "&spotify_uri=" + enc(uri) }
+        guard let d = try? await data(path),
+              let r = try? JSONDecoder().decode(YTSearchResponse.self, from: d) else { return [] }
+        return r.results ?? []
+    }
+    @discardableResult
+    func ytOverride(uri: String, videoId: String) async -> Bool {
+        let body: [String: Any] = ["spotify_uri": uri, "videoId": videoId]
+        guard let d = try? await data("/api/yt/override", method: "POST", json: body),
+              let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return false }
+        return (obj["ok"] as? Bool) ?? false
+    }
+
     func settings() async throws -> UserSettings {
         try await get("/api/me/settings")
     }

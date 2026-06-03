@@ -481,6 +481,14 @@ final class PlayerController: ObservableObject {
         guard queue.indices.contains(i) else { return }
         index = i; loadCurrent(autoplay: true)
     }
+    /// Aktuellen Track neu laden (z.B. nach YT-Match-Override) — Prebuffer/Fail-Cache
+    /// fuer diesen Track verwerfen, damit die neue Version frisch gestreamt wird.
+    func reloadCurrent() {
+        guard !isRadio, let uri = current?.uri else { return }
+        if let url = prebuf[uri] { try? FileManager.default.removeItem(at: url); prebuf[uri] = nil }
+        failedOffline.remove(uri)
+        loadCurrent(autoplay: true)
+    }
     /// Tap auf einen Eintrag in "Als Naechstes" (manuelle Queue + Rest).
     func playUpNext(_ offset: Int) {
         if offset < manualQueue.count {

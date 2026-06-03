@@ -178,6 +178,7 @@ struct TrackMenu: View {
     var onShowAlbum: (() -> Void)? = nil
     var onAddToPlaylist: (() -> Void)? = nil
     var onSendToUser: (() -> Void)? = nil
+    var onFixYTMatch: (() -> Void)? = nil
     // WICHTIG: NICHT beobachten (kein @EnvironmentObject), sonst zeichnet das
     // offene Menue bei jedem Player-Tick neu (Flackern). Referenz nur lesen.
     private var app: AppState? { DiscoverServices.app }
@@ -225,6 +226,9 @@ struct TrackMenu: View {
         if let onAlbum = onShowAlbum, track.album_uri != nil {
             Button { onAlbum() } label: { Label("Album anzeigen", systemImage: "square.stack") }
         }
+        if let onFix = onFixYTMatch {
+            Button { onFix() } label: { Label("YouTube-Match fixen", systemImage: "arrow.triangle.2.circlepath") }
+        }
         Button { startRadio() } label: { Label("Song-Radio starten", systemImage: "dot.radiowaves.left.and.right") }
     }
     private func copySpotify() {
@@ -245,6 +249,115 @@ struct TrackMenu: View {
                   let puri = r.playlist_uri,
                   let resp = try? await api.playlistTracks(puri) else { return }
             player.play(tracks: resp.tracks)
+        }
+    }
+}
+
+// MARK: - YouTube-Match fixen (andere Version waehlen)
+struct YTMatchSheet: View {
+    let track: Track
+    @EnvironmentObject var app: AppState
+    @EnvironmentObject var player: PlayerController
+    @Environment(\.dismiss) private var dismiss
+    @State private var cands: [YTCandidate] = []
+    @State private var query = ""
+    @State private var loading = true
+    @State private var busy = false
+    @State private var msg = ""
+    @State private var searchTask: Task<Void, Never>?
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 10) {
+                VStack(spacing: 2) {
+                    Text(track.name).font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.text).lineLimit(1)
+                    Text(track.artist).font(.system(size: 13)).foregroundStyle(Theme.sub).lineLimit(1)
+                }.padding(.top, 6)
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(Theme.sub)
+                    TextField("YouTube durchsuchen…", text: $query)
+                        .foregroundStyle(Theme.text).autocorrectionDisabled()
+                        .onChange(of: query) { _ in scheduleSearch() }
+                }.padding(10).background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8)).padding(.horizontal)
+
+                if loading {
+                    Spacer(); LoadingView(); Spacer()
+                } else if cands.isEmpty {
+                    Spacer(); Text("Keine Treffer").foregroundStyle(Theme.mute); Spacer()
+                } else {
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            ForEach(cands) { c in
+                                Button { setMatch(c) } label: { row(c) }.buttonStyle(.plain)
+                                Divider().background(Theme.input)
+                            }
+                        }
+                    }
+                }
+            }
+            .background(Theme.bg)
+            .navigationTitle("YouTube-Match fixen").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Fertig") { dismiss() }.foregroundStyle(Theme.accent) } }
+            .overlay(alignment: .bottom) {
+                if !msg.isEmpty {
+                    Text(msg).font(.system(size: 14, weight: .semibold)).foregroundStyle(.black)
+                        .padding(.horizontal, 18).padding(.vertical, 10)
+                        .background(Theme.accent).clipShape(Capsule()).padding(.bottom, 24)
+                }
+            }
+        }
+        .task {
+            query = track.name + " " + track.artist
+            cands = await app.api.ytLookup(track)
+            loading = false
+        }
+    }
+
+    @ViewBuilder private func row(_ c: YTCandidate) -> some View {
+        HStack(spacing: 10) {
+            Artwork(url: c.thumbURL, size: 48, corner: 4)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(c.title ?? "—").font(.system(size: 15)).foregroundStyle(Theme.text).lineLimit(1)
+                    if c.isrc_hit == true {
+                        Text("★ ISRC").font(.system(size: 10, weight: .bold)).foregroundStyle(.black)
+                            .padding(.horizontal, 5).padding(.vertical, 1).background(Theme.accent).clipShape(Capsule())
+                    }
+                    Text(c.isSong ? "Song" : "Video").font(.system(size: 10)).foregroundStyle(Theme.sub)
+                        .padding(.horizontal, 5).padding(.vertical, 1).background(Theme.input).clipShape(Capsule())
+                }
+                Text(c.artistsLine + (c.duration != nil ? " · " + fmt(Double(c.duration!)) : ""))
+                    .font(.system(size: 12)).foregroundStyle(Theme.sub).lineLimit(1)
+            }
+            Spacer()
+        }.padding(.vertical, 8).padding(.horizontal).contentShape(Rectangle())
+    }
+
+    private func scheduleSearch() {
+        searchTask?.cancel()
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return }
+        searchTask = Task {
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            if Task.isCancelled { return }
+            let res = await app.api.ytSearch(q, uri: track.uri)
+            if Task.isCancelled { return }
+            cands = res; loading = false
+        }
+    }
+    private func setMatch(_ c: YTCandidate) {
+        guard let vid = c.videoId, !busy else { return }
+        busy = true; Haptics.tap()
+        Task {
+            let ok = await app.api.ytOverride(uri: track.uri, videoId: vid)
+            busy = false
+            if ok {
+                if player.current?.uri == track.uri { player.reloadCurrent() }
+                dismiss()
+            } else {
+                msg = "Fehlgeschlagen"
+                try? await Task.sleep(nanoseconds: 1_500_000_000); msg = ""
+            }
         }
     }
 }
@@ -1052,6 +1165,7 @@ private struct TrackNavSheets: ViewModifier {
     @Binding var showAlbum: Bool
     @Binding var showAddPlaylist: Bool
     @Binding var showSendUser: Bool
+    @Binding var showFixYT: Bool
     func body(content: Content) -> some View {
         content
             .sheet(isPresented: $showArtist) {
@@ -1070,11 +1184,12 @@ private struct TrackNavSheets: ViewModifier {
             }
             .sheet(isPresented: $showAddPlaylist) { AddToPlaylistSheet(track: track) }
             .sheet(isPresented: $showSendUser) { SendToUserSheet(track: track) }
+            .sheet(isPresented: $showFixYT) { YTMatchSheet(track: track) }
     }
 }
 extension View {
-    func trackNavSheets(track: Track, showArtist: Binding<Bool>, showAlbum: Binding<Bool>, showAddPlaylist: Binding<Bool>, showSendUser: Binding<Bool>) -> some View {
-        modifier(TrackNavSheets(track: track, showArtist: showArtist, showAlbum: showAlbum, showAddPlaylist: showAddPlaylist, showSendUser: showSendUser))
+    func trackNavSheets(track: Track, showArtist: Binding<Bool>, showAlbum: Binding<Bool>, showAddPlaylist: Binding<Bool>, showSendUser: Binding<Bool>, showFixYT: Binding<Bool>) -> some View {
+        modifier(TrackNavSheets(track: track, showArtist: showArtist, showAlbum: showAlbum, showAddPlaylist: showAddPlaylist, showSendUser: showSendUser, showFixYT: showFixYT))
     }
 }
 
@@ -1972,6 +2087,7 @@ struct NumberedTrackRow: View {
     @State private var showAlbum = false
     @State private var showAddPlaylist = false
     @State private var showSendUser = false
+    @State private var showFixYT = false
     var body: some View {
         HStack(spacing: 12) {
             Text("\(n)").font(.system(size: 14).monospacedDigit()).foregroundStyle(playing ? Theme.accent : Theme.sub)
@@ -1987,7 +2103,7 @@ struct NumberedTrackRow: View {
                 Image(systemName: "checkmark").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.accent)
             }
             Menu {
-                TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true })
+                TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true })
             } label: {
                 Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
                     .frame(width: 46, height: 46).contentShape(Rectangle())
@@ -1996,8 +2112,8 @@ struct NumberedTrackRow: View {
             .background(playing ? Theme.accent.opacity(0.08) : .clear)
             .contentShape(Rectangle())
             .onTapGesture(perform: tap)
-            .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }) }
-            .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum, showAddPlaylist: $showAddPlaylist, showSendUser: $showSendUser)
+            .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }) }
+            .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum, showAddPlaylist: $showAddPlaylist, showSendUser: $showSendUser, showFixYT: $showFixYT)
     }
 }
 
@@ -2028,6 +2144,7 @@ struct TrackRow: View {
     @State private var showAlbum = false
     @State private var showAddPlaylist = false
     @State private var showSendUser = false
+    @State private var showFixYT = false
     var body: some View {
         HStack(spacing: 12) {
             Artwork(url: track.image, size: 52, corner: 4)
@@ -2041,7 +2158,7 @@ struct TrackRow: View {
                 Image(systemName: "arrow.down.circle.fill").font(.system(size: 15)).foregroundStyle(Theme.accent.opacity(0.7))
             }
             Menu {
-                TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true })
+                TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true })
             } label: {
                 Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
                     .frame(width: 46, height: 46).contentShape(Rectangle())
@@ -2049,8 +2166,8 @@ struct TrackRow: View {
         }.padding(.vertical, 9).padding(.horizontal)
             .contentShape(Rectangle())
             .onTapGesture(perform: tap)
-            .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }) }
-            .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum, showAddPlaylist: $showAddPlaylist, showSendUser: $showSendUser)
+            .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }) }
+            .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum, showAddPlaylist: $showAddPlaylist, showSendUser: $showSendUser, showFixYT: $showFixYT)
     }
 }
 
@@ -2125,6 +2242,7 @@ struct PlayerView: View {
     @State private var showArtist = false
     @State private var showAlbum = false
     @State private var showSendUser = false
+    @State private var showFixYT = false
 
     var body: some View {
         let p = player
@@ -2161,7 +2279,7 @@ struct PlayerView: View {
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle((p.sleepRemaining > 0 || p.sleepAtEnd) ? Theme.accent : Theme.text)
                     }.padding(.trailing, 14)
-                    Menu { if let t = p.current { TrackMenu(track: t, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }) } } label: {
+                    Menu { if let t = p.current { TrackMenu(track: t, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }) } } label: {
                         Image(systemName: "ellipsis").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
                     }.disabled(p.current == nil)
                 }.padding(.horizontal, 4).padding(.top, 8)
@@ -2276,6 +2394,7 @@ struct PlayerView: View {
         .presentationDragIndicator(.hidden)
         .sheet(isPresented: $showAddPlaylist) { if let t = player.current { AddToPlaylistSheet(track: t) } }
         .sheet(isPresented: $showSendUser) { if let t = player.current { SendToUserSheet(track: t) } }
+        .sheet(isPresented: $showFixYT) { if let t = player.current { YTMatchSheet(track: t) } }
         .sheet(isPresented: $showArtist) {
             if let t = player.current, let u = t.artists?.first?.uri {
                 NavigationStack { ArtistView(uri: u, name: t.artists?.first?.name ?? t.artist, image: t.image) }

@@ -123,6 +123,25 @@ struct Track: Codable, Identifiable, Hashable {
         self.deezer_link = nil
     }
 }
+
+// MARK: - YouTube-Match (Match fixen / andere Version)
+struct YTThumb: Codable { let url: String? }
+struct YTCandidate: Codable, Identifiable {
+    let videoId: String?
+    let title: String?
+    let artists: [String]?
+    let duration: Int?
+    let thumbnails: [YTThumb]?
+    let resultType: String?
+    let isrc_hit: Bool?
+    var id: String { videoId ?? UUID().uuidString }
+    var thumbURL: String? { thumbnails?.first?.url }
+    var artistsLine: String { (artists ?? []).joined(separator: ", ") }
+    var isSong: Bool { resultType == "song" }
+}
+struct YTCandidatesResponse: Codable { let candidates: [YTCandidate]? }
+struct YTSearchResponse: Codable { let results: [YTCandidate]? }
+
 struct PlaylistTracksResponse: Codable {
     let name: String?
     let tracks: [Track]
