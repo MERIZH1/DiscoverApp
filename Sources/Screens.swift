@@ -1576,6 +1576,8 @@ struct RadioView: View {
     @EnvironmentObject var app: AppState
     @EnvironmentObject var player: PlayerController
     @State private var stations: [RadioStation] = []
+    @State private var loaded = false
+    @State private var showSearch = false
 
     var body: some View {
         NavigationStack {
@@ -1587,12 +1589,98 @@ struct RadioView: View {
                         Button { player.playRadio(st) } label: { RadioRow(station: st) }.buttonStyle(.plain)
                     }
                 }.padding(.top, 10).padding(.bottom, 130)
+                if loaded && stations.isEmpty {
+                    VStack(spacing: 8) {
+                        Image(systemName: "antenna.radiowaves.left.and.right").font(.system(size: 34)).foregroundStyle(Theme.sub)
+                        Text("Noch keine Sender. Tippe auf + um welche hinzuzufügen.")
+                            .font(.system(size: 14)).foregroundStyle(Theme.sub).multilineTextAlignment(.center)
+                    }.frame(maxWidth: .infinity).padding(.top, 60).padding(.horizontal, 30)
+                }
             }
             .scrollContentBackground(.hidden).background(Theme.bg)
             .navigationTitle("").navigationBarTitleDisplayMode(.inline)
-            .overlay { if stations.isEmpty { LoadingView() } }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showSearch = true } label: {
+                        Image(systemName: "plus").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
+                    }
+                }
+            }
+            .overlay { if !loaded { LoadingView() } }
         }
-        .task { if stations.isEmpty { stations = (try? await app.api.radioFavorites()) ?? [] } }
+        .sheet(isPresented: $showSearch) { RadioSearchSheet(onAdded: { await reload() }).environmentObject(app) }
+        .task { if !loaded { await reload() } }
+    }
+    private func reload() async {
+        stations = (try? await app.api.radioFavorites()) ?? []
+        loaded = true
+    }
+}
+
+// MARK: - Radiosender suchen + hinzufuegen
+struct RadioSearchSheet: View {
+    @EnvironmentObject var app: AppState
+    @Environment(\.dismiss) private var dismiss
+    var onAdded: () async -> Void
+    @State private var query = ""
+    @State private var results: [RadioStation] = []
+    @State private var searching = false
+    @State private var added: Set<String> = []
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(Theme.sub)
+                    TextField("Sender suchen (z.B. SWR3, 1Live)", text: $query)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                        .foregroundStyle(Theme.text)
+                        .onSubmit { Task { await run() } }
+                    if !query.isEmpty {
+                        Button { query = ""; results = [] } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.sub) }
+                    }
+                }
+                .padding(10).background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 10)).padding()
+                List {
+                    if searching {
+                        HStack { Spacer(); ProgressView().tint(Theme.accent); Spacer() }.listRowBackground(Color.clear)
+                    }
+                    ForEach(results) { st in
+                        HStack(spacing: 12) {
+                            Artwork(url: st.favicon, size: 40, corner: 6)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(st.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
+                                if let c = st.country, !c.isEmpty {
+                                    Text(c).font(.system(size: 12)).foregroundStyle(Theme.sub)
+                                }
+                            }
+                            Spacer()
+                            Button {
+                                Task {
+                                    if await app.api.addRadioFavorite(st) {
+                                        added.insert(st.id); Haptics.tap(); await onAdded()
+                                    }
+                                }
+                            } label: {
+                                Image(systemName: added.contains(st.id) ? "checkmark.circle.fill" : "plus.circle")
+                                    .font(.system(size: 24)).foregroundStyle(added.contains(st.id) ? Theme.accent : Theme.text)
+                            }.buttonStyle(.plain).disabled(added.contains(st.id))
+                        }.listRowBackground(Color.clear)
+                    }
+                }
+                .listStyle(.plain).scrollContentBackground(.hidden)
+            }
+            .background(Theme.bg.ignoresSafeArea())
+            .navigationTitle("Sender hinzufügen").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Fertig") { dismiss() } } }
+        }
+    }
+    private func run() async {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return }
+        searching = true
+        results = await app.api.radioSearch(q)
+        searching = false
     }
 }
 

@@ -242,6 +242,20 @@ final class APIClient: ObservableObject {
         let r: RadioFavoritesResponse = try await get("/api/radio-livestream/favorites")
         return r.items
     }
+    /// Radiosender suchen (radio-browser.info).
+    func radioSearch(_ q: String) async -> [RadioStation] {
+        guard let d = try? await data("/api/radio-livestream/search?q=\(enc(q))"),
+              let r = try? JSONDecoder().decode(RadioFavoritesResponse.self, from: d) else { return [] }
+        return r.items
+    }
+    /// Sender zu den Favoriten hinzufuegen.
+    func addRadioFavorite(_ st: RadioStation) async -> Bool {
+        let body: [String: Any] = ["id": st.id, "name": st.name, "url": st.url,
+                                   "favicon": st.favicon ?? "", "country": st.country ?? ""]
+        guard let d = try? await data("/api/radio-livestream/favorites", method: "POST", json: body),
+              let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return false }
+        return (obj["ok"] as? Bool) ?? false
+    }
 
     /// Liefert die spielbare (server-relative) URL fuer einen Track.
     func streamURL(for track: Track) async throws -> StreamURLResponse {

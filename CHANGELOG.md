@@ -3,6 +3,10 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.2 — Radiosender hinzufuegen + EQ-Ruckler-Fix
+- Radio: + oben rechts -> Sender suchen & zu den Favoriten hinzufuegen (ging vorher gar nicht)
+- Fix: kurzer Ruckler/komischer Klang beim Songwechsel bei aktivem EQ — der Audio-Mix wird jetzt VOR dem Start gesetzt statt mitten rein
+
 ## v1.1 — Wiedergabe-Geraet wechseln + Playlist-Cleanup
 - Wiedergabe-Geraet wechseln (Connect-Style): im Player aufs Lautsprecher-Symbol tippen -> ein anderes Geraet uebernimmt Song + Warteschlange an der aktuellen Position
 - Songs aus Playlists entfernen — im Song-Menue, fuer eigene Spotify-Playlists + YouTube-Funde

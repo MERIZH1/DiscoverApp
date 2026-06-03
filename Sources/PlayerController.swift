@@ -414,10 +414,23 @@ final class PlayerController: ObservableObject {
     }
 
     // MARK: - Equalizer
-    private func applyEQ(to item: AVPlayerItem) {
+    private func applyEQ(to item: AVPlayerItem, thenResume: Bool = false) {
         let preset = eqPreset
-        guard !preset.isFlat else { return }
-        Task { item.audioMix = await makeEQAudioMix(for: item, preset: preset) }
+        if preset.isFlat {
+            item.audioMix = nil
+            if thenResume { resume() }
+            return
+        }
+        // Mix VOR dem Start setzen, sonst spielt der Song kurz "dry" und der
+        // EQ-Tap kickt erst mitten rein -> Ruckler/komischer Klang beim
+        // Songwechsel (am deutlichsten bei Bass-Boost).
+        Task {
+            let mix = await makeEQAudioMix(for: item, preset: preset)
+            await MainActor.run {
+                item.audioMix = mix
+                if thenResume { resume() }
+            }
+        }
     }
     private func applyEQToCurrent() {
         guard let item = player.currentItem else { return }
@@ -587,8 +600,7 @@ final class PlayerController: ObservableObject {
             let item = AVPlayerItem(url: local)
             attachItemObservers(item)
             player.replaceCurrentItem(with: item)
-            applyEQ(to: item)
-            if autoplay { resume() }
+            applyEQ(to: item, thenResume: autoplay)
             loading = false
             Task { await api.postHistory(track, contextName: ctxName, contextURI: ctxURI) }
             prefetchUpcoming()
@@ -600,8 +612,7 @@ final class PlayerController: ObservableObject {
             let item = AVPlayerItem(url: pre)
             attachItemObservers(item)
             player.replaceCurrentItem(with: item)
-            applyEQ(to: item)
-            if autoplay { resume() }
+            applyEQ(to: item, thenResume: autoplay)
             loading = false
             Task { await api.postHistory(track, contextName: ctxName, contextURI: ctxURI) }
             prefetchUpcoming()
@@ -620,8 +631,7 @@ final class PlayerController: ObservableObject {
                 let item = AVPlayerItem(url: url)
                 attachItemObservers(item)
                 player.replaceCurrentItem(with: item)
-                applyEQ(to: item)
-                if autoplay { resume() }
+                applyEQ(to: item, thenResume: autoplay)
                 loading = false
                 prefetchUpcoming()
             } catch { loading = false }
