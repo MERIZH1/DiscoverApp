@@ -6,6 +6,9 @@ Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 ## v1.8 — Spotify-Link in der Suche
 - Spotify-Link (Track / Playlist / Album / Künstler) in die Suche einfuegen -> Track spielt direkt, der Rest oeffnet sich in der jeweiligen Ansicht (genau wie der YouTube-Link-Import)
 
+## v1.9 — Playlists loeschen
+- Playlists koennen jetzt geloescht werden: Playlist-Ansicht → ⋯-Menue → „Playlist loeschen" (mit Rueckfrage). Wie auf Webseite/PWA. Laeuft serverseitig ueber spclient, am gedrosselten Spotify-Web-API vorbei.
+
 ## v1.7 — Ein Player statt zwei (Connect)
 - Wenn auf einem anderen Geraet gespielt wird, zeigt jetzt EIN Mini-Player das aktive Geraet — kein zweiter Banner mehr obendrauf
 - Connect-Symbol im Mini-Player -> Geraet wechseln (wie Spotify Connect); Play/Pause steuert das aktive Geraet

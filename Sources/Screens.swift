@@ -1551,6 +1551,9 @@ struct LibraryView: View {
         .task(id: tab) {
             if tab == "history" { history = (try? await app.api.history()) ?? [] }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .init("discoverPlaylistsChanged"))) { _ in
+            Task { await load() }
+        }
     }
     private func load() async {
         // Cache sofort (Playlists + Abos) -> Sortierung gleich korrekt, kein Hochschnellen
@@ -1870,6 +1873,7 @@ struct TrackListView: View {
     @State private var isSubscribed = false
     @State private var addedRecs: Set<String> = []
     @State private var copyMsg = ""
+    @State private var showDeleteConfirm = false
 
     private func copyAsOwn() {
         guard !tracks.isEmpty else { return }
@@ -1879,6 +1883,24 @@ struct TrackListView: View {
             copyMsg = res != nil ? "Kopiert ✓ (\(res!.count) Songs)" : "Fehler beim Kopieren"
             try? await Task.sleep(nanoseconds: 2_000_000_000)
             copyMsg = ""
+        }
+    }
+
+    private func deletePlaylist() {
+        Task {
+            let ok = await app.api.deletePlaylist(uri: uri)
+            await MainActor.run {
+                if ok {
+                    NotificationCenter.default.post(name: .init("discoverPlaylistsChanged"), object: nil)
+                    dismiss()
+                } else {
+                    copyMsg = "Löschen fehlgeschlagen"
+                }
+            }
+            if !ok {
+                try? await Task.sleep(nanoseconds: 1_600_000_000)
+                await MainActor.run { copyMsg = "" }
+            }
         }
     }
 
@@ -1981,6 +2003,11 @@ struct TrackListView: View {
                                 }
                                 Button { copyAsOwn() } label: {
                                     Label("Als eigene Playlist kopieren", systemImage: "plus.square.on.square")
+                                }
+                                if uri.hasPrefix("spotify:playlist:") {
+                                    Button(role: .destructive) { showDeleteConfirm = true } label: {
+                                        Label("Playlist löschen", systemImage: "trash")
+                                    }
                                 }
                             }
                         } label: {
@@ -2089,6 +2116,10 @@ struct TrackListView: View {
                     .background(Theme.accent).clipShape(Capsule()).padding(.bottom, 150)
             }
         }
+        .confirmationDialog("Playlist löschen?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+            Button("Löschen", role: .destructive) { deletePlaylist() }
+            Button("Abbrechen", role: .cancel) {}
+        } message: { Text("„\(title)“ wird aus deiner Bibliothek entfernt.") }
         .task(id: reload) {
             loading = true; tracks = []
             if !isAlbum { isSubscribed = (try? await app.api.subscriptions())?.contains { $0.uri == uri } ?? false }
