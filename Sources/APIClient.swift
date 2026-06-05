@@ -336,6 +336,14 @@ final class APIClient: ObservableObject {
         return (obj["ok"] as? Bool) ?? false
     }
 
+    /// Playlist-Link importieren. Spotify -> der Bibliothek folgen,
+    /// YouTube/YT-Music -> als eigene lokale Playlist ablegen.
+    func importPlaylist(url: String) async -> ImportResult? {
+        let body: [String: Any] = ["url": url]
+        guard let d = try? await data("/api/playlist/import", method: "POST", json: body) else { return nil }
+        return try? JSONDecoder().decode(ImportResult.self, from: d)
+    }
+
     /// Track aus einer Playlist entfernen. Spotify-Playlist -> /api/remove-track,
     /// YouTube-Funde (yt:finds) -> /api/yt/finds/remove.
     func removeFromPlaylist(playlistUri: String, trackUri: String) async -> Bool {

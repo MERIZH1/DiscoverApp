@@ -3,6 +3,10 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.0 — Playlist-Link-Import
+- Playlist-Link in die Suche einfuegen + Enter -> wird importiert: Spotify-Playlist folgt deiner Bibliothek, YouTube/YT-Music-Playlist wird als eigene lokale Playlist abgelegt (Name = Quell-Playlist). Funktioniert auch fuer grosse Playlists.
+- Einzelne YouTube-Songs landen weiterhin in „YouTube-Funde"
+
 ## v1.8 — Spotify-Link in der Suche
 - Spotify-Link (Track / Playlist / Album / Künstler) in die Suche einfuegen -> Track spielt direkt, der Rest oeffnet sich in der jeweiligen Ansicht (genau wie der YouTube-Link-Import)
 

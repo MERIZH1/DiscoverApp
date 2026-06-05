@@ -37,6 +37,15 @@ struct SpotifyResolve: Codable {
     let image: String?
 }
 
+// Ergebnis vom Playlist-Link-Import (/api/playlist/import)
+struct ImportResult: Codable {
+    let ok: Bool
+    let uri: String?
+    let name: String?
+    let count: Int?
+    let kind: String?   // "spotify" | "yt"
+}
+
 struct HomeItem: Codable, Identifiable, Hashable {
     var id: String { uri }
     let uri: String

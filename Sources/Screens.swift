@@ -1139,6 +1139,7 @@ struct SearchView: View {
     private func runSearch() {
         let q = query.trimmingCharacters(in: .whitespaces)
         guard !q.isEmpty else { return }
+        if isPlaylistLink(q) { importPlaylist(q); return }
         if isYouTubeURL(q) { addYTFind(q); return }
         if isSpotifyURL(q) { handleSpotifyLink(q); return }
         busy = true
@@ -1180,11 +1181,33 @@ struct SearchView: View {
             }
         }
     }
+    /// Playlist-Link? (Spotify-Playlist oder YouTube/YT-Music-Playlist mit list=)
+    private func isPlaylistLink(_ s: String) -> Bool {
+        let l = s.lowercased()
+        if l.contains("open.spotify.com/") && l.contains("/playlist/") { return true }
+        if l.hasPrefix("spotify:playlist:") { return true }
+        if (l.contains("youtube.com") || l.contains("youtu.be")) && l.contains("list=") && !l.contains("watch?v=") { return true }
+        return false
+    }
+    /// Playlist-Link importieren: Spotify -> der Bibliothek folgen,
+    /// YouTube/YT-Music -> als eigene lokale Playlist. Danach oeffnen + Bibliothek refreshen.
+    private func importPlaylist(_ url: String) {
+        busy = true
+        Task {
+            let r = await app.api.importPlaylist(url: url)
+            busy = false
+            guard let r, r.ok, let uri = r.uri else { return }
+            query = ""
+            NotificationCenter.default.post(name: .init("discoverPlaylistsChanged"), object: nil)
+            navPath.append(Card(uri: uri, name: r.name ?? "", image: nil, artist: nil, owner: nil, desc: nil))
+        }
+    }
     /// Tippen -> nach kurzer Pause automatisch suchen (wie PWA).
     private func debounceSearch() {
         debounce?.cancel()
         let q = query.trimmingCharacters(in: .whitespaces)
         if q.isEmpty { res = nil; busy = false; return }
+        if isPlaylistLink(q) { return }   // Import nur bei explizitem Absenden (Enter)
         if isYouTubeURL(q) { addYTFind(q); return }
         if isSpotifyURL(q) { handleSpotifyLink(q); return }
         debounce = Task {
@@ -2004,7 +2027,7 @@ struct TrackListView: View {
                                 Button { copyAsOwn() } label: {
                                     Label("Als eigene Playlist kopieren", systemImage: "plus.square.on.square")
                                 }
-                                if uri.hasPrefix("spotify:playlist:") {
+                                if uri.hasPrefix("spotify:playlist:") || uri.hasPrefix("ytpl:") {
                                     Button(role: .destructive) { showDeleteConfirm = true } label: {
                                         Label("Playlist löschen", systemImage: "trash")
                                     }
