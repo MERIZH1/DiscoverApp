@@ -72,6 +72,8 @@ final class PlayerController: ObservableObject {
     private let metaReader = ICYMetadataReader()
     private var primedNotLoaded = false   // letzter Song wiederhergestellt, aber noch nicht gestreamt
     private var failedOffline: Set<String> = []   // Offline-Dateien, die diese Session nicht liefen -> streamen
+    private var streamRetried: Set<String> = []   // gestreamte Tracks, die nach Fehler schon 1x frisch geladen wurden
+    private var wantPlay = false                   // Absicht zu spielen -> beim readyToPlay durchsetzen (gegen 2x-play)
     var profileScope = ""                 // fuer profil-spezifische Persistenz
     weak var downloads: DownloadManager?  // Offline-Wiedergabe
     @Published var sleepRemaining = 0     // Sekunden, 0 = aus
@@ -187,11 +189,12 @@ final class PlayerController: ObservableObject {
     }
     func resume() {
         if primedNotLoaded && !isRadio { loadCurrent(autoplay: true); return }
+        wantPlay = true
         player.play()
         if !isRadio && playbackRate != 1.0 { player.rate = Float(playbackRate) }
         isPlaying = true; updateRate()
     }
-    func pause() { player.pause(); isPlaying = false; updateRate() }
+    func pause() { wantPlay = false; player.pause(); isPlaying = false; updateRate() }
 
     /// Gesamten Player wiederherstellen (ganze Queue, Mini-Player sofort da).
     func restoreLast() {
@@ -588,6 +591,7 @@ final class PlayerController: ObservableObject {
         guard let track = current else { return }
         if crossfading { abortCrossfade() }
         primedNotLoaded = false
+        if autoplay { wantPlay = true }
         persistSnapshot()
         updateRemoteForContent()
         loading = true; currentTime = 0; duration = track.durationSec; source = ""
@@ -675,13 +679,24 @@ final class PlayerController: ObservableObject {
                 if it.status == .readyToPlay {
                     let d = CMTimeGetSeconds(it.duration)
                     if d.isFinite, d > 0 { self.duration = d }
+                    if let t = self.current { self.streamRetried.remove(t.uri) }
+                    // Wiedergabe durchsetzen, falls play() vor readyToPlay kam (sonst 2x play noetig)
+                    if self.wantPlay {
+                        self.player.play()
+                        if !self.isRadio && self.playbackRate != 1.0 { self.player.rate = Float(self.playbackRate) }
+                        self.isPlaying = true; self.updateRate()
+                    }
                 } else if it.status == .failed {
-                    // Offline-Datei spielt gerade nicht -> NUR diese Session streamen.
-                    // Datei NICHT loeschen (bleibt in der Offline-Bibliothek).
                     if self.source == "offline", let t = self.current {
+                        // Offline-Datei spielt gerade nicht -> NUR diese Session streamen.
+                        // Datei NICHT loeschen (bleibt in der Offline-Bibliothek).
                         self.failedOffline.insert(t.uri)
                         self.source = ""
                         self.loadCurrent(autoplay: true)
+                    } else if let t = self.current, !self.streamRetried.contains(t.uri) {
+                        // Gestreamter Track (z.B. abgelaufene YouTube-URL) -> einmal frische URL holen
+                        self.streamRetried.insert(t.uri)
+                        self.loadCurrent(autoplay: self.wantPlay)
                     }
                 }
             }

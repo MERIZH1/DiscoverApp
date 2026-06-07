@@ -3,6 +3,10 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.1 — YouTube-Wiedergabe robuster
+- YT-Songs blieben morgens bei 0:00 haengen (abgelaufene Stream-URL) -> die App holt jetzt automatisch eine frische URL und spielt weiter
+- Play musste manchmal 2x gedrueckt werden -> Wiedergabe startet jetzt zuverlaessig beim ersten Druck
+
 ## v2.0 — Playlist-Link-Import
 - Playlist-Link in die Suche einfuegen + Enter -> wird importiert: Spotify-Playlist folgt deiner Bibliothek, YouTube/YT-Music-Playlist wird als eigene lokale Playlist abgelegt (Name = Quell-Playlist). Funktioniert auch fuer grosse Playlists.
 - Einzelne YouTube-Songs landen weiterhin in „YouTube-Funde"
