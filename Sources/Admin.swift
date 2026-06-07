@@ -87,7 +87,7 @@ struct AdminConsoleView: View {
                             }.foregroundStyle(Theme.text).padding(.vertical, 11).padding(.horizontal, 14)
                                 .background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 10))
                         }
-                        Text("Bei Haengern hilft meist „Discover neustarten". „Caches leeren" erzwingt frische Daten.")
+                        Text("Bei Haengern hilft meist Discover neustarten. Caches leeren erzwingt frische Daten.")
                             .font(.caption2).foregroundStyle(Theme.mute)
                     }
 
