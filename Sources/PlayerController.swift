@@ -66,6 +66,7 @@ final class PlayerController: ObservableObject {
     @Published var repeatMode: RepeatMode = .off
     @Published private(set) var isRadio = false
     @Published private(set) var source = ""   // "youtube" | "navidrome"
+    @Published private(set) var streamCache = ""   // "file" = spielt aus lokaler Datei
     private var radioTitle = ""
     private var radioFavicon: String?
     @Published private(set) var radioNowPlaying = ""   // ICY-StreamTitle (laufender Song im Radio)
@@ -594,7 +595,7 @@ final class PlayerController: ObservableObject {
         if autoplay { wantPlay = true }
         persistSnapshot()
         updateRemoteForContent()
-        loading = true; currentTime = 0; duration = track.durationSec; source = ""
+        loading = true; currentTime = 0; duration = track.durationSec; source = ""; streamCache = ""
         player.volume = 1                                   // aktiver Track immer voll (Einblenden nur in der Ueberblende)
         updateNowPlaying(title: track.name, artist: track.artist, album: track.album,
                          dur: track.durationSec, art: track.image, live: false)
@@ -629,6 +630,7 @@ final class PlayerController: ObservableObject {
                 guard myIndex == index, !isRadio else { return }
                 guard r.ok, let rel = r.url, let url = api.absoluteURL(rel) else { loading = false; return }
                 source = r.source ?? ""
+                streamCache = r.stream_cache ?? ""
                 UserDefaults.standard.set(source, forKey: "lastSource_\(profileScope)")
                 let played = track
                 Task { await api.postHistory(played, contextName: ctxName, contextURI: ctxURI) }

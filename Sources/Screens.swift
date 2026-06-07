@@ -2498,7 +2498,7 @@ struct NowPlayingBar: View {
                             Text(bufferLabel).font(.caption).foregroundStyle(Theme.sub).lineLimit(1)
                         } else {
                             if !player.isRadio && !player.source.isEmpty {
-                                Circle().fill(player.source == "youtube" ? Color(hex6: 0xFF3B30) : Theme.accent)
+                                Circle().fill(player.streamCache == "file" ? Color(hex6: 0x1DB954) : (player.source == "youtube" ? Color(hex6: 0xFF3B30) : Theme.accent))
                                     .frame(width: 6, height: 6)
                             }
                             Text(player.displayArtist).font(.caption).foregroundStyle(Theme.sub).lineLimit(1)
@@ -2615,7 +2615,7 @@ struct PlayerView: View {
                         if p.isEpisode {
                             SourceBadge(source: "podcast").padding(.top, 4)
                         } else if !p.isRadio && !p.source.isEmpty {
-                            SourceBadge(source: p.source).padding(.top, 4)
+                            SourceBadge(source: p.source, cache: p.streamCache).padding(.top, 4)
                         }
                     }
                     Spacer(minLength: 8)
@@ -2912,15 +2912,21 @@ struct LyricsSheet: View {
 // MARK: - Quellen-Pille (woher kommt der Stream)
 struct SourceBadge: View {
     let source: String
+    var cache: String = ""
     var body: some View {
         let label: String
         let color: Color
-        switch source {
-        case "youtube":   label = "YouTube";    color = Color(hex6: 0xFF3B30)
-        case "navidrome": label = "Bibliothek"; color = Theme.accent
-        case "podcast":   label = "Podcast";    color = Theme.sub
-        case "offline":   label = "Offline";    color = Color(hex6: 0x4A90E2)
-        default:          label = source.capitalized; color = Theme.sub
+        if cache == "file" && (source == "youtube" || source.isEmpty) {
+            // Spielt gerade aus der lokal gespeicherten Datei -> Quelle = Server
+            label = "Gespeichert"; color = Color(hex6: 0x1DB954)
+        } else {
+            switch source {
+            case "youtube":   label = "YouTube";    color = Color(hex6: 0xFF3B30)
+            case "navidrome": label = "Bibliothek"; color = Theme.accent
+            case "podcast":   label = "Podcast";    color = Theme.sub
+            case "offline":   label = "Offline";    color = Color(hex6: 0x4A90E2)
+            default:          label = source.capitalized; color = Theme.sub
+            }
         }
         return HStack(spacing: 6) {
             Circle().fill(color).frame(width: 7, height: 7)

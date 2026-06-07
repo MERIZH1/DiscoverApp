@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.2 — Quellen-Badge zeigt die echte Quelle
+- Das Badge zeigt jetzt, woher gerade gespielt wird: „Gespeichert" (gruen) wenn der Song aus der lokalen Server-Datei laeuft, „YouTube" nur noch beim echten Live-Stream
+
 ## v2.1 — YouTube-Wiedergabe robuster
 - YT-Songs blieben morgens bei 0:00 haengen (abgelaufene Stream-URL) -> die App holt jetzt automatisch eine frische URL und spielt weiter
 - Play musste manchmal 2x gedrueckt werden -> Wiedergabe startet jetzt zuverlaessig beim ersten Druck

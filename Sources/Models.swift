@@ -264,6 +264,7 @@ struct StreamURLResponse: Codable {
     let source: String?
     let videoId: String?
     let navidromeId: String?
+    let stream_cache: String?    // "file" = lokal gespeichert, "url" = Stream-URL gecacht, "none"
     let error: String?
 }
 struct SmartCache: Codable {
