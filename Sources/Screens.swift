@@ -279,6 +279,70 @@ struct TrackMenu: View {
     }
 }
 
+// MARK: - Playlist-Kontextmenue (Long-Press + "…", geteilt)
+struct PlaylistMenu: View {
+    let uri: String
+    let name: String
+    var isAlbum: Bool = false
+    var onOpen: (() -> Void)? = nil
+    var onDeleted: (() -> Void)? = nil
+    private var app: AppState? { DiscoverServices.app }
+    var body: some View {
+        if let onOpen {
+            Button { onOpen() } label: { Label("Öffnen", systemImage: "play.fill") }
+        }
+        Button { downloadAll() } label: { Label("Alle herunterladen", systemImage: "arrow.down.circle") }
+        if !isAlbum {
+            Button { startRadio() } label: { Label("Playlist-Radio starten", systemImage: "dot.radiowaves.left.and.right") }
+            Button { copyAsOwn() } label: { Label("Als eigene Playlist kopieren", systemImage: "plus.square.on.square") }
+            if uri.hasPrefix("spotify:playlist:") || uri.hasPrefix("ytpl:") {
+                Button(role: .destructive) { confirmDelete() } label: { Label("Playlist löschen", systemImage: "trash") }
+            }
+        }
+    }
+    private func startRadio() {
+        guard let app else { return }
+        Task {
+            guard let r = await app.api.startPlaylistRadio(uri: uri, name: name), r.ok,
+                  let puri = r.playlist_uri,
+                  let resp = try? await app.api.playlistTracks(puri) else { return }
+            app.player.play(tracks: resp.tracks, contextName: r.name ?? "Radio", contextURI: puri)
+        }
+    }
+    private func copyAsOwn() {
+        guard let app else { return }
+        Task { _ = await app.api.copyPlaylist(sourceURI: uri, name: name + " (Kopie)") }
+    }
+    private func downloadAll() {
+        guard let app else { return }
+        Task {
+            guard let resp = try? await app.api.playlistTracks(uri) else { return }
+            for t in resp.tracks { await app.downloads.download(t) }
+        }
+    }
+    private func confirmDelete() {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let keyWin = scenes.flatMap { $0.windows }.first { $0.isKeyWindow } ?? scenes.first?.windows.first
+        guard var top = keyWin?.rootViewController else { return }
+        while let p = top.presentedViewController { top = p }
+        let ac = UIAlertController(title: "Playlist löschen?", message: "„\(name)“ wird aus deiner Bibliothek entfernt.", preferredStyle: .alert)
+        ac.addAction(UIAlertAction(title: "Abbrechen", style: .cancel))
+        ac.addAction(UIAlertAction(title: "Löschen", style: .destructive) { _ in
+            let u = self.uri
+            let api = self.app?.api
+            let cb = self.onDeleted
+            Task {
+                _ = await api?.deletePlaylist(uri: u)
+                await MainActor.run {
+                    NotificationCenter.default.post(name: .init("discoverPlaylistsChanged"), object: nil)
+                    cb?()
+                }
+            }
+        })
+        top.present(ac, animated: true)
+    }
+}
+
 // MARK: - YouTube-Match fixen (andere Version waehlen)
 struct YTMatchSheet: View {
     let track: Track
@@ -1571,6 +1635,7 @@ struct LibraryView: View {
                             NavigationLink(value: pl) {
                                 LibraryRow(pl: pl, subscribed: subs.contains(pl.uri), sync: subSync[pl.uri])
                             }.buttonStyle(.plain)
+                            .contextMenu { PlaylistMenu(uri: pl.uri, name: pl.name) }
                         }
                     }
                 }.padding(.top, 10).padding(.bottom, 130)
@@ -2039,22 +2104,7 @@ struct TrackListView: View {
                                 .font(.title2).foregroundStyle(all ? Theme.accent : Theme.sub)
                         }
                         Menu {
-                            Button { Task { for t in tracks { await downloads.download(t) } } } label: {
-                                Label("Alle herunterladen", systemImage: "arrow.down.circle")
-                            }
-                            if !isAlbum {
-                                Button { startPlaylistRadio() } label: {
-                                    Label("Playlist-Radio starten", systemImage: "dot.radiowaves.left.and.right")
-                                }
-                                Button { copyAsOwn() } label: {
-                                    Label("Als eigene Playlist kopieren", systemImage: "plus.square.on.square")
-                                }
-                                if uri.hasPrefix("spotify:playlist:") || uri.hasPrefix("ytpl:") {
-                                    Button(role: .destructive) { showDeleteConfirm = true } label: {
-                                        Label("Playlist löschen", systemImage: "trash")
-                                    }
-                                }
-                            }
+                            PlaylistMenu(uri: uri, name: title, isAlbum: isAlbum, onDeleted: { dismiss() })
                         } label: {
                             Image(systemName: "ellipsis").font(.title3).foregroundStyle(Theme.sub)
                                 .frame(width: 46, height: 46).contentShape(Rectangle())

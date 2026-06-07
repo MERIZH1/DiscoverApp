@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.4 — Einheitliches Playlist-Menue
+- Langer Druck auf eine Playlist in der Bibliothek zeigt jetzt dasselbe Menue wie das „…" in der Playlist (Alle herunterladen, Playlist-Radio, kopieren, löschen)
+
 ## v2.3 — Songs umbenennen
 - YouTube-Songs (auch in importierten Playlists) lassen sich umbenennen: Song-Menue → „Umbenennen" → Titel/Interpret aendern
 - Funktioniert ueber beide Wege gleich — langer Druck UND das „…"-Menue nutzen dasselbe Menue
