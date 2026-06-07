@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.5 — Debug-Konsole
+- Konsole (Account → Konsole) → neue Sektion „Debug/Wartung": Discover-Server (und andere Dienste wie deemix/navidrome/jellyfin) neustarten + Caches leeren — falls mal was haengt
+
 ## v2.4 — Einheitliches Playlist-Menue
 - Langer Druck auf eine Playlist in der Bibliothek zeigt jetzt dasselbe Menue wie das „…" in der Playlist (Alle herunterladen, Playlist-Radio, kopieren, löschen)
 

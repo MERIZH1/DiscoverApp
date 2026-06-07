@@ -71,6 +71,26 @@ struct AdminConsoleView: View {
                             .font(.caption2).foregroundStyle(Theme.mute)
                     }
 
+                    // Debug / Wartung
+                    SettingsGroup("DEBUG / WARTUNG") {
+                        debugButton("Discover-Server neustarten", icon: "arrow.clockwise.circle") { await doRestart("gallien-discover") }
+                        debugButton("Caches leeren", icon: "trash") { await doClearCache() }
+                        Menu {
+                            ForEach(["deemix", "navidrome", "jellyfin", "gallienbot", "sabnzbd"], id: \.self) { svc in
+                                Button(svc) { Task { await doRestart(svc) } }
+                            }
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "square.stack.3d.up")
+                                Text("Anderen Dienst neustarten").font(.system(size: 15, weight: .semibold))
+                                Spacer()
+                            }.foregroundStyle(Theme.text).padding(.vertical, 11).padding(.horizontal, 14)
+                                .background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
+                        Text("Bei Haengern hilft meist „Discover neustarten". „Caches leeren" erzwingt frische Daten.")
+                            .font(.caption2).foregroundStyle(Theme.mute)
+                    }
+
                     // Log (letzte Statusaenderungen)
                     SettingsGroup("VERLAUF (letzte Änderungen)") {
                         if logItems.isEmpty {
@@ -115,6 +135,30 @@ struct AdminConsoleView: View {
         status = await app.api.systemStatus()
         logItems = await app.api.statusLog()
         loading = false
+    }
+    @ViewBuilder private func debugButton(_ title: String, icon: String, _ action: @escaping () async -> Void) -> some View {
+        Button { Task { await action() } } label: {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                Text(title).font(.system(size: 15, weight: .semibold))
+                Spacer()
+            }.foregroundStyle(Theme.text).padding(.vertical, 11).padding(.horizontal, 14)
+                .background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 10))
+        }.buttonStyle(.plain).disabled(busy)
+    }
+    private func doRestart(_ svc: String) async {
+        busy = true
+        let ok = await app.api.adminRestart(service: svc)
+        toast = ok ? "\(svc) wird neugestartet…" : "Neustart fehlgeschlagen"
+        busy = false
+        try? await Task.sleep(nanoseconds: 1_800_000_000); toast = ""
+    }
+    private func doClearCache() async {
+        busy = true
+        let ok = await app.api.adminClearCache()
+        toast = ok ? "Caches geleert ✓" : "Fehlgeschlagen"
+        busy = false
+        try? await Task.sleep(nanoseconds: 1_500_000_000); toast = ""
     }
     @ViewBuilder private func statusRow(_ name: String, _ key: String, _ s: ServiceStatus) -> some View {
         VStack(alignment: .leading, spacing: 4) {

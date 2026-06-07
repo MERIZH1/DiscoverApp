@@ -93,6 +93,18 @@ final class APIClient: ObservableObject {
               let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return false }
         return (obj["ok"] as? Bool) ?? false
     }
+    /// Admin: einen Docker-Container neustarten (Whitelist serverseitig).
+    func adminRestart(service: String) async -> Bool {
+        guard let d = try? await data("/api/admin/restart", method: "POST", json: ["service": service]),
+              let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return false }
+        return (obj["ok"] as? Bool) ?? false
+    }
+    /// Admin: interne Caches leeren.
+    func adminClearCache() async -> Bool {
+        guard let d = try? await data("/api/admin/clear-cache", method: "POST"),
+              let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return false }
+        return (obj["ok"] as? Bool) ?? false
+    }
 
     // MARK: - Cross-Device-Sync (/api/sync/*)
     func syncPushState(_ snapshot: [String: Any]) async {
