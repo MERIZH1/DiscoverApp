@@ -221,6 +221,9 @@ struct TrackMenu: View {
             let dl = app?.downloads.isDownloaded(track.uri) ?? false
             Label(dl ? "Aus Offline entfernen" : "Herunterladen", systemImage: dl ? "trash" : "arrow.down.circle")
         }
+        if track.uri.hasPrefix("yt:") {
+            Button { promptRename() } label: { Label("Umbenennen", systemImage: "pencil") }
+        }
         if let onArtist = onShowArtist, track.artists?.first?.uri != nil {
             Button { onArtist() } label: { Label("Künstler anzeigen", systemImage: "person") }
         }
@@ -254,6 +257,25 @@ struct TrackMenu: View {
                   let resp = try? await api.playlistTracks(puri) else { return }
             player.play(tracks: resp.tracks)
         }
+    }
+    /// Umbenennen-Dialog (UIKit-Alert, da Menue-Content keine eigenen Sheets halten kann).
+    private func promptRename() {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let keyWin = scenes.flatMap { $0.windows }.first { $0.isKeyWindow } ?? scenes.first?.windows.first
+        guard var top = keyWin?.rootViewController else { return }
+        while let p = top.presentedViewController { top = p }
+        let ac = UIAlertController(title: "Song umbenennen", message: nil, preferredStyle: .alert)
+        ac.addTextField { tf in tf.text = self.track.name; tf.placeholder = "Titel" }
+        ac.addTextField { tf in tf.text = self.track.artist; tf.placeholder = "Interpret" }
+        ac.addAction(UIAlertAction(title: "Abbrechen", style: .cancel))
+        ac.addAction(UIAlertAction(title: "Speichern", style: .default) { _ in
+            let n = ac.textFields?.first?.text ?? ""
+            let a = (ac.textFields?.count ?? 0) > 1 ? (ac.textFields?[1].text ?? "") : ""
+            let uri = self.track.uri
+            let api = self.app?.api
+            Task { _ = await api?.renameYtFind(uri: uri, name: n, artist: a) }
+        })
+        top.present(ac, animated: true)
     }
 }
 

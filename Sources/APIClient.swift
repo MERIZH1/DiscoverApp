@@ -344,6 +344,14 @@ final class APIClient: ObservableObject {
         return try? JSONDecoder().decode(ImportResult.self, from: d)
     }
 
+    /// YouTube-Song (YouTube-Funde oder Playlist-Song) umbenennen.
+    func renameYtFind(uri: String, name: String, artist: String) async -> Bool {
+        let body: [String: Any] = ["uri": uri, "name": name, "artist": artist]
+        guard let d = try? await data("/api/yt/finds/rename", method: "POST", json: body),
+              let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return false }
+        return (obj["ok"] as? Bool) ?? false
+    }
+
     /// Track aus einer Playlist entfernen. Spotify-Playlist -> /api/remove-track,
     /// YouTube-Funde (yt:finds) -> /api/yt/finds/remove.
     func removeFromPlaylist(playlistUri: String, trackUri: String) async -> Bool {

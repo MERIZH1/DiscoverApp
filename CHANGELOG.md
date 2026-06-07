@@ -3,6 +3,10 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.3 — Songs umbenennen
+- YouTube-Songs (auch in importierten Playlists) lassen sich umbenennen: Song-Menue → „Umbenennen" → Titel/Interpret aendern
+- Funktioniert ueber beide Wege gleich — langer Druck UND das „…"-Menue nutzen dasselbe Menue
+
 ## v2.2 — Quellen-Badge zeigt die echte Quelle
 - Das Badge zeigt jetzt, woher gerade gespielt wird: „Gespeichert" (gruen) wenn der Song aus der lokalen Server-Datei laeuft, „YouTube" nur noch beim echten Live-Stream
 
