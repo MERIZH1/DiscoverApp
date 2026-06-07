@@ -149,9 +149,17 @@ struct AdminConsoleView: View {
     private func doRestart(_ svc: String) async {
         busy = true
         let ok = await app.api.adminRestart(service: svc)
-        toast = ok ? "\(svc) wird neugestartet…" : "Neustart fehlgeschlagen"
+        if svc == "gallien-discover" {
+            // Selbst-Neustart: Verbindung bricht ab -> warten bis der Server wieder antwortet
+            toast = "Discover startet neu…"
+            let back = await app.api.waitUntilUp()
+            toast = back ? "Discover läuft wieder ✓" : "Neustart angestossen — Status unklar"
+            if back { await reload() }
+        } else {
+            toast = ok ? "\(svc) wird neugestartet…" : "Neustart fehlgeschlagen"
+        }
         busy = false
-        try? await Task.sleep(nanoseconds: 1_800_000_000); toast = ""
+        try? await Task.sleep(nanoseconds: 2_500_000_000); toast = ""
     }
     private func doClearCache() async {
         busy = true

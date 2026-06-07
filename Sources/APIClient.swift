@@ -105,6 +105,24 @@ final class APIClient: ObservableObject {
               let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return false }
         return (obj["ok"] as? Bool) ?? false
     }
+    /// Leichter Health-Check.
+    func ping() async -> Bool {
+        guard let url = URL(string: base + "/api/ping") else { return false }
+        var req = URLRequest(url: url); req.timeoutInterval = 4
+        guard let (_, resp) = try? await session.data(for: req),
+              let h = resp as? HTTPURLResponse, h.statusCode == 200 else { return false }
+        return true
+    }
+    /// Wartet bis der Server nach einem Neustart wieder antwortet. true = wieder oben.
+    func waitUntilUp(timeoutSec: Int = 40) async -> Bool {
+        try? await Task.sleep(nanoseconds: 2_000_000_000)   // alten Server erst runterfahren lassen
+        let deadline = Date().addingTimeInterval(TimeInterval(timeoutSec))
+        while Date() < deadline {
+            if await ping() { return true }
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+        }
+        return false
+    }
 
     // MARK: - Cross-Device-Sync (/api/sync/*)
     func syncPushState(_ snapshot: [String: Any]) async {
