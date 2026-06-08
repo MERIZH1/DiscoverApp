@@ -3,6 +3,10 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.18 — Server steuern aus der Konsole
+- **Smart-Cache (Auto-Download)** direkt einstellbar: an/aus + Schwellen (ab X Sekunden gehoert / ODER X-mal abgespielt).
+- **Server-Konfiguration** als Info-Anzeige (Navidrome/Deemix/Spotify-User + ob Passwort/Webhook gesetzt sind).
+
 ## v2.17 — Benachrichtigung bei Server-Problemen
 - Die App meldet sich per **lokaler Mitteilung**, wenn ein Dienst ausfaellt (Spotify/Deezer/Navidrome/YouTube) — im Vordergrund sofort, im Hintergrund wann iOS es zulaesst (kein Push-Server noetig).
 - Schalter in der Konsole („Benachrichtigungen") zum An-/Abschalten.

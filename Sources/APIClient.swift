@@ -143,6 +143,19 @@ final class APIClient: ObservableObject {
               let r = try? JSONDecoder().decode(DiskResponse.self, from: d) else { return [] }
         return r.disks
     }
+    func smartCacheConfig() async -> SmartCacheConfig? {
+        guard let d = try? await data("/api/admin/smart-cache-config") else { return nil }
+        return try? JSONDecoder().decode(SmartCacheConfig.self, from: d)
+    }
+    @discardableResult func setSmartCacheConfig(_ c: SmartCacheConfig) async -> Bool {
+        let body: [String: Any] = ["enabled": c.enabled, "min_listened_sec": c.min_listened_sec,
+                                   "min_listened_pct": c.min_listened_pct, "min_play_count": c.min_play_count]
+        return (try? await data("/api/admin/smart-cache-config", method: "POST", json: body)) != nil
+    }
+    func serverConfig() async -> ServerConfig? {
+        guard let d = try? await data("/api/admin/server-config") else { return nil }
+        return try? JSONDecoder().decode(ServerConfig.self, from: d)
+    }
     /// Leichter Health-Check.
     func ping() async -> Bool {
         guard let url = URL(string: base + "/api/ping") else { return false }

@@ -41,6 +41,20 @@ struct DiskInfo: Codable, Identifiable {
     var id: String { name }
 }
 struct DiskResponse: Codable { let disks: [DiskInfo] }
+struct SmartCacheConfig: Codable {
+    var min_listened_sec: Int
+    var min_listened_pct: Double
+    var min_play_count: Int
+    var enabled: Bool
+}
+struct ServerConfig: Codable {
+    let navidrome_url: String?
+    let navidrome_user: String?
+    let deemix_url: String?
+    let spotify_user_id: String?
+    let navidrome_pass_set: Bool?
+    let discord_webhook_set: Bool?
+}
 
 // MARK: - Admin-/Wartungs-Konsole (nur fuer Admins der eigenen Instanz)
 struct AdminConsoleView: View {
@@ -58,6 +72,9 @@ struct AdminConsoleView: View {
     @State private var tokens: [TokenInfo] = []
     @State private var disks: [DiskInfo] = []
     @AppStorage("serverAlerts") private var serverAlerts = true
+    @State private var smartCache = SmartCacheConfig(min_listened_sec: 45, min_listened_pct: 0, min_play_count: 4, enabled: true)
+    @State private var smartCacheLoaded = false
+    @State private var serverConfig: ServerConfig?
 
     var body: some View {
         NavigationStack {
@@ -211,6 +228,33 @@ struct AdminConsoleView: View {
                             .font(.caption2).foregroundStyle(Theme.mute)
                     }
 
+                    if smartCacheLoaded {
+                        SettingsGroup("SMART-CACHE (Auto-Download)") {
+                            Toggle(isOn: Binding(get: { smartCache.enabled }, set: { smartCache.enabled = $0; saveSmartCache() })) {
+                                Text("Vielgehoerte Songs automatisch speichern").font(.system(size: 15)).foregroundStyle(Theme.text)
+                            }.tint(Theme.accent)
+                            Stepper(value: Binding(get: { smartCache.min_listened_sec }, set: { smartCache.min_listened_sec = $0; saveSmartCache() }), in: 0...600, step: 5) {
+                                Text("Ab \(smartCache.min_listened_sec)s gehoert").font(.system(size: 14)).foregroundStyle(Theme.text)
+                            }
+                            Stepper(value: Binding(get: { smartCache.min_play_count }, set: { smartCache.min_play_count = $0; saveSmartCache() }), in: 1...50) {
+                                Text("ODER \(smartCache.min_play_count)x abgespielt").font(.system(size: 14)).foregroundStyle(Theme.text)
+                            }
+                            Text("Songs, die du oft oder lange hoerst, landen automatisch dauerhaft auf dem Server.")
+                                .font(.caption2).foregroundStyle(Theme.mute)
+                        }
+                    }
+
+                    if let sc = serverConfig {
+                        SettingsGroup("SERVER-KONFIG (Info)") {
+                            cfgRow("Navidrome", sc.navidrome_url)
+                            cfgRow("Navidrome-User", sc.navidrome_user)
+                            cfgRow("Deemix", sc.deemix_url)
+                            cfgRow("Spotify-User", sc.spotify_user_id)
+                            cfgRow("Navidrome-Passwort", (sc.navidrome_pass_set ?? false) ? "gesetzt ✓" : "fehlt")
+                            cfgRow("Discord-Webhook", (sc.discord_webhook_set ?? false) ? "gesetzt ✓" : "—")
+                        }
+                    }
+
                     // Log (letzte Statusaenderungen)
                     SettingsGroup("VERLAUF (letzte Änderungen)") {
                         if logItems.isEmpty {
@@ -261,6 +305,19 @@ struct AdminConsoleView: View {
         stats = await app.api.adminStats()
         tokens = await app.api.adminTokens()
         disks = await app.api.adminDisk()
+        if let sc = await app.api.smartCacheConfig() { smartCache = sc; smartCacheLoaded = true }
+        serverConfig = await app.api.serverConfig()
+    }
+    private func saveSmartCache() {
+        let c = smartCache
+        Task { _ = await app.api.setSmartCacheConfig(c) }
+    }
+    @ViewBuilder private func cfgRow(_ label: String, _ v: String?) -> some View {
+        HStack {
+            Text(label).font(.system(size: 13)).foregroundStyle(Theme.sub)
+            Spacer()
+            Text((v?.isEmpty == false) ? v! : "—").font(.system(size: 13)).foregroundStyle(Theme.text).lineLimit(1)
+        }.padding(.vertical, 2)
     }
     private func restartAll() async {
         busy = true
