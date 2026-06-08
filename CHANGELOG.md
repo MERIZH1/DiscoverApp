@@ -3,6 +3,11 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.16 — Konsole: Speicher, Notfall, Logs teilen
+- **Speicherplatz** mit Balken + Warnfarbe (orange ab 75%, rot ab 90%).
+- **Notfall: alle Dienste neustarten** auf einen Knopf (inkl. Discover, mit „wieder online"-Bestaetigung).
+- **Server-Logs teilen/exportieren** (Teilen-Symbol in der Log-Ansicht) — fuer wenn du sie mir schicken willst.
+
 ## v2.15 — Konsole 2.0
 - **Server-Logs in Klartext** — die Konsole zeigt jetzt, was der Server tut, verstaendlich aufbereitet + farbcodiert (gruen ok / orange Warnung / rot Fehler). Debuggen ohne SSH.
 - **Alle Playlists synchronisieren** auf Knopfdruck (statt auf den Nacht-Sync zu warten).

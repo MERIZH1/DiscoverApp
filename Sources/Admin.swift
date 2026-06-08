@@ -36,6 +36,11 @@ struct TokenInfo: Codable, Identifiable {
 }
 struct TokensResponse: Codable { let tokens: [TokenInfo] }
 struct StatsResponse: Codable { let stats: [String: Int] }
+struct DiskInfo: Codable, Identifiable {
+    let name: String; let free_gb: Double; let total_gb: Double; let used_pct: Int
+    var id: String { name }
+}
+struct DiskResponse: Codable { let disks: [DiskInfo] }
 
 // MARK: - Admin-/Wartungs-Konsole (nur fuer Admins der eigenen Instanz)
 struct AdminConsoleView: View {
@@ -51,6 +56,7 @@ struct AdminConsoleView: View {
     @State private var resources: [ContainerStat] = []
     @State private var stats: [String: Int] = [:]
     @State private var tokens: [TokenInfo] = []
+    @State private var disks: [DiskInfo] = []
 
     var body: some View {
         NavigationStack {
@@ -167,6 +173,34 @@ struct AdminConsoleView: View {
                         }
                     }
 
+                    if !disks.isEmpty {
+                        SettingsGroup("SPEICHER") {
+                            ForEach(disks) { d in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack {
+                                        Text(d.name).font(.system(size: 13)).foregroundStyle(Theme.text)
+                                        Spacer()
+                                        Text("\(String(format: "%.0f", d.free_gb)) frei / \(String(format: "%.0f", d.total_gb)) GB")
+                                            .font(.system(size: 12)).foregroundStyle(Theme.sub)
+                                    }
+                                    GeometryReader { g in
+                                        ZStack(alignment: .leading) {
+                                            Capsule().fill(Theme.input).frame(height: 6)
+                                            Capsule().fill(diskColor(d.used_pct))
+                                                .frame(width: max(4, g.size.width * CGFloat(d.used_pct) / 100), height: 6)
+                                        }
+                                    }.frame(height: 6)
+                                }.padding(.vertical, 3)
+                            }
+                        }
+                    }
+
+                    SettingsGroup("NOTFALL") {
+                        debugButton("Alle Dienste neustarten", icon: "exclamationmark.arrow.circlepath") { await restartAll() }
+                        Text("Startet deemix, navidrome, jellyfin, bot, sabnzbd + Discover neu.")
+                            .font(.caption2).foregroundStyle(Theme.mute)
+                    }
+
                     // Log (letzte Statusaenderungen)
                     SettingsGroup("VERLAUF (letzte Änderungen)") {
                         if logItems.isEmpty {
@@ -216,6 +250,22 @@ struct AdminConsoleView: View {
         resources = await app.api.adminResources()
         stats = await app.api.adminStats()
         tokens = await app.api.adminTokens()
+        disks = await app.api.adminDisk()
+    }
+    private func restartAll() async {
+        busy = true
+        for svc in ["deemix", "navidrome", "jellyfin", "gallienbot", "sabnzbd"] {
+            _ = await app.api.adminRestart(service: svc)
+        }
+        toast = "Dienste neugestartet — Discover folgt…"
+        _ = await app.api.adminRestart(service: "gallien-discover")
+        let back = await app.api.waitUntilUp()
+        toast = back ? "Alles neugestartet ✓" : "Neugestartet — Status unklar"
+        busy = false
+        try? await Task.sleep(nanoseconds: 2_500_000_000); toast = ""
+    }
+    private func diskColor(_ pct: Int) -> Color {
+        pct >= 90 ? Color(hex6: 0xFF3B30) : (pct >= 75 ? Color(hex6: 0xFF9500) : Theme.accent)
     }
     private func doSyncAll() async {
         busy = true
@@ -369,6 +419,11 @@ struct LogsSheet: View {
             .scrollContentBackground(.hidden).background(Theme.bg)
             .navigationTitle("Server-Logs").navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    ShareLink(item: items.map { "[\($0.level)] \($0.time) \($0.text)" }.joined(separator: "\n")) {
+                        Image(systemName: "square.and.arrow.up").foregroundStyle(Theme.accent)
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Fertig") { dismiss() }.foregroundStyle(Theme.accent)
                 }

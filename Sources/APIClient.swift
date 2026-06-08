@@ -138,6 +138,11 @@ final class APIClient: ObservableObject {
               let r = try? JSONDecoder().decode(TokensResponse.self, from: d) else { return [] }
         return r.tokens
     }
+    func adminDisk() async -> [DiskInfo] {
+        guard let d = try? await data("/api/admin/disk"),
+              let r = try? JSONDecoder().decode(DiskResponse.self, from: d) else { return [] }
+        return r.disks
+    }
     /// Leichter Health-Check.
     func ping() async -> Bool {
         guard let url = URL(string: base + "/api/ping") else { return false }
