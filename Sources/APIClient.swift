@@ -236,7 +236,7 @@ final class APIClient: ObservableObject {
         return try? JSONDecoder().decode(SpotifyResolve.self, from: d)
     }
 
-    func playlistTracks(_ uri: String, check: Bool = false) async throws -> PlaylistTracksResponse {
+    func playlistTracks(_ uri: String, check: Bool = false, force: Bool = false) async throws -> PlaylistTracksResponse {
         // Radio-Playlists liegen an eigenen Endpoints (wie in der PWA)
         if uri.hasPrefix("radio-name:") {
             return try await get("/api/radio-playlist/by-name/\(enc(String(uri.dropFirst(11))))")
@@ -247,7 +247,8 @@ final class APIClient: ObservableObject {
         if uri.hasPrefix("radio:") {
             return try await get("/api/radio-playlist/\(enc(String(uri.dropFirst(6))))")
         }
-        let q = check ? "?check=1" : ""
+        var q = check ? "?check=1" : ""
+        if force { q += (q.isEmpty ? "?" : "&") + "force=1" }   // Cache umgehen (Pull-to-Refresh)
         return try await get("/api/playlist/\(enc(uri))\(q)")
     }
 

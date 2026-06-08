@@ -3,6 +3,10 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.13 — Pull-to-Refresh + mehr Feedback
+- Playlists/Alben: nach unten ziehen laedt frisch von Spotify (umgeht den Cache → stale/Phantom-Eintraege verschwinden) + neue Empfehlungen.
+- Mehr sichtbare Rueckmeldung: „Gesendet an X", Empfehlung hinzufuegen / zur Warteschlange melden jetzt Erfolg/Fehler.
+
 ## v2.12 — Entfernen-Feedback + Recs neu
 - Song aus Playlist entfernen meldet jetzt klar Erfolg/Fehler (globaler Toast) statt stumm.
 - Nach erfolgreichem Entfernen werden die Playlist-Empfehlungen neu geladen

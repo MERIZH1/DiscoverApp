@@ -203,7 +203,7 @@ struct TrackMenu: View {
     private func sendTo(_ p: Profile) {
         guard let api = app?.api else { return }
         Haptics.tap()
-        Task { _ = await api.pushToProfile(p.id, track: track) }
+        Task { _ = await api.pushToProfile(p.id, track: track); app?.flash("Gesendet an \(p.name) ✓") }
     }
 
     var body: some View {
@@ -2194,11 +2194,14 @@ struct TrackListView: View {
 
     /// "+" auf einer Empfehlung -> Song in die Playlist (wie PWA: /api/add-track).
     private func addRec(_ t: Track) {
-        if isAlbum { player.addToQueue(t); Haptics.tap(); return }
+        if isAlbum { player.addToQueue(t); Haptics.tap(); app.flash("Zur Warteschlange ✓"); return }
         Task {
             if await app.api.addTrack(playlistURI: uri, track: t, playlistName: title) {
                 addedRecs.insert(t.uri); Haptics.tap()
                 if !tracks.contains(where: { $0.uri == t.uri }) { tracks.append(t) }   // ans Ende wie PWA
+                app.flash("Hinzugefügt ✓")
+            } else {
+                app.flash("Hinzufügen fehlgeschlagen")
             }
         }
     }
@@ -2308,6 +2311,7 @@ struct TrackListView: View {
             }
         }
         .scrollContentBackground(.hidden)
+        .refreshable { await refreshAll() }
         .background(
             // Gradient als ScrollView-Hintergrund: bleedet hinter die Notch (kein Clipping);
             // Cover bleibt korrekt unter der Toolbar, da die ScrollView die Safe-Area respektiert.
@@ -2373,6 +2377,16 @@ struct TrackListView: View {
                 recs = fresh
                 app.cacheSet(ckey, fresh)
             }
+        }
+    }
+    /// Pull-to-Refresh: Playlist-Inhalt frisch von Spotify (Cache umgehen -> Phantome/stale weg) + Recs neu.
+    private func refreshAll() async {
+        if let r = try? await (isAlbum ? app.api.albumTracks(uri) : app.api.playlistTracks(uri, check: true, force: true)),
+           !r.tracks.isEmpty {
+            await MainActor.run { tracks = r.tracks }
+        }
+        if let fresh = try? await app.api.recommendations(uri), !fresh.isEmpty {
+            await MainActor.run { recs = fresh; app.cacheSet("recs_\(uri)", fresh) }
         }
     }
 }
