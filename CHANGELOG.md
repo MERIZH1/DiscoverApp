@@ -3,6 +3,13 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.9 — Parity mit der Webseite
+- Song-Menue: „Auf Spotify oeffnen" + „Falsch gespielt – Cache zuruecksetzen"; bei lokalen Songs jetzt „Kuenstler + Name kopieren" statt der (sinnlosen) Spotify-/YouTube-Links.
+- Radio-Menue: Radio loeschen (auch per Langdruck in der Bibliothek) + „Als Spotify-Playlist speichern".
+- Navidrome-Album: „Als Playlist speichern" (Reihenfolge bleibt).
+- Playlist-Menue: „Link kopieren", „Auf Spotify oeffnen", „Jetzt synchronisieren".
+- Suche: Genre-Kacheln (Stoebern) auf der Startseite — Pop, Hip-Hop, Dance, Rock, Latin, R&B.
+
 ## v2.8 — Lokale Suche (Navidrome)
 - Suche: neue „Lokal"-Pille + Navidrome-Treffer — Songs („Auf dem Server") und Alben („Alben auf dem Server"), in „Alle" und unter „Lokal".
 - Lokale Songs streamen direkt aus der Bibliothek (Quellen-Badge im Player zeigt „Bibliothek"); Navidrome-Alben oeffnen sich mit erhaltener Reihenfolge.

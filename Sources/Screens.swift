@@ -198,8 +198,12 @@ struct TrackMenu: View {
         // -> ControlGroup rendert sie gleich gross. ShareLink = natives Teilen-Menue.
         ControlGroup {
             Menu {
-                Button { copySpotify() } label: { Label("Spotify-Link kopieren", systemImage: "link") }
-                Button { Task { await copyYouTube() } } label: { Label("YouTube-Link kopieren", systemImage: "play.rectangle") }
+                if track.isLocal {
+                    Button { copyArtistName() } label: { Label("Künstler + Name kopieren", systemImage: "doc.on.doc") }
+                } else {
+                    Button { copySpotify() } label: { Label("Spotify-Link kopieren", systemImage: "link") }
+                    Button { Task { await copyYouTube() } } label: { Label("YouTube-Link kopieren", systemImage: "play.rectangle") }
+                }
             } label: { Label("Teilen", systemImage: "square.and.arrow.up") }
             Button { app?.player.playNext(track); Haptics.tap() } label: { Label("Als Nächstes", systemImage: "text.line.first.and.arrowtriangle.forward") }
             Menu {
@@ -234,6 +238,12 @@ struct TrackMenu: View {
             Button { onFix() } label: { Label("YouTube-Match fixen", systemImage: "arrow.triangle.2.circlepath") }
         }
         Button { startRadio() } label: { Label("Song-Radio starten", systemImage: "dot.radiowaves.left.and.right") }
+        if !track.isLocal, track.uri.hasPrefix("spotify:") {
+            Button { openTrackInSpotify() } label: { Label("Auf Spotify öffnen", systemImage: "arrow.up.forward.app") }
+        }
+        if !track.isLocal, !track.uri.isEmpty {
+            Button { Task { await forgetCache() } } label: { Label("Falsch gespielt – Cache zurücksetzen", systemImage: "arrow.counterclockwise") }
+        }
         if let onRemove = onRemoveFromPlaylist {
             Button(role: .destructive) { onRemove() } label: { Label("Aus Playlist entfernen", systemImage: "trash") }
         }
@@ -248,6 +258,18 @@ struct TrackMenu: View {
         if let vid = await api.ytVideoId(for: track) {
             UIPasteboard.general.string = "https://www.youtube.com/watch?v=\(vid)"; Haptics.tap()
         }
+    }
+    private func copyArtistName() {
+        UIPasteboard.general.string = "\(track.artist) - \(track.name)"; Haptics.tap()
+    }
+    private func openTrackInSpotify() {
+        guard let id = track.uri.split(separator: ":").last,
+              let url = URL(string: "https://open.spotify.com/track/\(id)") else { return }
+        UIApplication.shared.open(url)
+    }
+    private func forgetCache() async {
+        guard let api = app?.api else { return }
+        _ = await api.forgetYtCache(track.uri); Haptics.tap()
     }
     private func startRadio() {
         guard let api = app?.api, let player = app?.player else { return }
@@ -290,16 +312,31 @@ struct PlaylistMenu: View {
     var onOpen: (() -> Void)? = nil
     var onDeleted: (() -> Void)? = nil
     private var app: AppState? { DiscoverServices.app }
+    private var isRadio: Bool { uri.hasPrefix("radio-name:") || uri.hasPrefix("radio-id:") || uri.hasPrefix("radio:") }
+    private var isSpotifyPlaylist: Bool { uri.hasPrefix("spotify:playlist:") }
     var body: some View {
         if let onOpen {
             Button { onOpen() } label: { Label("Öffnen", systemImage: "play.fill") }
         }
-        Button { downloadAll() } label: { Label("Alle herunterladen", systemImage: "arrow.down.circle") }
-        if !isAlbum {
-            Button { startRadio() } label: { Label("Playlist-Radio starten", systemImage: "dot.radiowaves.left.and.right") }
-            Button { copyAsOwn() } label: { Label("Als eigene Playlist kopieren", systemImage: "plus.square.on.square") }
-            if uri.hasPrefix("spotify:playlist:") || uri.hasPrefix("ytpl:") {
-                Button(role: .destructive) { confirmDelete() } label: { Label("Playlist löschen", systemImage: "trash") }
+        if isRadio {
+            Button { saveRadioAsPlaylist() } label: { Label("Als Spotify-Playlist speichern", systemImage: "square.and.arrow.down") }
+            Button(role: .destructive) { deleteRadio() } label: { Label("Radio löschen", systemImage: "trash") }
+        } else {
+            Button { downloadAll() } label: { Label("Alle herunterladen", systemImage: "arrow.down.circle") }
+            if uri.hasPrefix("navialbum:") {
+                Button { saveAlbum() } label: { Label("Als Playlist speichern", systemImage: "plus.square.on.square") }
+            }
+            if !isAlbum {
+                Button { startRadio() } label: { Label("Playlist-Radio starten", systemImage: "dot.radiowaves.left.and.right") }
+                Button { copyAsOwn() } label: { Label("Als eigene Playlist kopieren", systemImage: "plus.square.on.square") }
+                if isSpotifyPlaylist {
+                    Button { copyLink() } label: { Label("Link kopieren", systemImage: "link") }
+                    Button { openInSpotify() } label: { Label("Auf Spotify öffnen", systemImage: "arrow.up.forward.app") }
+                    Button { syncNow() } label: { Label("Jetzt synchronisieren", systemImage: "arrow.triangle.2.circlepath") }
+                }
+                if isSpotifyPlaylist || uri.hasPrefix("ytpl:") {
+                    Button(role: .destructive) { confirmDelete() } label: { Label("Playlist löschen", systemImage: "trash") }
+                }
             }
         }
     }
@@ -315,6 +352,30 @@ struct PlaylistMenu: View {
     private func copyAsOwn() {
         guard let app else { return }
         Task { _ = await app.api.copyPlaylist(sourceURI: uri, name: name + " (Kopie)") }
+    }
+    private func saveAlbum() {
+        guard let app else { return }
+        Task { if await app.api.saveAlbumAsPlaylist(uri) { NotificationCenter.default.post(name: .init("discoverPlaylistsChanged"), object: nil) } }
+    }
+    private func saveRadioAsPlaylist() {
+        guard let app else { return }
+        Task { if await app.api.saveRadioAsPlaylist(name: name) { NotificationCenter.default.post(name: .init("discoverPlaylistsChanged"), object: nil) } }
+    }
+    private func deleteRadio() {
+        guard let app else { return }
+        Task { if await app.api.deleteRadio(uri: uri, name: name) { onDeleted?(); NotificationCenter.default.post(name: .init("discoverPlaylistsChanged"), object: nil) } }
+    }
+    private func copyLink() {
+        guard let id = uri.split(separator: ":").last else { return }
+        UIPasteboard.general.string = "https://open.spotify.com/playlist/\(id)"; Haptics.tap()
+    }
+    private func openInSpotify() {
+        guard let id = uri.split(separator: ":").last, let url = URL(string: "https://open.spotify.com/playlist/\(id)") else { return }
+        UIApplication.shared.open(url)
+    }
+    private func syncNow() {
+        guard let app else { return }
+        Task { _ = await app.api.syncPlaylistNow(uri) }
     }
     private func downloadAll() {
         guard let app else { return }
@@ -1090,6 +1151,24 @@ struct SearchView: View {
         return ""
     }
 
+    private let genres: [(String, String, UInt)] = [
+        ("Pop", "Pop", 0xDC148C), ("Hip-Hop", "Hip-Hop", 0xBC5900),
+        ("Dance / Electronic", "Electronic Dance", 0x1E3264), ("Rock", "Rock", 0xE13300),
+        ("Latin", "Latin", 0xE1118C), ("R&B", "R&B", 0x8D67AB),
+    ]
+    @ViewBuilder private var genreTiles: some View {
+        Text("Stöbern").font(.title3.bold()).foregroundStyle(Theme.text)
+            .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal).padding(.top, 14)
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+            ForEach(genres, id: \.0) { g in
+                Button { query = g.1; runSearch() } label: {
+                    Text(g.0).font(.system(size: 16, weight: .bold)).foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 76, alignment: .topLeading)
+                        .padding(14).background(Color(hex6: g.2)).clipShape(RoundedRectangle(cornerRadius: 12))
+                }.buttonStyle(.plain)
+            }
+        }.padding(.horizontal).padding(.top, 6)
+    }
     private var recentList: [String] { recentRaw.split(separator: "\n").map(String.init) }
     private func saveRecent() {
         let q = query.trimmingCharacters(in: .whitespaces)
@@ -1194,16 +1273,10 @@ struct SearchView: View {
                                     }.padding(.vertical, 6).padding(.horizontal).contentShape(Rectangle())
                                 }.buttonStyle(.plain)
                             }
+                            genreTiles
                         }.padding(.top, 6)
                     } else {
-                        VStack(spacing: 10) {
-                            Circle().fill(Theme.input).frame(width: 84, height: 84)
-                                .overlay(Image(systemName: "magnifyingglass").font(.system(size: 32)).foregroundStyle(Theme.sub))
-                            Text("Such nach einem Song").font(.title3.bold()).foregroundStyle(Theme.text)
-                            Text("Songs, Playlists, Alben, Künstler — der Spotify-Katalog")
-                                .font(.system(size: 14)).foregroundStyle(Theme.mute)
-                                .multilineTextAlignment(.center).padding(.horizontal, 40)
-                        }.frame(maxWidth: .infinity).padding(.top, 70)
+                        LazyVStack(alignment: .leading, spacing: 0) { genreTiles }.padding(.top, 4)
                     }
                 }
                 .scrollContentBackground(.hidden)
@@ -1620,6 +1693,7 @@ struct LibraryView: View {
                             NavigationLink(value: pl) {
                                 LibraryRow(pl: pl, subscribed: false, sync: nil)
                             }.buttonStyle(.plain)
+                            .contextMenu { PlaylistMenu(uri: pl.uri, name: pl.name, onDeleted: { Task { await load() } }) }
                         }
                     } else if tab == "offline" {
                         if downloads.tracks.isEmpty {

@@ -202,6 +202,34 @@ final class APIClient: ObservableObject {
         }
     }
 
+    private func postOK(_ path: String, _ json: [String: Any]? = nil) async -> Bool {
+        guard let d = try? await data(path, method: "POST", json: json),
+              let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return false }
+        return (o["ok"] as? Bool) ?? false
+    }
+    /// YT-Cache eines Tracks vergessen -> naechste Wiedergabe sucht neu.
+    @discardableResult func forgetYtCache(_ uri: String) async -> Bool {
+        await postOK("/api/yt/forget", ["spotify_uri": uri])
+    }
+    /// Navidrome-Album als eigene lokale Playlist speichern.
+    @discardableResult func saveAlbumAsPlaylist(_ uri: String) async -> Bool {
+        await postOK("/api/playlist/save-album", ["uri": uri])
+    }
+    /// Radio loeschen (per ID wenn moeglich, sonst Name).
+    @discardableResult func deleteRadio(uri: String, name: String) async -> Bool {
+        let body: [String: Any] = uri.hasPrefix("radio-id:")
+            ? ["radio_id": String(uri.dropFirst(9))] : ["radio_name": name]
+        return await postOK("/api/radio/delete", body)
+    }
+    /// Radio als Spotify-Playlist speichern.
+    @discardableResult func saveRadioAsPlaylist(name: String) async -> Bool {
+        await postOK("/api/radio/save-as-playlist", ["radio_name": name])
+    }
+    /// Einzelne Playlist sofort synchronisieren.
+    @discardableResult func syncPlaylistNow(_ uri: String) async -> Bool {
+        await postOK("/api/sync-playlist/\(enc(uri))", nil)
+    }
+
     /// Spotify-Share-Link aufloesen (Track/Playlist/Album/Artist).
     func spotifyResolve(_ url: String) async -> SpotifyResolve? {
         guard let d = try? await data("/api/spotify/resolve?url=\(enc(url))") else { return nil }
