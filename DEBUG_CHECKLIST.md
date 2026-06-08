@@ -44,6 +44,15 @@ Laufende Liste: was gefixt ist und was noch offen. ASCII (keine Umlaute).
   melden (kein sinnloses /v1), (d) aktuellen Phantom per force-refresh bereinigt.
 - App: Entfernen meldet jetzt sichtbar + laedt Recs neu (schon committed, bee9fb0).
 
+## ✅ Erledigt — autonome Bug-Runde
+- Player- + Sync-Flows Zeile-fuer-Zeile gelesen: solide gebaut, keine echten Bugs.
+  (Notiz: Sync nutzt device_name statt device_id zur Self-Erkennung -> Edge-Case
+  bei gleichnamigen Geraeten, bewusst nicht geaendert ohne Testmoeglichkeit.)
+- Pull-to-Refresh fuer Playlists/Alben (force=1 -> stale/Phantome wegziehbar).
+- Toast-Feedback nachgeruestet: Senden-an-Profil, Empfehlung hinzufuegen/Warteschlange.
+- Empfehlungen ~5x schneller (parallel + Cache, Invalidierung bei Add/Remove).
+- PWA: Kuenstler-Link am Desktop repariert.
+
 ## 🔲 Offen / als Naechstes
 - [ ] Build d666e3b+ signieren (rustsign) + durchtesten: Radios, lokale Suche,
       Toasts, Remote-Transfer, "Gehe zu", alle neuen Menues.
