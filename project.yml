@@ -30,6 +30,9 @@ targets:
         UILaunchScreen: {}
         UIBackgroundModes:
           - audio
+          - fetch
+        BGTaskSchedulerPermittedIdentifiers:
+          - com.discover.app.healthcheck
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
         UISupportedInterfaceOrientations:

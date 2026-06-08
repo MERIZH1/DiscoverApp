@@ -57,6 +57,7 @@ struct AdminConsoleView: View {
     @State private var stats: [String: Int] = [:]
     @State private var tokens: [TokenInfo] = []
     @State private var disks: [DiskInfo] = []
+    @AppStorage("serverAlerts") private var serverAlerts = true
 
     var body: some View {
         NavigationStack {
@@ -198,6 +199,15 @@ struct AdminConsoleView: View {
                     SettingsGroup("NOTFALL") {
                         debugButton("Alle Dienste neustarten", icon: "exclamationmark.arrow.circlepath") { await restartAll() }
                         Text("Startet deemix, navidrome, jellyfin, bot, sabnzbd + Discover neu.")
+                            .font(.caption2).foregroundStyle(Theme.mute)
+                    }
+
+                    SettingsGroup("BENACHRICHTIGUNGEN") {
+                        Toggle(isOn: $serverAlerts) {
+                            Text("Bei Server-Problemen benachrichtigen")
+                                .font(.system(size: 15)).foregroundStyle(Theme.text)
+                        }.tint(Theme.accent)
+                        Text("Lokale Mitteilung, wenn ein Dienst ausfaellt — im Vordergrund sofort, im Hintergrund wann iOS es zulaesst (kein Push-Server noetig).")
                             .font(.caption2).foregroundStyle(Theme.mute)
                     }
 

@@ -3,6 +3,10 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.17 — Benachrichtigung bei Server-Problemen
+- Die App meldet sich per **lokaler Mitteilung**, wenn ein Dienst ausfaellt (Spotify/Deezer/Navidrome/YouTube) — im Vordergrund sofort, im Hintergrund wann iOS es zulaesst (kein Push-Server noetig).
+- Schalter in der Konsole („Benachrichtigungen") zum An-/Abschalten.
+
 ## v2.16 — Konsole: Speicher, Notfall, Logs teilen
 - **Speicherplatz** mit Balken + Warnfarbe (orange ab 75%, rot ab 90%).
 - **Notfall: alle Dienste neustarten** auf einen Knopf (inkl. Discover, mit „wieder online"-Bestaetigung).
