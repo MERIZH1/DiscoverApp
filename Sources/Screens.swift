@@ -241,11 +241,15 @@ struct TrackMenu: View {
         if track.uri.hasPrefix("yt:") {
             Button { promptRename() } label: { Label("Umbenennen", systemImage: "pencil") }
         }
-        if let onArtist = onShowArtist, track.artists?.first?.uri != nil {
-            Button { onArtist() } label: { Label("Künstler anzeigen", systemImage: "person") }
-        }
-        if let onAlbum = onShowAlbum, track.album_uri != nil {
-            Button { onAlbum() } label: { Label("Album anzeigen", systemImage: "square.stack") }
+        if (onShowArtist != nil && track.artists?.first?.uri != nil) || (onShowAlbum != nil && track.album_uri != nil) {
+            Menu {
+                if onShowArtist != nil, track.artists?.first?.uri != nil {
+                    Button { onShowArtist?() } label: { Label("Künstler", systemImage: "person") }
+                }
+                if onShowAlbum != nil, track.album_uri != nil {
+                    Button { onShowAlbum?() } label: { Label("Album", systemImage: "square.stack") }
+                }
+            } label: { Label("Gehe zu", systemImage: "arrow.forward.circle") }
         }
         if let onFix = onFixYTMatch {
             Button { onFix() } label: { Label("YouTube-Match fixen", systemImage: "arrow.triangle.2.circlepath") }

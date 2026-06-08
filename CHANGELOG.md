@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.11 — „Gehe zu"-Menue
+- Song-Menue: „Künstler anzeigen" + „Album anzeigen" sind jetzt im Untermenue „Gehe zu" gebuendelt (wie „Teilen") → Künstler / Album.
+
 ## v2.10 — Kein stilles Scheitern mehr
 - Globales Toast-System: Aktionen (Radio erstellen/loeschen/als Playlist speichern, Album/Playlist speichern, synchronisieren, kopieren, Cache-Reset) melden jetzt **Erfolg ODER Fehler** — statt bei einem Problem einfach nichts zu tun.
 - Song-Radio auf einem lokalen/YouTube-Treffer sagt jetzt klar „konnte nicht erstellt werden" (Radio braucht einen Spotify-Song).
