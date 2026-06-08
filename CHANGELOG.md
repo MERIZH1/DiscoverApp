@@ -3,6 +3,10 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.14 — Such-Tastatur + Bibliothek-Refresh
+- Suche: Tastatur verschwindet beim Antippen eines Songs (auch bei „letzte Suche" / Genre-Kachel) und beim Scrollen durch die Ergebnisse.
+- Bibliothek: Pull-to-Refresh (frische Playlists + Radios runterziehen).
+
 ## v2.13 — Pull-to-Refresh + mehr Feedback
 - Playlists/Alben: nach unten ziehen laedt frisch von Spotify (umgeht den Cache → stale/Phantom-Eintraege verschwinden) + neue Empfehlungen.
 - Mehr sichtbare Rueckmeldung: „Gesendet an X", Empfehlung hinzufuegen / zur Warteschlange melden jetzt Erfolg/Fehler.

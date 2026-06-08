@@ -1197,7 +1197,7 @@ struct SearchView: View {
             .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal).padding(.top, 14)
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
             ForEach(genres, id: \.0) { g in
-                Button { query = g.1; runSearch() } label: {
+                Button { searchFocused = false; query = g.1; runSearch() } label: {
                     Text(g.0).font(.system(size: 16, weight: .bold)).foregroundStyle(.white)
                         .frame(maxWidth: .infinity, minHeight: 76, alignment: .topLeading)
                         .padding(14).background(Color(hex6: g.2)).clipShape(RoundedRectangle(cornerRadius: 12))
@@ -1257,6 +1257,7 @@ struct SearchView: View {
                                 SectionHeader("Songs")
                                 ForEach(Array(tracks.prefix(scope == "tracks" ? 50 : 6).enumerated()), id: \.offset) { i, t in
                                     TrackRow(track: t, playing: player.current?.id == t.id) {
+                                        searchFocused = false   // Tastatur weg beim Song-Tippen
                                         pushRecentItem(RecentSearchItem(uri: t.uri, name: t.name, image: t.image ?? "", sub: t.artist))
                                         player.play(tracks: tracks, startAt: i, contextName: "Suche", contextURI: "")
                                     }
@@ -1278,6 +1279,7 @@ struct SearchView: View {
                                 SectionHeader("Auf dem Server")
                                 ForEach(Array(loc.prefix(scope == "lokal" ? 50 : 6).enumerated()), id: \.offset) { i, t in
                                     TrackRow(track: t, playing: player.current?.id == t.id) {
+                                        searchFocused = false   // Tastatur weg beim Song-Tippen
                                         pushRecentItem(RecentSearchItem(uri: t.uri, name: t.name, image: t.image ?? "", sub: t.artist))
                                         player.play(tracks: loc, startAt: i, contextName: "Server", contextURI: "")
                                     }
@@ -1295,7 +1297,7 @@ struct SearchView: View {
                                 Button("Löschen") { recentItemsRaw = "" }.font(.system(size: 14)).foregroundStyle(Theme.sub)
                             }.padding(.horizontal).padding(.top, 8).padding(.bottom, 4)
                             ForEach(recentItems) { it in
-                                Button { query = it.name; runSearch() } label: {
+                                Button { searchFocused = false; query = it.name; runSearch() } label: {
                                     HStack(spacing: 12) {
                                         Artwork(url: it.image, size: 48, corner: 4)
                                         VStack(alignment: .leading, spacing: 2) {
@@ -1316,6 +1318,7 @@ struct SearchView: View {
                     }
                 }
                 .scrollContentBackground(.hidden)
+                .scrollDismissesKeyboard(.interactively)
             }
             .padding(.top, 6)
             .background(Theme.bg)
@@ -1782,6 +1785,7 @@ struct LibraryView: View {
             }
             .refreshable { await load() }
         }
+        .refreshable { await load() }
         .task(id: app.profile?.id) { await load() }
         .task(id: tab) {
             if tab == "history" { history = (try? await app.api.history()) ?? [] }
