@@ -35,6 +35,15 @@ Laufende Liste: was gefixt ist und was noch offen. ASCII (keine Umlaute).
 - App: "Gehe zu"-Untermenue (Kuenstler/Album) im Song-Menue (d666e3b).
 - Backend: Empfehlungen ~5x schneller (parallel + Cache) — bestaetigt schneller.
 
+## ✅ Erledigt — Playlist-Song entfernen (Backend)
+- Ursache war ein "Phantom"-Track: beim Hinzufuegen optimistisch in den persistenten
+  _playlist_cache geschrieben, aber auf Spotify nie angekommen (Vertipper) -> blieb
+  haengen, GQL-Resolve fand die uid nicht -> /v1-Fallback 429.
+- Fix: (a) GQL-Resolve mit Retry gehaertet, (b) /v1-Fallback entschaerft (2x/8s statt
+  5x/35s), (c) "uid nicht gefunden" = Phantom -> aus lokalem Cache entfernen + ok
+  melden (kein sinnloses /v1), (d) aktuellen Phantom per force-refresh bereinigt.
+- App: Entfernen meldet jetzt sichtbar + laedt Recs neu (schon committed, bee9fb0).
+
 ## 🔲 Offen / als Naechstes
 - [ ] Build d666e3b+ signieren (rustsign) + durchtesten: Radios, lokale Suche,
       Toasts, Remote-Transfer, "Gehe zu", alle neuen Menues.
