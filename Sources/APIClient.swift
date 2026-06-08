@@ -199,6 +199,16 @@ final class APIClient: ObservableObject {
     }
 
     func playlistTracks(_ uri: String, check: Bool = false) async throws -> PlaylistTracksResponse {
+        // Radio-Playlists liegen an eigenen Endpoints (wie in der PWA)
+        if uri.hasPrefix("radio-name:") {
+            return try await get("/api/radio-playlist/by-name/\(enc(String(uri.dropFirst(11))))")
+        }
+        if uri.hasPrefix("radio-id:") {
+            return try await get("/api/radio-playlist/by-id/\(enc(String(uri.dropFirst(9))))")
+        }
+        if uri.hasPrefix("radio:") {
+            return try await get("/api/radio-playlist/\(enc(String(uri.dropFirst(6))))")
+        }
         let q = check ? "?check=1" : ""
         return try await get("/api/playlist/\(enc(uri))\(q)")
     }

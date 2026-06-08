@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.6 — Song-Radio repariert
+- „Song-Radio starten" tat in der App nichts: die erzeugte Radio-Playlist (radio-name:/radio-id:/radio:) wurde am falschen Endpoint geladen. Wird jetzt korrekt aufgeloest — Radio aus einem Song (und das Oeffnen gespeicherter Radios) funktioniert.
+
 ## v2.5 — Debug-Konsole
 - Konsole (Account → Konsole) → neue Sektion „Debug/Wartung": Discover-Server (und andere Dienste wie deemix/navidrome/jellyfin) neustarten + Caches leeren — falls mal was haengt
 - Beim Discover-Neustart wartet die App, bis der Server wieder antwortet, und meldet „läuft wieder ✓"
