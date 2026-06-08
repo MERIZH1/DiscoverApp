@@ -318,7 +318,11 @@ struct TrackMenu: View {
             let a = (ac.textFields?.count ?? 0) > 1 ? (ac.textFields?[1].text ?? "") : ""
             let uri = self.track.uri
             let api = self.app?.api
-            Task { _ = await api?.renameYtFind(uri: uri, name: n, artist: a) }
+            Task {
+                _ = await api?.renameYtFind(uri: uri, name: n, artist: a)
+                DiscoverServices.app?.flash("Umbenannt ✓")
+                NotificationCenter.default.post(name: .init("discoverPlaylistsChanged"), object: nil)
+            }
         })
         top.present(ac, animated: true)
     }
@@ -416,7 +420,8 @@ struct PlaylistMenu: View {
     private func downloadAll() {
         guard let app else { return }
         Task {
-            guard let resp = try? await app.api.playlistTracks(uri) else { return }
+            guard let resp = try? await app.api.playlistTracks(uri) else { app.flash("Konnte Playlist nicht laden"); return }
+            app.flash("\(resp.tracks.count) Songs werden geladen…")
             for t in resp.tracks { await app.downloads.download(t) }
         }
     }
@@ -544,6 +549,7 @@ struct YTMatchSheet: View {
             busy = false
             if ok {
                 if player.current?.uri == track.uri { player.reloadCurrent() }
+                app.flash("Match geändert ✓")
                 dismiss()
             } else {
                 msg = "Fehlgeschlagen"
@@ -2185,6 +2191,7 @@ struct TrackListView: View {
         let was = isSubscribed
         isSubscribed.toggle(); Haptics.tap()
         Task { was ? await app.api.unsubscribe(uri: uri) : await app.api.subscribe(uri: uri, name: title) }
+        app.flash(was ? "Abo entfernt" : "Abonniert ✓")
     }
 
     private func startPlaylistRadio() {
