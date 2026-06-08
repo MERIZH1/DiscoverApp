@@ -2389,7 +2389,7 @@ struct TrackListView: View {
            !r.tracks.isEmpty {
             await MainActor.run { tracks = r.tracks }
         }
-        if let fresh = try? await app.api.recommendations(uri), !fresh.isEmpty {
+        if let fresh = try? await app.api.recommendations(uri, nocache: true), !fresh.isEmpty {
             await MainActor.run { recs = fresh; app.cacheSet("recs_\(uri)", fresh) }
         }
     }

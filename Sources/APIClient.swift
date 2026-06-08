@@ -290,9 +290,10 @@ final class APIClient: ObservableObject {
 
     /// "Discover": Empfehlungen basierend auf einer Playlist/einem Album.
     /// skip = bereits gezeigte Track-IDs (fuer "Mehr laden").
-    func recommendations(_ uri: String, n: Int = 15, skip: [String] = []) async throws -> [Track] {
+    func recommendations(_ uri: String, n: Int = 15, skip: [String] = [], nocache: Bool = false) async throws -> [Track] {
         let s = skip.isEmpty ? "" : "&skip=" + skip.joined(separator: ",")
-        return try await get("/api/recommendations/\(enc(uri))?n=\(n)\(s)")
+        let nc = nocache ? "&nocache=1" : ""
+        return try await get("/api/recommendations/\(enc(uri))?n=\(n)\(s)\(nc)")
     }
 
     /// Podcast: Episoden einer Show.
