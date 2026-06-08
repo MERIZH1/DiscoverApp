@@ -3,6 +3,11 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.12 — Entfernen-Feedback + Recs neu
+- Song aus Playlist entfernen meldet jetzt klar Erfolg/Fehler (globaler Toast) statt stumm.
+- Nach erfolgreichem Entfernen werden die Playlist-Empfehlungen neu geladen
+  (Server-Empfehlungs-Cache wird bei Add/Remove invalidiert).
+
 ## v2.11 — „Gehe zu"-Menue
 - Song-Menue: „Künstler anzeigen" + „Album anzeigen" sind jetzt im Untermenue „Gehe zu" gebuendelt (wie „Teilen") → Künstler / Album.
 

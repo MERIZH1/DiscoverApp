@@ -2154,6 +2154,13 @@ struct TrackListView: View {
                 if ok { tracks.removeAll { $0.uri == t.uri } }
                 copyMsg = ok ? "Entfernt ✓" : "Entfernen fehlgeschlagen"
             }
+            app.flash(ok ? "Aus Playlist entfernt ✓" : "Entfernen fehlgeschlagen")
+            if ok {
+                // Empfehlungen neu triggern (Server-Cache wurde invalidiert)
+                if let fresh = try? await app.api.recommendations(uri), !fresh.isEmpty {
+                    await MainActor.run { recs = fresh }
+                }
+            }
             try? await Task.sleep(nanoseconds: 1_600_000_000)
             await MainActor.run { copyMsg = "" }
         }
