@@ -25,6 +25,20 @@ final class AppState: ObservableObject {
     @Published var connected = false
     @Published var allProfiles: [Profile] = []   // fuer "An Nutzer senden"
 
+    /// Globaler Toast (Erfolg/Fehler von Aktionen) -> kein stilles Scheitern mehr.
+    @Published var toast = ""
+    private var toastSeq = 0
+    /// Aus beliebigem Kontext aufrufbar (fire-and-forget), landet immer auf dem MainActor.
+    nonisolated func flash(_ msg: String) {
+        Task { @MainActor in
+            self.toast = msg
+            self.toastSeq += 1
+            let mySeq = self.toastSeq
+            try? await Task.sleep(nanoseconds: 2_200_000_000)
+            if self.toastSeq == mySeq { self.toast = "" }
+        }
+    }
+
     /// Liquid-Glass-Design (iOS 26) — nur in der App umschaltbar.
     /// Standard: AN (wenn nie gesetzt) -> die App sieht ab Werk nach iOS 26 aus.
     /// Auf iOS < 26 faellt jede Glass-Flaeche eh automatisch auf solide Farbe zurueck.

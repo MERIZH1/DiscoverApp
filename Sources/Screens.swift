@@ -90,6 +90,7 @@ func averageColor(_ urlStr: String?) async -> Color? {
 struct MainView: View {
     @EnvironmentObject var player: PlayerController
     @EnvironmentObject var sync: SyncManager
+    @EnvironmentObject var app: AppState
     @State private var showPlayer = false
     @State private var keyboardUp = false
 
@@ -124,6 +125,18 @@ struct MainView: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: sync.injectToast)
+        .overlay(alignment: .bottom) {
+            if !app.toast.isEmpty {
+                Text(app.toast)
+                    .font(.system(size: 14, weight: .semibold)).foregroundStyle(.black)
+                    .padding(.horizontal, 18).padding(.vertical, 10)
+                    .background(Theme.accent).clipShape(Capsule())
+                    .shadow(color: .black.opacity(0.4), radius: 8, y: 3)
+                    .padding(.bottom, 96)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: app.toast)
         .onAppear(perform: configureAppearance)
         .sheet(isPresented: $showPlayer) { PlayerView() }
     }
@@ -260,7 +273,7 @@ struct TrackMenu: View {
         }
     }
     private func copyArtistName() {
-        UIPasteboard.general.string = "\(track.artist) - \(track.name)"; Haptics.tap()
+        UIPasteboard.general.string = "\(track.artist) - \(track.name)"; Haptics.tap(); app?.flash("Kopiert")
     }
     private func openTrackInSpotify() {
         guard let id = track.uri.split(separator: ":").last,
@@ -269,17 +282,20 @@ struct TrackMenu: View {
     }
     private func forgetCache() async {
         guard let api = app?.api else { return }
-        _ = await api.forgetYtCache(track.uri); Haptics.tap()
+        _ = await api.forgetYtCache(track.uri); Haptics.tap(); app?.flash("Cache zurückgesetzt — naechste Wiedergabe sucht neu")
     }
     private func startRadio() {
         guard let api = app?.api, let player = app?.player else { return }
-        Haptics.tap()
+        Haptics.tap(); app?.flash("Radio wird erstellt…")
         Task {
             guard let r = try? await api.startRadio(track: track), r.ok,
                   let puri = r.playlist_uri,
-                  let resp = try? await api.playlistTracks(puri) else { return }
+                  let resp = try? await api.playlistTracks(puri) else {
+                app?.flash("Radio konnte nicht erstellt werden")   // z.B. lokaler/YT-Song ohne Spotify-Empfehlungen
+                return
+            }
             player.play(tracks: resp.tracks, contextName: r.name ?? "Radio", contextURI: puri)
-            // Bibliothek aktualisieren, damit das neue Radio sofort in der Liste auftaucht
+            app?.flash("Radio gestartet ✓")
             NotificationCenter.default.post(name: .init("discoverPlaylistsChanged"), object: nil)
         }
     }
@@ -342,32 +358,47 @@ struct PlaylistMenu: View {
     }
     private func startRadio() {
         guard let app else { return }
+        app.flash("Radio wird erstellt…")
         Task {
             guard let r = await app.api.startPlaylistRadio(uri: uri, name: name), r.ok,
                   let puri = r.playlist_uri,
-                  let resp = try? await app.api.playlistTracks(puri) else { return }
+                  let resp = try? await app.api.playlistTracks(puri) else { app.flash("Radio fehlgeschlagen"); return }
             app.player.play(tracks: resp.tracks, contextName: r.name ?? "Radio", contextURI: puri)
+            app.flash("Radio gestartet ✓")
+            NotificationCenter.default.post(name: .init("discoverPlaylistsChanged"), object: nil)
         }
     }
     private func copyAsOwn() {
         guard let app else { return }
-        Task { _ = await app.api.copyPlaylist(sourceURI: uri, name: name + " (Kopie)") }
+        Task { _ = await app.api.copyPlaylist(sourceURI: uri, name: name + " (Kopie)"); app.flash("Als eigene Playlist kopiert ✓") }
     }
     private func saveAlbum() {
         guard let app else { return }
-        Task { if await app.api.saveAlbumAsPlaylist(uri) { NotificationCenter.default.post(name: .init("discoverPlaylistsChanged"), object: nil) } }
+        Task {
+            let ok = await app.api.saveAlbumAsPlaylist(uri)
+            app.flash(ok ? "Album als Playlist gespeichert ✓" : "Speichern fehlgeschlagen")
+            if ok { NotificationCenter.default.post(name: .init("discoverPlaylistsChanged"), object: nil) }
+        }
     }
     private func saveRadioAsPlaylist() {
         guard let app else { return }
-        Task { if await app.api.saveRadioAsPlaylist(name: name) { NotificationCenter.default.post(name: .init("discoverPlaylistsChanged"), object: nil) } }
+        Task {
+            let ok = await app.api.saveRadioAsPlaylist(name: name)
+            app.flash(ok ? "Als Playlist gespeichert ✓" : "Fehlgeschlagen")
+            if ok { NotificationCenter.default.post(name: .init("discoverPlaylistsChanged"), object: nil) }
+        }
     }
     private func deleteRadio() {
         guard let app else { return }
-        Task { if await app.api.deleteRadio(uri: uri, name: name) { onDeleted?(); NotificationCenter.default.post(name: .init("discoverPlaylistsChanged"), object: nil) } }
+        Task {
+            let ok = await app.api.deleteRadio(uri: uri, name: name)
+            app.flash(ok ? "Radio gelöscht" : "Löschen fehlgeschlagen")
+            if ok { onDeleted?(); NotificationCenter.default.post(name: .init("discoverPlaylistsChanged"), object: nil) }
+        }
     }
     private func copyLink() {
         guard let id = uri.split(separator: ":").last else { return }
-        UIPasteboard.general.string = "https://open.spotify.com/playlist/\(id)"; Haptics.tap()
+        UIPasteboard.general.string = "https://open.spotify.com/playlist/\(id)"; Haptics.tap(); app?.flash("Link kopiert")
     }
     private func openInSpotify() {
         guard let id = uri.split(separator: ":").last, let url = URL(string: "https://open.spotify.com/playlist/\(id)") else { return }
@@ -375,7 +406,8 @@ struct PlaylistMenu: View {
     }
     private func syncNow() {
         guard let app else { return }
-        Task { _ = await app.api.syncPlaylistNow(uri) }
+        app.flash("Synchronisiere…")
+        Task { app.flash(await app.api.syncPlaylistNow(uri) ? "Sync abgeschlossen ✓" : "Sync fehlgeschlagen") }
     }
     private func downloadAll() {
         guard let app else { return }
