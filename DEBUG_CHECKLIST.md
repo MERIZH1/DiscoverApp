@@ -53,6 +53,15 @@ Laufende Liste: was gefixt ist und was noch offen. ASCII (keine Umlaute).
 - Empfehlungen ~5x schneller (parallel + Cache, Invalidierung bei Add/Remove).
 - PWA: Kuenstler-Link am Desktop repariert.
 
+## ✅ Erledigt — autonome Runde 2 (Vollgas)
+- Pull-to-Refresh ueberall: Playlists, Alben, Bibliothek, Home (+ nocache fuer echte frische Empfehlungen).
+- Offene Playlist aktualisiert sich nach Aenderung (Umbenennen etc.) automatisch.
+- Such-Tastatur schliesst beim Song-/Top-Treffer-/Recent-/Genre-Tap + beim Scrollen.
+- Lueckenloses Aktions-Feedback (Toast): Senden, Hinzufuegen, Warteschlange, Radio,
+  Entfernen, Cache-Reset, Alle-herunterladen, Abo, Umbenennen, YT-Match.
+- Backend: Empfehlungs-Cache konsistent (Invalidierung bei Add/Remove, in clear-cache, nocache-Param).
+- Player/Sync/DownloadManager: Zeile-fuer-Zeile reviewed -> exzellent, keine Bugs.
+
 ## 🔲 Offen / als Naechstes
 - [ ] Build d666e3b+ signieren (rustsign) + durchtesten: Radios, lokale Suche,
       Toasts, Remote-Transfer, "Gehe zu", alle neuen Menues.
