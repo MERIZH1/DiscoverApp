@@ -3,6 +3,10 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.8 — Lokale Suche (Navidrome)
+- Suche: neue „Lokal"-Pille + Navidrome-Treffer — Songs („Auf dem Server") und Alben („Alben auf dem Server"), in „Alle" und unter „Lokal".
+- Lokale Songs streamen direkt aus der Bibliothek (Quellen-Badge im Player zeigt „Bibliothek"); Navidrome-Alben oeffnen sich mit erhaltener Reihenfolge.
+
 ## v2.7 — Radios sichtbar + Wiedergabe herholen
 - Song-Radios tauchten nicht in der Bibliothek auf (die App lud `/api/radio-playlists` nie) → Filterpille „📻 Radios" blieb leer. Werden jetzt geladen und angezeigt.
 - Neu erstelltes Song-Radio erscheint sofort in der Liste und startet mit Namen im Player.

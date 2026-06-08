@@ -117,11 +117,13 @@ struct Track: Codable, Identifiable, Hashable {
     let duration_ms: Int?
     var downloaded: Bool?
     let deezer_link: String?    // fuer /api/add-track (Empfehlungen)
+    let navidromeId: String?    // lokale Songs (Navidrome) -> direktes Streaming
 
     var durationSec: Double { Double(duration_ms ?? 0) / 1000.0 }
+    var isLocal: Bool { uri.hasPrefix("navidrome:") || (navidromeId?.isEmpty == false) }
 
     enum CodingKeys: String, CodingKey {
-        case uri, name, artist, artists, album, album_uri, image, duration_ms, downloaded, deezer_link
+        case uri, name, artist, artists, album, album_uri, image, duration_ms, downloaded, deezer_link, navidromeId
     }
     private enum ExtraKeys: String, CodingKey { case deezer_cover, spotify_uri }
     init(from d: Decoder) throws {
@@ -141,12 +143,13 @@ struct Track: Codable, Identifiable, Hashable {
         duration_ms = try? c.decode(Int.self, forKey: .duration_ms)
         downloaded  = try? c.decode(Bool.self, forKey: .downloaded)
         deezer_link = try? c.decode(String.self, forKey: .deezer_link)
+        navidromeId = (try? c.decode(String.self, forKey: .navidromeId)).flatMap { $0.isEmpty ? nil : $0 }
     }
     init(uri: String, name: String, artist: String, image: String?) {
         self.uri = uri; self.name = name; self.artist = artist
         self.image = image; self.artists = nil; self.album = nil
         self.album_uri = nil; self.duration_ms = nil; self.downloaded = nil
-        self.deezer_link = nil
+        self.deezer_link = nil; self.navidromeId = nil
     }
 }
 
@@ -200,6 +203,8 @@ struct SearchResponse: Codable {
     let albums: [Card]?
     let artists: [Card]?
     let shows: [Card]?
+    let local: [Track]?          // Navidrome-Songs ("Auf dem Server")
+    let local_albums: [Card]?    // Navidrome-Alben
 }
 
 // MARK: - Podcast

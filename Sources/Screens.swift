@@ -1124,7 +1124,7 @@ struct SearchView: View {
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(["all","tracks","playlists","albums","artists","shows"], id: \.self) { s in
+                        ForEach(["all","tracks","playlists","albums","artists","shows","lokal"], id: \.self) { s in
                             Pill(text: label(s), active: scope == s) { scope = s }
                         }
                     }.padding(.horizontal)
@@ -1158,6 +1158,18 @@ struct SearchView: View {
                             }
                             if scope == "all" || scope == "shows", let shs = r.shows, !shs.isEmpty {
                                 SectionHeader("Podcasts"); CardRows(cards: shs, isAlbum: false)
+                            }
+                            if scope == "all" || scope == "lokal", let loc = r.local, !loc.isEmpty {
+                                SectionHeader("Auf dem Server")
+                                ForEach(Array(loc.prefix(scope == "lokal" ? 50 : 6).enumerated()), id: \.offset) { i, t in
+                                    TrackRow(track: t, playing: player.current?.id == t.id) {
+                                        pushRecentItem(RecentSearchItem(uri: t.uri, name: t.name, image: t.image ?? "", sub: t.artist))
+                                        player.play(tracks: loc, startAt: i, contextName: "Server", contextURI: "")
+                                    }
+                                }
+                            }
+                            if scope == "all" || scope == "lokal", let la = r.local_albums, !la.isEmpty {
+                                SectionHeader("Alben auf dem Server"); CardRows(cards: la, isAlbum: true)
                             }
                         }.padding(.bottom, 130).padding(.top, 4)
                     } else if !recentItems.isEmpty {
@@ -1215,7 +1227,7 @@ struct SearchView: View {
                     } else if c.uri.contains(":artist:") {
                         ArtistView(uri: c.uri, name: c.name, image: c.image)
                     } else {
-                        TrackListView(uri: c.uri, title: c.name, image: c.image, isAlbum: c.uri.contains(":album:"))
+                        TrackListView(uri: c.uri, title: c.name, image: c.image, isAlbum: c.uri.contains(":album:") || c.uri.hasPrefix("navialbum:"))
                     }
                 }
                 .onAppear { pushRecentItem(RecentSearchItem(uri: c.uri, name: c.name, image: c.image ?? "", sub: cardSub(c.uri))) }
@@ -1223,7 +1235,7 @@ struct SearchView: View {
         }
     }
     private func label(_ s: String) -> String {
-        ["all":"Alle","tracks":"Songs","playlists":"Playlists","albums":"Alben","artists":"Künstler","shows":"Podcasts"][s] ?? s
+        ["all":"Alle","tracks":"Songs","playlists":"Playlists","albums":"Alben","artists":"Künstler","shows":"Podcasts","lokal":"Lokal"][s] ?? s
     }
     private func runSearch() {
         let q = query.trimmingCharacters(in: .whitespaces)

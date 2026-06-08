@@ -333,13 +333,14 @@ final class APIClient: ObservableObject {
 
     /// Liefert die spielbare (server-relative) URL fuer einen Track.
     func streamURL(for track: Track) async throws -> StreamURLResponse {
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "spotify_uri": track.uri,
             "name": track.name,
             "artist": track.artist,
             "album": track.album ?? "",
             "duration": Int(track.durationSec),
         ]
+        if let nid = track.navidromeId, !nid.isEmpty { body["navidromeId"] = nid }   // lokal -> direkt Navidrome
         let d = try await data("/api/stream-url", method: "POST", json: body)
         return try JSONDecoder().decode(StreamURLResponse.self, from: d)
     }
