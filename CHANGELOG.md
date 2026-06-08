@@ -3,6 +3,14 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.15 — Konsole 2.0
+- **Server-Logs in Klartext** — die Konsole zeigt jetzt, was der Server tut, verstaendlich aufbereitet + farbcodiert (gruen ok / orange Warnung / rot Fehler). Debuggen ohne SSH.
+- **Alle Playlists synchronisieren** auf Knopfdruck (statt auf den Nacht-Sync zu warten).
+- **Statistik**: Abos, Radios, Navidrome-Songs, gecachte Playlists/Empfehlungen.
+- **Ressourcen**: CPU/RAM der Kern-Container.
+- **Login-Daten-Alter**: zeigt wie alt Spotify-/Deezer-/YouTube-Cookies sind (alt = Vorbote von Aussetzern).
+- **Einzelne Caches gezielt leeren** (Playlists / Home / Empfehlungen) statt alles.
+
 ## v2.14 — Such-Tastatur + Bibliothek-Refresh
 - Suche: Tastatur verschwindet beim Antippen eines Songs (auch bei „letzte Suche" / Genre-Kachel) und beim Scrollen durch die Ergebnisse.
 - Bibliothek: Pull-to-Refresh (frische Playlists + Radios runterziehen).

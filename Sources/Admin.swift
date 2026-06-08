@@ -19,6 +19,24 @@ struct StatusLogItem: Codable, Identifiable {
 }
 struct StatusLogResponse: Codable { let items: [StatusLogItem] }
 
+// MARK: - Konsole 2.0 (Logs / Ressourcen / Statistik / Token-Alter)
+struct LogItem: Codable, Identifiable {
+    let time: String; let level: String; let text: String
+    var id: String { time + "|" + text }
+}
+struct LogsResponse: Codable { let items: [LogItem] }
+struct ContainerStat: Codable, Identifiable {
+    let name: String; let cpu: String; let mem: String
+    var id: String { name }
+}
+struct ResourcesResponse: Codable { let containers: [ContainerStat] }
+struct TokenInfo: Codable, Identifiable {
+    let name: String; let age_days: Double?
+    var id: String { name }
+}
+struct TokensResponse: Codable { let tokens: [TokenInfo] }
+struct StatsResponse: Codable { let stats: [String: Int] }
+
 // MARK: - Admin-/Wartungs-Konsole (nur fuer Admins der eigenen Instanz)
 struct AdminConsoleView: View {
     @EnvironmentObject var app: AppState
@@ -28,6 +46,11 @@ struct AdminConsoleView: View {
     @State private var loading = true
     @State private var busy = false
     @State private var toast = ""
+    @State private var showLogs = false
+    @State private var logs: [LogItem] = []
+    @State private var resources: [ContainerStat] = []
+    @State private var stats: [String: Int] = [:]
+    @State private var tokens: [TokenInfo] = []
 
     var body: some View {
         NavigationStack {
@@ -91,6 +114,59 @@ struct AdminConsoleView: View {
                             .font(.caption2).foregroundStyle(Theme.mute)
                     }
 
+                    SettingsGroup("SERVER-LOGS") {
+                        debugButton("Logs anzeigen (Klartext)", icon: "doc.text.magnifyingglass") { await loadAndShowLogs() }
+                        Text("Was der Server gerade tut — verstaendlich aufbereitet.")
+                            .font(.caption2).foregroundStyle(Theme.mute)
+                    }
+
+                    SettingsGroup("SYNC & CACHE") {
+                        debugButton("Alle Playlists synchronisieren", icon: "arrow.triangle.2.circlepath") { await doSyncAll() }
+                        Text("Einzelne Caches leeren:").font(.caption2).foregroundStyle(Theme.mute).padding(.top, 2)
+                        HStack(spacing: 8) {
+                            cacheChip("Playlists", "playlists")
+                            cacheChip("Home", "home")
+                            cacheChip("Empfehlungen", "recs")
+                        }
+                    }
+
+                    if !stats.isEmpty {
+                        SettingsGroup("STATISTIK") {
+                            statRow("Abos (Playlists)", stats["abos"])
+                            statRow("Radios", stats["radios"])
+                            statRow("Navidrome-Songs", stats["navidrome_songs"])
+                            statRow("Playlists gecacht", stats["playlists_gecacht"])
+                            statRow("Empfehlungen gecacht", stats["empfehlungen_gecacht"])
+                        }
+                    }
+
+                    if !resources.isEmpty {
+                        SettingsGroup("RESSOURCEN") {
+                            ForEach(resources) { c in
+                                HStack {
+                                    Text(c.name).font(.system(size: 13)).foregroundStyle(Theme.text).lineLimit(1)
+                                    Spacer()
+                                    Text("CPU \(c.cpu)").font(.system(size: 12)).foregroundStyle(Theme.sub)
+                                    Text(c.mem).font(.system(size: 11)).foregroundStyle(Theme.mute).lineLimit(1)
+                                }.padding(.vertical, 2)
+                            }
+                        }
+                    }
+
+                    if !tokens.isEmpty {
+                        SettingsGroup("LOGIN-DATEN (Alter)") {
+                            ForEach(tokens) { t in
+                                HStack {
+                                    Text(t.name).font(.system(size: 14)).foregroundStyle(Theme.text)
+                                    Spacer()
+                                    Text(tokenAge(t.age_days)).font(.system(size: 13, weight: .semibold)).foregroundStyle(tokenColor(t.age_days))
+                                }.padding(.vertical, 3)
+                            }
+                            Text("Alte Cookies sind oft der Vorbote von Aussetzern — bei Problemen erneuern.")
+                                .font(.caption2).foregroundStyle(Theme.mute)
+                        }
+                    }
+
                     // Log (letzte Statusaenderungen)
                     SettingsGroup("VERLAUF (letzte Änderungen)") {
                         if logItems.isEmpty {
@@ -128,6 +204,7 @@ struct AdminConsoleView: View {
             }
         }
         .task { await reload() }
+        .sheet(isPresented: $showLogs) { LogsSheet(items: logs) }
     }
 
     private func reload() async {
@@ -135,6 +212,52 @@ struct AdminConsoleView: View {
         status = await app.api.systemStatus()
         logItems = await app.api.statusLog()
         loading = false
+        // Konsolen-Daten im Hintergrund nachladen (blockieren den Status nicht)
+        resources = await app.api.adminResources()
+        stats = await app.api.adminStats()
+        tokens = await app.api.adminTokens()
+    }
+    private func doSyncAll() async {
+        busy = true
+        let n = await app.api.adminSyncAll()
+        toast = n >= 0 ? "\(n) Playlists werden synchronisiert…" : "Sync fehlgeschlagen"
+        busy = false
+        try? await Task.sleep(nanoseconds: 2_000_000_000); toast = ""
+    }
+    private func loadAndShowLogs() async {
+        logs = await app.api.adminLogs()
+        showLogs = true
+    }
+    private func clearOne(_ label: String, _ key: String) {
+        Task {
+            _ = await app.api.adminClearCache(which: [key])
+            toast = "\(label)-Cache geleert ✓"
+            try? await Task.sleep(nanoseconds: 1_500_000_000); toast = ""
+        }
+    }
+    private func tokenAge(_ d: Double?) -> String {
+        guard let d = d else { return "—" }
+        return d < 1 ? "heute" : "vor \(Int(d)) Tagen"
+    }
+    private func tokenColor(_ d: Double?) -> Color {
+        guard let d = d else { return Theme.sub }
+        return d > 25 ? Color(hex6: 0xFF9500) : Theme.sub
+    }
+    @ViewBuilder private func cacheChip(_ label: String, _ key: String) -> some View {
+        Button { clearOne(label, key) } label: {
+            Text(label).font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.text)
+                .padding(.horizontal, 12).padding(.vertical, 7)
+                .background(Theme.input).clipShape(Capsule())
+        }.buttonStyle(.plain)
+    }
+    @ViewBuilder private func statRow(_ label: String, _ v: Int?) -> some View {
+        if let v = v {
+            HStack {
+                Text(label).font(.system(size: 14)).foregroundStyle(Theme.text)
+                Spacer()
+                Text("\(v)").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.accent)
+            }.padding(.vertical, 3)
+        }
     }
     @ViewBuilder private func debugButton(_ title: String, icon: String, _ action: @escaping () async -> Void) -> some View {
         Button { Task { await action() } } label: {
@@ -212,5 +335,52 @@ struct AdminConsoleView: View {
         let d = Date(timeIntervalSince1970: TimeInterval(ts))
         let f = DateFormatter(); f.locale = Locale(identifier: "de_DE"); f.dateFormat = "d. MMM HH:mm"
         return f.string(from: d)
+    }
+}
+
+// MARK: - Server-Logs (Klartext, farbcodiert nach Schwere)
+struct LogsSheet: View {
+    let items: [LogItem]
+    @Environment(\.dismiss) private var dismiss
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    if items.isEmpty {
+                        Text("Keine Eintraege.").font(.system(size: 14)).foregroundStyle(Theme.mute)
+                            .frame(maxWidth: .infinity).padding(.top, 40)
+                    }
+                    ForEach(items.reversed()) { it in   // neueste oben
+                        HStack(alignment: .top, spacing: 10) {
+                            Circle().fill(color(it.level)).frame(width: 8, height: 8).padding(.top, 6)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(it.text).font(.system(size: 14)).foregroundStyle(Theme.text)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                if !it.time.isEmpty {
+                                    Text(it.time).font(.caption2).foregroundStyle(Theme.mute)
+                                }
+                            }
+                            Spacer(minLength: 0)
+                        }.padding(.horizontal).padding(.vertical, 7)
+                        Divider().background(Theme.input)
+                    }
+                }.padding(.vertical, 8)
+            }
+            .scrollContentBackground(.hidden).background(Theme.bg)
+            .navigationTitle("Server-Logs").navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Fertig") { dismiss() }.foregroundStyle(Theme.accent)
+                }
+            }
+        }
+    }
+    private func color(_ lvl: String) -> Color {
+        switch lvl {
+        case "err":  return Color(hex6: 0xFF3B30)
+        case "warn": return Color(hex6: 0xFF9500)
+        case "ok":   return Theme.accent
+        default:     return Theme.sub
+        }
     }
 }

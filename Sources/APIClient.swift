@@ -105,6 +105,39 @@ final class APIClient: ObservableObject {
               let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return false }
         return (obj["ok"] as? Bool) ?? false
     }
+    /// Admin: einzelne Caches gezielt leeren (playlists|pllist|home|recs).
+    @discardableResult func adminClearCache(which: [String]) async -> Bool {
+        guard let d = try? await data("/api/admin/clear-cache", method: "POST", json: ["which": which]),
+              let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return false }
+        return (obj["ok"] as? Bool) ?? false
+    }
+    /// Konsole: Klartext-Server-Logs.
+    func adminLogs() async -> [LogItem] {
+        guard let d = try? await data("/api/admin/logs"),
+              let r = try? JSONDecoder().decode(LogsResponse.self, from: d) else { return [] }
+        return r.items
+    }
+    /// Konsole: alle abonnierten Playlists synchronisieren. Gibt Anzahl zurueck.
+    @discardableResult func adminSyncAll() async -> Int {
+        guard let d = try? await data("/api/admin/sync-all", method: "POST"),
+              let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return -1 }
+        return (o["count"] as? Int) ?? -1
+    }
+    func adminResources() async -> [ContainerStat] {
+        guard let d = try? await data("/api/admin/resources"),
+              let r = try? JSONDecoder().decode(ResourcesResponse.self, from: d) else { return [] }
+        return r.containers
+    }
+    func adminStats() async -> [String: Int] {
+        guard let d = try? await data("/api/admin/stats"),
+              let r = try? JSONDecoder().decode(StatsResponse.self, from: d) else { return [:] }
+        return r.stats
+    }
+    func adminTokens() async -> [TokenInfo] {
+        guard let d = try? await data("/api/admin/tokens"),
+              let r = try? JSONDecoder().decode(TokensResponse.self, from: d) else { return [] }
+        return r.tokens
+    }
     /// Leichter Health-Check.
     func ping() async -> Bool {
         guard let url = URL(string: base + "/api/ping") else { return false }
