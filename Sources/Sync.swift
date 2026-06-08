@@ -200,6 +200,19 @@ final class SyncManager: ObservableObject {
         }
     }
 
+    /// Dieses Geraet HOLT die laufende Wiedergabe zu sich (Owner -> hier).
+    /// (Im Picker das eigene Geraet antippen; switchPlaybackTo blockt sich selbst.)
+    func pullPlaybackHere() {
+        guard let p = player else { return }
+        let ownerID = remote?.device_id
+        Task {
+            await handleTakeOver(p, value: nil)   // frischen State (syncGetState) ziehen + lokal spielen
+            if let ownerID, ownerID != deviceID {
+                await api.syncSendCommand("pause", value: nil, target: ownerID, fromID: deviceID)
+            }
+        }
+    }
+
     /// Dieses Geraet uebernimmt die Wiedergabe (track + position + queue) vom aktuellen Owner.
     private func handleTakeOver(_ p: PlayerController, value: Any?) async {
         var snap: RemoteState? = nil
@@ -253,7 +266,11 @@ struct DevicePickerSheet: View {
                     ForEach(devices) { dev in
                         Button {
                             if dev.is_owner { dismiss(); return }
-                            sync.switchPlaybackTo(dev.device_id, name: dev.name)
+                            if dev.device_id == sync.deviceID {
+                                sync.pullPlaybackHere()        // dieses Geraet holt die Wiedergabe her
+                            } else {
+                                sync.switchPlaybackTo(dev.device_id, name: dev.name)
+                            }
                             Haptics.tap(); dismiss()
                         } label: {
                             HStack(spacing: 12) {

@@ -192,6 +192,16 @@ final class APIClient: ObservableObject {
         try await get("/api/home")
     }
 
+    /// Song-Radios (separater Endpoint) als Playlist-Eintraege fuer die Bibliothek.
+    func radioPlaylists() async -> [Playlist] {
+        guard let d = try? await data("/api/radio-playlists"),
+              let r = try? JSONDecoder().decode(RadioPlaylistsResponse.self, from: d) else { return [] }
+        return r.items.map { it in
+            let uri = (it.id?.isEmpty == false) ? "radio-id:" + it.id! : "radio-name:" + it.name
+            return Playlist(uri: uri, name: it.name, image: it.image)
+        }
+    }
+
     /// Spotify-Share-Link aufloesen (Track/Playlist/Album/Artist).
     func spotifyResolve(_ url: String) async -> SpotifyResolve? {
         guard let d = try? await data("/api/spotify/resolve?url=\(enc(url))") else { return nil }

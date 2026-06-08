@@ -251,11 +251,14 @@ struct TrackMenu: View {
     }
     private func startRadio() {
         guard let api = app?.api, let player = app?.player else { return }
+        Haptics.tap()
         Task {
             guard let r = try? await api.startRadio(track: track), r.ok,
                   let puri = r.playlist_uri,
                   let resp = try? await api.playlistTracks(puri) else { return }
-            player.play(tracks: resp.tracks)
+            player.play(tracks: resp.tracks, contextName: r.name ?? "Radio", contextURI: puri)
+            // Bibliothek aktualisieren, damit das neue Radio sofort in der Liste auftaucht
+            NotificationCenter.default.post(name: .init("discoverPlaylistsChanged"), object: nil)
         }
     }
     /// Umbenennen-Dialog (UIKit-Alert, da Menue-Content keine eigenen Sheets halten kann).
@@ -1671,21 +1674,24 @@ struct LibraryView: View {
         if subs.isEmpty, let cs = app.cacheGet("subs", [SubItem].self) { applySubs(cs) }
         // ALLE Seiten paginiert nachladen (wie PWA): Seite 1 zeigt sofort, der
         // Rest fuellt sich inkrementell — sonst brach die Liste nach ~50 ab.
+        // Song-Radios liegen an einem eigenen Endpoint -> sonst fehlen sie in der Bibliothek
+        let radios = await app.api.radioPlaylists()
         var all: [Playlist] = []
         var offset = 0
-        for i in 0..<40 {
-            guard let page = try? await app.api.playlistsPage(offset: offset) else {
-                if i == 0 { break }   // erste Seite fehlgeschlagen -> Cache behalten
-                break
-            }
+        var gotAny = false
+        for _ in 0..<40 {
+            guard let page = try? await app.api.playlistsPage(offset: offset) else { break }
+            gotAny = true
             all.append(contentsOf: page.items)
-            playlists = all           // inkrementelles UI-Update
+            playlists = radios + all   // Radios immer mit anzeigen, inkrementelles UI-Update
             if !(page.has_more ?? false) || page.items.isEmpty { break }
             offset = page.next_offset ?? (offset + page.items.count)
         }
-        if !all.isEmpty {
-            app.cacheSet("playlists", all)
+        if gotAny {
+            app.cacheSet("playlists", all)   // Cache nur die echten Playlists (Radios laufen ab)
             indexPlaylistsInSpotlight(all)   // iOS-Suche
+        } else if !radios.isEmpty {
+            playlists = radios + playlists.filter { !isRadioItem($0.uri) }   // Fetch fehlgeschlagen -> wenigstens Radios
         }
         if let s = try? await app.api.subscriptions() { applySubs(s); app.cacheSet("subs", s) }
         loaded = true

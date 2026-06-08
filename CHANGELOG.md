@@ -3,6 +3,11 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.7 — Radios sichtbar + Wiedergabe herholen
+- Song-Radios tauchten nicht in der Bibliothek auf (die App lud `/api/radio-playlists` nie) → Filterpille „📻 Radios" blieb leer. Werden jetzt geladen und angezeigt.
+- Neu erstelltes Song-Radio erscheint sofort in der Liste und startet mit Namen im Player.
+- Remote/Connect: Wiedergabe laesst sich jetzt **aufs eigene Geraet holen** (im Geraete-Picker das eigene Geraet antippen). Vorher ging nur Wegschieben — die Wiedergabe blieb am PC.
+
 ## v2.6 — Song-Radio repariert
 - „Song-Radio starten" tat in der App nichts: die erzeugte Radio-Playlist (radio-name:/radio-id:/radio:) wurde am falschen Endpoint geladen. Wird jetzt korrekt aufgeloest — Radio aus einem Song (und das Oeffnen gespeicherter Radios) funktioniert.
 

@@ -249,6 +249,14 @@ struct RadioStation: Codable, Identifiable, Hashable {
 }
 struct RadioFavoritesResponse: Codable { let items: [RadioStation] }
 
+// Song-Radios (/api/radio-playlists) -> erscheinen als Playlists in der Bibliothek
+struct RadioPlaylistItem: Codable {
+    let id: String?
+    let name: String
+    let image: String?
+}
+struct RadioPlaylistsResponse: Codable { let items: [RadioPlaylistItem] }
+
 // MARK: - Lyrics
 struct Lyrics: Codable {
     let lyrics: String?
