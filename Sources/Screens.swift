@@ -1449,6 +1449,7 @@ struct TopHitCard: View {
         Group {
             if hit.type == "track" {
                 Button {
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                     player.play(tracks: [Track(uri: hit.realURI, name: hit.name ?? "", artist: hit.artist ?? "", image: hit.image)])
                 } label: { card }.buttonStyle(.plain)
             } else {
