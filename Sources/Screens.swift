@@ -672,20 +672,22 @@ struct HomeView: View {
             }
         }
         .sheet(isPresented: $showAccount) { AccountSheet() }
-        .task {
-            // 1) Cache sofort zeigen
-            if home == nil { home = app.cacheGet("home", HomeResponse.self) }
-            if recents.isEmpty { recents = app.cacheGet("recents", [HomeItem].self) ?? [] }
-            // 2) Frisch nachladen + Cache aktualisieren (taucht beim Zurueckkommen auf)
-            if let h = try? await app.api.home() { home = h; app.cacheSet("home", h) }
-            // Offline ohne Cache: leeren Zustand setzen statt ewig "Lädt..."
-            if home == nil { home = HomeResponse(greeting: nil, user_name: nil, country: nil, quick: [], sections: []) }
-            // Recents: zuerst Spotify-recents, sonst aus dem lokalen Verlauf bauen (zuverlaessig)
-            if let r = try? await app.api.recents(), !r.isEmpty {
-                recents = r; app.cacheSet("recents", r)
-            } else if let hist = try? await app.api.history(), !hist.isEmpty {
-                recents = recentsFromHistory(hist); app.cacheSet("recents", recents)
-            }
+        .task { await loadHome() }
+        .refreshable { await loadHome() }
+    }
+    private func loadHome() async {
+        // 1) Cache sofort zeigen
+        if home == nil { home = app.cacheGet("home", HomeResponse.self) }
+        if recents.isEmpty { recents = app.cacheGet("recents", [HomeItem].self) ?? [] }
+        // 2) Frisch nachladen + Cache aktualisieren (taucht beim Zurueckkommen auf)
+        if let h = try? await app.api.home() { home = h; app.cacheSet("home", h) }
+        // Offline ohne Cache: leeren Zustand setzen statt ewig "Lädt..."
+        if home == nil { home = HomeResponse(greeting: nil, user_name: nil, country: nil, quick: [], sections: []) }
+        // Recents: zuerst Spotify-recents, sonst aus dem lokalen Verlauf bauen (zuverlaessig)
+        if let r = try? await app.api.recents(), !r.isEmpty {
+            recents = r; app.cacheSet("recents", r)
+        } else if let hist = try? await app.api.history(), !hist.isEmpty {
+            recents = recentsFromHistory(hist); app.cacheSet("recents", recents)
         }
     }
 
@@ -2323,6 +2325,9 @@ struct TrackListView: View {
         }
         .scrollContentBackground(.hidden)
         .refreshable { await refreshAll() }
+        .onReceive(NotificationCenter.default.publisher(for: .init("discoverPlaylistsChanged"))) { _ in
+            Task { await refreshAll() }   // z.B. nach Umbenennen/Aenderung -> offene Playlist auffrischen
+        }
         .background(
             // Gradient als ScrollView-Hintergrund: bleedet hinter die Notch (kein Clipping);
             // Cover bleibt korrekt unter der Toolbar, da die ScrollView die Safe-Area respektiert.
