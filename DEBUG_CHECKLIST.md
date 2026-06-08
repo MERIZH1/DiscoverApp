@@ -29,10 +29,16 @@ Laufende Liste: was gefixt ist und was noch offen. ASCII (keine Umlaute).
 - v1-Audit: Suche (Pathfinder) + Playlist-erstellen (spclient) schon "v2";
   restliche /v1 sind Fallbacks/selten -> bewusst als Sicherheitsnetz behalten.
 
+## ✅ Erledigt — diese Runde nachgezogen
+- PWA-Bug: Kuenstler-Link war am Desktop tot (Touch-Sperre galt faelschlich auch
+  fuer Maus) -> jetzt am Desktop ueberall klickbar (app.js, SW v97).
+- App: "Gehe zu"-Untermenue (Kuenstler/Album) im Song-Menue (d666e3b).
+- Backend: Empfehlungen ~5x schneller (parallel + Cache) — bestaetigt schneller.
+
 ## 🔲 Offen / als Naechstes
-- [ ] Build ca95d07+ signieren (rustsign) + durchtesten: Radios, lokale Suche,
-      Toasts, Remote-Transfer, alle neuen Menues.
-- [ ] Player- + Sync-Flows Zeile-fuer-Zeile auf Bugs pruefen (noch nicht gemacht).
+- [ ] Build d666e3b+ signieren (rustsign) + durchtesten: Radios, lokale Suche,
+      Toasts, Remote-Transfer, "Gehe zu", alle neuen Menues.
+- [ ] Player- + Sync-Flows Zeile-fuer-Zeile auf Bugs pruefen (LAEUFT als Naechstes).
 - [ ] "Senden an Profil" (Song an User): Toast-Feedback noch nicht verdrahtet.
 - [ ] Home-Feed: Genre/Mood-Browse auf der Home-Startseite (PWA?) nicht verglichen.
 - [ ] Optional/niedrige Prio: Radio->als-Playlist nutzt noch /v1 direkt
