@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Status-Modelle (/api/status, /api/status-log)
 struct ServiceStatus: Codable, Hashable {
@@ -75,6 +76,7 @@ struct AdminConsoleView: View {
     @State private var smartCache = SmartCacheConfig(min_listened_sec: 45, min_listened_pct: 0, min_play_count: 4, enabled: true)
     @State private var smartCacheLoaded = false
     @State private var serverConfig: ServerConfig?
+    @State private var profiles: [Profile] = []
 
     var body: some View {
         NavigationStack {
@@ -255,6 +257,28 @@ struct AdminConsoleView: View {
                         }
                     }
 
+                    if !profiles.isEmpty {
+                        SettingsGroup("PROFILE") {
+                            ForEach(profiles) { p in
+                                HStack(spacing: 8) {
+                                    Text(p.name).font(.system(size: 14)).foregroundStyle(Theme.text)
+                                    if p.is_admin == true {
+                                        Text("Admin").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.accent)
+                                    }
+                                    Spacer()
+                                    if p.id != app.profile?.id {
+                                        Button { confirmDeleteProfile(p) } label: {
+                                            Image(systemName: "trash").font(.system(size: 14)).foregroundStyle(Color(hex6: 0xFF6B6B))
+                                        }.buttonStyle(.plain)
+                                    } else {
+                                        Text("aktuell").font(.system(size: 11)).foregroundStyle(Theme.mute)
+                                    }
+                                }.padding(.vertical, 3)
+                            }
+                            debugButton("Profil hinzufuegen", icon: "person.badge.plus") { promptNewProfile() }
+                        }
+                    }
+
                     // Log (letzte Statusaenderungen)
                     SettingsGroup("VERLAUF (letzte Änderungen)") {
                         if logItems.isEmpty {
@@ -307,6 +331,44 @@ struct AdminConsoleView: View {
         disks = await app.api.adminDisk()
         if let sc = await app.api.smartCacheConfig() { smartCache = sc; smartCacheLoaded = true }
         serverConfig = await app.api.serverConfig()
+        profiles = (try? await app.api.profiles()) ?? []
+    }
+    private func present(_ ac: UIAlertController) {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let keyWin = scenes.flatMap { $0.windows }.first { $0.isKeyWindow } ?? scenes.first?.windows.first
+        guard var top = keyWin?.rootViewController else { return }
+        while let p = top.presentedViewController { top = p }
+        top.present(ac, animated: true)
+    }
+    private func promptNewProfile() {
+        let ac = UIAlertController(title: "Neues Profil", message: nil, preferredStyle: .alert)
+        ac.addTextField { $0.placeholder = "Name" }
+        ac.addAction(UIAlertAction(title: "Abbrechen", style: .cancel))
+        ac.addAction(UIAlertAction(title: "Anlegen", style: .default) { _ in
+            let n = (ac.textFields?.first?.text ?? "").trimmingCharacters(in: .whitespaces)
+            guard !n.isEmpty else { return }
+            Task {
+                let ok = await app.api.createProfile(name: n)
+                toast = ok ? "Profil angelegt ✓" : "Anlegen fehlgeschlagen"
+                profiles = (try? await app.api.profiles()) ?? profiles
+                try? await Task.sleep(nanoseconds: 1_500_000_000); toast = ""
+            }
+        })
+        present(ac)
+    }
+    private func confirmDeleteProfile(_ p: Profile) {
+        let ac = UIAlertController(title: "Profil löschen?",
+                                   message: "„\(p.name)“ samt seinen Daten wird entfernt.", preferredStyle: .alert)
+        ac.addAction(UIAlertAction(title: "Abbrechen", style: .cancel))
+        ac.addAction(UIAlertAction(title: "Löschen", style: .destructive) { _ in
+            Task {
+                let ok = await app.api.deleteProfile(p.id)
+                toast = ok ? "Profil gelöscht" : "Löschen fehlgeschlagen"
+                profiles = (try? await app.api.profiles()) ?? profiles
+                try? await Task.sleep(nanoseconds: 1_500_000_000); toast = ""
+            }
+        })
+        present(ac)
     }
     private func saveSmartCache() {
         let c = smartCache

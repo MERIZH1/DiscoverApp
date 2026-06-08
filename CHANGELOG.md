@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.19 — Profile verwalten
+- Konsole: Profile **auflisten, anlegen und loeschen** direkt aus der App (Admin).
+
 ## v2.18 — Server steuern aus der Konsole
 - **Smart-Cache (Auto-Download)** direkt einstellbar: an/aus + Schwellen (ab X Sekunden gehoert / ODER X-mal abgespielt).
 - **Server-Konfiguration** als Info-Anzeige (Navidrome/Deemix/Spotify-User + ob Passwort/Webhook gesetzt sind).
