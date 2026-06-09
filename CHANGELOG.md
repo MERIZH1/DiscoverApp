@@ -3,6 +3,11 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.21 — Mehrfachauswahl: Songs zusammen zur Playlist
+- In **Suche, Playlist und Empfehlungen** oben rechts den Auswahl-Button (Haken-Symbol) antippen → Songs ankreuzen → unten **„Zu Playlist hinzufuegen (N)"**.
+- Funktioniert auch fuer **lokale Navidrome-Songs** (werden beim Hinzufuegen zu Spotify-Treffern aufgeloest, sonst lokal eingefuegt).
+- Langer Druck loest die Auswahl NICHT aus — nur der Button.
+
 ## v2.20 — Konsole-Feinschliff + 2 Bugfixes
 - **Bugfix:** Lokalen (Navidrome-)Song zu einer Playlist hinzufuegen ging schief → wird jetzt automatisch zum passenden Spotify-Track aufgeloest und hinzugefuegt.
 - **Bugfix:** Server-Logs blieben leer (das Sekunden-Sync-Polling flutete das Log-Fenster) → jetzt 2000 Zeilen Tiefe, Aktivitaet ist wieder sichtbar.

@@ -1176,6 +1176,14 @@ struct SearchView: View {
     @FocusState private var searchFocused: Bool
     @Environment(\.liquidGlass) private var glass
     @State private var navPath = NavigationPath()
+    @State private var selecting = false
+    @State private var selected: Set<String> = []
+    @State private var showMultiAdd = false
+    private var allResultTracks: [Track] { (res?.tracks ?? []) + (res?.local ?? []) }
+    private var selectedTracks: [Track] { allResultTracks.filter { selected.contains($0.uri) } }
+    private func toggleSel(_ uri: String) {
+        if selected.contains(uri) { selected.remove(uri) } else { selected.insert(uri) }
+    }
 
     private var recentItems: [RecentSearchItem] {
         (try? JSONDecoder().decode([RecentSearchItem].self, from: Data(recentItemsRaw.utf8))) ?? []
@@ -1264,7 +1272,9 @@ struct SearchView: View {
                             if scope == "all" || scope == "tracks", let tracks = r.tracks, !tracks.isEmpty {
                                 SectionHeader("Songs")
                                 ForEach(Array(tracks.prefix(scope == "tracks" ? 50 : 6).enumerated()), id: \.offset) { i, t in
-                                    TrackRow(track: t, playing: player.current?.id == t.id) {
+                                    TrackRow(track: t, playing: player.current?.id == t.id,
+                                             selecting: selecting, selected: selected.contains(t.uri)) {
+                                        if selecting { toggleSel(t.uri); return }
                                         searchFocused = false   // Tastatur weg beim Song-Tippen
                                         pushRecentItem(RecentSearchItem(uri: t.uri, name: t.name, image: t.image ?? "", sub: t.artist))
                                         player.play(tracks: tracks, startAt: i, contextName: "Suche", contextURI: "")
@@ -1286,7 +1296,9 @@ struct SearchView: View {
                             if scope == "all" || scope == "lokal", let loc = r.local, !loc.isEmpty {
                                 SectionHeader("Auf dem Server")
                                 ForEach(Array(loc.prefix(scope == "lokal" ? 50 : 6).enumerated()), id: \.offset) { i, t in
-                                    TrackRow(track: t, playing: player.current?.id == t.id) {
+                                    TrackRow(track: t, playing: player.current?.id == t.id,
+                                             selecting: selecting, selected: selected.contains(t.uri)) {
+                                        if selecting { toggleSel(t.uri); return }
                                         searchFocused = false   // Tastatur weg beim Song-Tippen
                                         pushRecentItem(RecentSearchItem(uri: t.uri, name: t.name, image: t.image ?? "", sub: t.artist))
                                         player.play(tracks: loc, startAt: i, contextName: "Server", contextURI: "")
@@ -1339,6 +1351,28 @@ struct SearchView: View {
                             .font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
                     }
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    if res != nil {
+                        Button { selecting.toggle(); if !selecting { selected = [] }; searchFocused = false } label: {
+                            Image(systemName: selecting ? "xmark.circle" : "checklist")
+                                .font(.system(size: 17, weight: .semibold)).foregroundStyle(selecting ? Theme.accent : Theme.text)
+                        }
+                    }
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if selecting && !selected.isEmpty {
+                    Button { showMultiAdd = true } label: {
+                        Label("Zu Playlist hinzufügen (\(selected.count))", systemImage: "plus.circle.fill")
+                            .font(.system(size: 16, weight: .semibold)).foregroundStyle(.black)
+                            .padding(.horizontal, 22).padding(.vertical, 14)
+                            .background(Theme.accent).clipShape(Capsule())
+                            .shadow(color: .black.opacity(0.45), radius: 12, y: 4)
+                    }.padding(.bottom, 100)
+                }
+            }
+            .sheet(isPresented: $showMultiAdd, onDismiss: { selecting = false; selected = [] }) {
+                AddToPlaylistSheet(tracks: selectedTracks).environmentObject(app)
             }
             .navigationDestination(for: Card.self) { c in
                 Group {
@@ -1589,9 +1623,12 @@ struct SendToUserSheet: View {
     }
 }
 
-// MARK: - "Zu Playlist hinzufügen" — Auswahl-Sheet
+// MARK: - "Zu Playlist hinzufügen" — Auswahl-Sheet (1 oder mehrere Songs)
 struct AddToPlaylistSheet: View {
-    let track: Track
+    let tracks: [Track]
+    init(track: Track) { self.tracks = [track] }
+    init(tracks: [Track]) { self.tracks = tracks }
+    private var first: Track { tracks.first ?? Track(uri: "", name: "", artist: "", image: nil) }
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
     @State private var playlists: [Playlist] = []
@@ -1607,10 +1644,12 @@ struct AddToPlaylistSheet: View {
         NavigationStack {
             VStack(spacing: 0) {
                 HStack(spacing: 12) {
-                    Artwork(url: track.image, size: 44, corner: 4)
+                    Artwork(url: first.image, size: 44, corner: 4)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(track.name).font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.text).lineLimit(1)
-                        Text(track.artist).font(.system(size: 13)).foregroundStyle(Theme.sub).lineLimit(1)
+                        Text(tracks.count > 1 ? "\(tracks.count) Songs" : first.name)
+                            .font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.text).lineLimit(1)
+                        Text(tracks.count > 1 ? "zu einer Playlist hinzufügen" : first.artist)
+                            .font(.system(size: 13)).foregroundStyle(Theme.sub).lineLimit(1)
                     }
                     Spacer()
                 }.padding()
@@ -1661,8 +1700,13 @@ struct AddToPlaylistSheet: View {
         .task { playlists = (try? await app.api.playlists()) ?? [] }
     }
     private func doAdd(_ uri: String, _ name: String) async {
-        let ok = await app.api.addTrack(playlistURI: uri, track: track, playlistName: name)
-        status = ok ? "Hinzugefügt ✓" : "Fehler – erneut versuchen"
+        let ok: Bool
+        if tracks.count == 1 {
+            ok = await app.api.addTrack(playlistURI: uri, track: first, playlistName: name)
+        } else {
+            ok = await app.api.addTracks(playlistURI: uri, tracks: tracks) > 0
+        }
+        status = ok ? (tracks.count > 1 ? "\(tracks.count) hinzugefügt ✓" : "Hinzugefügt ✓") : "Fehler – erneut versuchen"
         Haptics.tap()
         try? await Task.sleep(nanoseconds: 800_000_000)
         if ok { dismiss() } else { status = "" }
@@ -2125,6 +2169,13 @@ struct TrackListView: View {
     @State private var addedRecs: Set<String> = []
     @State private var copyMsg = ""
     @State private var showDeleteConfirm = false
+    @State private var selecting = false
+    @State private var selected: Set<String> = []
+    @State private var showMultiAdd = false
+    private var selectedTracks: [Track] { (tracks + recs).filter { selected.contains($0.uri) } }
+    private func toggleSel(_ uri: String) {
+        if selected.contains(uri) { selected.remove(uri) } else { selected.insert(uri) }
+    }
 
     private func copyAsOwn() {
         guard !tracks.isEmpty else { return }
@@ -2277,8 +2328,10 @@ struct TrackListView: View {
                 LazyVStack(spacing: 0) {
                     ForEach(Array(tracks.enumerated()), id: \.element.id) { idx, t in
                         NumberedTrackRow(n: idx + 1, track: t, showCover: !isAlbum, playing: player.current?.id == t.id,
-                                         onRemoveFromPlaylist: canRemoveTracks ? { removeTrack(t) } : nil) {
-                            player.shuffle = false; player.play(tracks: tracks, startAt: idx, contextName: title, contextURI: uri)
+                                         onRemoveFromPlaylist: canRemoveTracks ? { removeTrack(t) } : nil,
+                                         selecting: selecting, selected: selected.contains(t.uri)) {
+                            if selecting { toggleSel(t.uri) }
+                            else { player.shuffle = false; player.play(tracks: tracks, startAt: idx, contextName: title, contextURI: uri) }
                         }
                     }
                 }.padding(.top, 6)
@@ -2317,7 +2370,9 @@ struct TrackListView: View {
                             RecRow(track: t, playing: player.current?.id == t.id,
                                    added: addedRecs.contains(t.uri),
                                    add: { addRec(t) },
-                                   play: { player.shuffle = false; player.play(tracks: recs, startAt: i, contextName: "Empfehlungen", contextURI: uri) })
+                                   play: { player.shuffle = false; player.play(tracks: recs, startAt: i, contextName: "Empfehlungen", contextURI: uri) },
+                                   selecting: selecting, selected: selected.contains(t.uri),
+                                   selectTap: { toggleSel(t.uri) })
                         }
                     }.padding(.top, 14)
                 }
@@ -2358,6 +2413,26 @@ struct TrackListView: View {
                     }
                 }
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { selecting.toggle(); if !selecting { selected = [] } } label: {
+                    Image(systemName: selecting ? "xmark.circle" : "checklist")
+                        .font(.system(size: 17, weight: .semibold)).foregroundStyle(selecting ? Theme.accent : Theme.text)
+                }
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if selecting && !selected.isEmpty {
+                Button { showMultiAdd = true } label: {
+                    Label("Zu Playlist hinzufügen (\(selected.count))", systemImage: "plus.circle.fill")
+                        .font(.system(size: 16, weight: .semibold)).foregroundStyle(.black)
+                        .padding(.horizontal, 22).padding(.vertical, 14)
+                        .background(Theme.accent).clipShape(Capsule())
+                        .shadow(color: .black.opacity(0.45), radius: 12, y: 4)
+                }.padding(.bottom, 150)
+            }
+        }
+        .sheet(isPresented: $showMultiAdd, onDismiss: { selecting = false; selected = [] }) {
+            AddToPlaylistSheet(tracks: selectedTracks).environmentObject(app)
         }
         .overlay { if loading { LoadingView() } }
         .overlay(alignment: .bottom) {
@@ -2587,6 +2662,8 @@ struct EpisodeRow: View {
 struct NumberedTrackRow: View {
     let n: Int; let track: Track; var showCover: Bool = true; let playing: Bool
     var onRemoveFromPlaylist: (() -> Void)? = nil
+    var selecting: Bool = false
+    var selected: Bool = false
     let tap: () -> Void
     @State private var showArtist = false
     @State private var showAlbum = false
@@ -2595,8 +2672,13 @@ struct NumberedTrackRow: View {
     @State private var showFixYT = false
     var body: some View {
         HStack(spacing: 12) {
-            Text("\(n)").font(.system(size: 14).monospacedDigit()).foregroundStyle(playing ? Theme.accent : Theme.sub)
-                .frame(width: 24, alignment: .trailing)
+            if selecting {
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22)).foregroundStyle(selected ? Theme.accent : Theme.mute).frame(width: 24)
+            } else {
+                Text("\(n)").font(.system(size: 14).monospacedDigit()).foregroundStyle(playing ? Theme.accent : Theme.sub)
+                    .frame(width: 24, alignment: .trailing)
+            }
             if showCover { Artwork(url: track.image, size: 50, corner: 4) }
             VStack(alignment: .leading, spacing: 2) {
                 Text(track.name).font(.system(size: 16, weight: .regular))
@@ -2604,14 +2686,16 @@ struct NumberedTrackRow: View {
                 Text(track.artist).font(.system(size: 14)).foregroundStyle(Theme.sub).lineLimit(1)
             }
             Spacer()
-            if track.downloaded == true {
-                Image(systemName: "checkmark").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.accent)
-            }
-            Menu {
-                TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }, onRemoveFromPlaylist: onRemoveFromPlaylist)
-            } label: {
-                Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
-                    .frame(width: 46, height: 46).contentShape(Rectangle())
+            if !selecting {
+                if track.downloaded == true {
+                    Image(systemName: "checkmark").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.accent)
+                }
+                Menu {
+                    TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }, onRemoveFromPlaylist: onRemoveFromPlaylist)
+                } label: {
+                    Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
+                        .frame(width: 46, height: 46).contentShape(Rectangle())
+                }
             }
         }.padding(.vertical, 9).padding(.horizontal)
             .background(playing ? Theme.accent.opacity(0.08) : .clear)
@@ -2624,22 +2708,31 @@ struct NumberedTrackRow: View {
 
 struct RecRow: View {
     let track: Track; let playing: Bool; let added: Bool; let add: () -> Void; let play: () -> Void
+    var selecting: Bool = false
+    var selected: Bool = false
+    var selectTap: (() -> Void)? = nil
     var body: some View {
         HStack(spacing: 12) {
+            if selecting {
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22)).foregroundStyle(selected ? Theme.accent : Theme.mute)
+            }
             Artwork(url: track.image, size: 50, corner: 4)
             VStack(alignment: .leading, spacing: 2) {
                 Text(track.name).font(.system(size: 15)).foregroundStyle(playing ? Theme.accent : Theme.text).lineLimit(1)
                 Text(track.artist).font(.system(size: 13)).foregroundStyle(Theme.sub).lineLimit(1)
             }
             Spacer()
-            Button(action: add) {
-                Image(systemName: added ? "checkmark.circle.fill" : "plus.circle")
-                    .font(.system(size: 24)).foregroundStyle(added ? Theme.accent : Theme.text)
-                    .frame(width: 42, height: 42).contentShape(Rectangle())
-            }.buttonStyle(.plain).disabled(added)
+            if !selecting {
+                Button(action: add) {
+                    Image(systemName: added ? "checkmark.circle.fill" : "plus.circle")
+                        .font(.system(size: 24)).foregroundStyle(added ? Theme.accent : Theme.text)
+                        .frame(width: 42, height: 42).contentShape(Rectangle())
+                }.buttonStyle(.plain).disabled(added)
+            }
         }
         .padding(.vertical, 8).padding(.horizontal).contentShape(Rectangle())
-        .onTapGesture(perform: play)
+        .onTapGesture { if selecting { selectTap?() } else { play() } }
     }
 }
 
@@ -2654,6 +2747,8 @@ struct YTBadge: View {
 
 struct TrackRow: View {
     let track: Track; let playing: Bool; let tap: () -> Void
+    var selecting: Bool = false
+    var selected: Bool = false
     @State private var showArtist = false
     @State private var showAlbum = false
     @State private var showAddPlaylist = false
@@ -2661,6 +2756,10 @@ struct TrackRow: View {
     @State private var showFixYT = false
     var body: some View {
         HStack(spacing: 12) {
+            if selecting {
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22)).foregroundStyle(selected ? Theme.accent : Theme.mute)
+            }
             Artwork(url: track.image, size: 52, corner: 4)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 5) {
@@ -2671,14 +2770,16 @@ struct TrackRow: View {
                 Text(track.artist).font(.system(size: 14)).foregroundStyle(Theme.sub).lineLimit(1)
             }
             Spacer()
-            if track.downloaded == true {
-                Image(systemName: "arrow.down.circle.fill").font(.system(size: 15)).foregroundStyle(Theme.accent.opacity(0.7))
-            }
-            Menu {
-                TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true })
-            } label: {
-                Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
-                    .frame(width: 46, height: 46).contentShape(Rectangle())
+            if !selecting {
+                if track.downloaded == true {
+                    Image(systemName: "arrow.down.circle.fill").font(.system(size: 15)).foregroundStyle(Theme.accent.opacity(0.7))
+                }
+                Menu {
+                    TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true })
+                } label: {
+                    Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
+                        .frame(width: 46, height: 46).contentShape(Rectangle())
+                }
             }
         }.padding(.vertical, 9).padding(.horizontal)
             .contentShape(Rectangle())

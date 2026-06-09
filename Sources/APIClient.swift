@@ -362,6 +362,15 @@ final class APIClient: ObservableObject {
     }
 
     /// Empfehlung in die Playlist hinzufuegen (Spotify-Playlist + paralleler Deemix-Download).
+    /// Mehrere Tracks auf einmal hinzufuegen (Mehrfachauswahl). Gibt Anzahl erfolgreich zurueck.
+    @discardableResult func addTracks(playlistURI: String, tracks: [Track]) async -> Int {
+        let arr = tracks.map { t -> [String: Any] in
+            ["track_uri": t.uri, "title": t.name, "artist": t.artist, "image": t.image ?? ""]
+        }
+        guard let d = try? await data("/api/add-tracks", method: "POST", json: ["playlist_uri": playlistURI, "tracks": arr]),
+              let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return 0 }
+        return (o["added"] as? Int) ?? 0
+    }
     func addTrack(playlistURI: String, track: Track, playlistName: String) async -> Bool {
         let body: [String: Any] = [
             "playlist_uri": playlistURI,
