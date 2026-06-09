@@ -79,7 +79,7 @@ final class NoiseDSP: @unchecked Sendable {
         }
     }
     func render(_ frames: Int, _ abl: UnsafeMutableAudioBufferListPointer) {
-        let vol = volume * 1.6, ty = type                      // Pegel hoch
+        let vol = volume * 1.0, ty = type                      // an Ambient-Pegel angeglichen
         let nch = abl.count
         if enabled == 0 {                                       // aus -> Stille + Fade fuer naechsten Start zuruecksetzen
             fadeGain = 0
@@ -124,7 +124,7 @@ final class NoiseEngine: ObservableObject {
     var musicPlaying = false {
         didSet { guard musicPlaying != oldValue else { return }; applyDuck() }
     }
-    private let duckFactor: Double = 0.6        // bei Musik auf 60% runter
+    private let duckFactor: Double = 0.85       // bei Musik nur leicht runter (auf 85%)
     private var fileTargetVolume: Double { volume * (musicPlaying ? duckFactor : 1.0) }
     private func applyDuck() {
         dsp.duckTarget = musicPlaying ? Float(duckFactor) : 1.0
