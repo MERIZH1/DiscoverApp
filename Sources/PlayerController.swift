@@ -75,6 +75,8 @@ final class PlayerController: ObservableObject {
     private var failedOffline: Set<String> = []   // Offline-Dateien, die diese Session nicht liefen -> streamen
     private var streamRetried: Set<String> = []   // gestreamte Tracks, die nach Fehler schon 1x frisch geladen wurden
     private var wantPlay = false                   // Absicht zu spielen -> beim readyToPlay durchsetzen (gegen 2x-play)
+    private var endStallTicks = 0                  // Auto-Advance-Fallback: Ticks am Track-Ende ohne Fortschritt
+    private var lastStallTime = -1.0               // letzte Position fuer die Stillstands-Erkennung
     var profileScope = ""                 // fuer profil-spezifische Persistenz
     weak var downloads: DownloadManager?  // Offline-Wiedergabe
     @Published var sleepRemaining = 0     // Sekunden, 0 = aus
@@ -458,6 +460,21 @@ final class PlayerController: ObservableObject {
         }
     }
 
+    /// Auto-Advance-Fallback: manche (transkodierten) Navidrome-Streams feuern KEIN
+    /// sauberes .AVPlayerItemDidPlayToEndTime. Wenn wir am BEKANNTEN Track-Ende stehen
+    /// und die Position ~1.5s nicht mehr vorankommt, selbst weiterschalten. Schneidet
+    /// nie zu frueh ab: setzt Stillstand am Ende voraus (laufende Songs ticken weiter).
+    private func checkEndStall() {
+        guard isPlaying, !isRadio, !crossfading, duration > 1,
+              currentTime >= duration - 1.5 else { endStallTicks = 0; return }
+        if abs(currentTime - lastStallTime) < 0.05 { endStallTicks += 1 } else { endStallTicks = 0 }
+        lastStallTime = currentTime
+        if endStallTicks >= 3 {        // ~1.5s Stillstand am Ende -> EOF kam offenbar nicht
+            endStallTicks = 0
+            next(auto: true)
+        }
+    }
+
     func next(auto: Bool = false) {
         if crossfading { completeCrossfade(); return }
         if auto && sleepAtEnd { sleepAtEnd = false; pause(); return }
@@ -592,6 +609,7 @@ final class PlayerController: ObservableObject {
         guard let track = current else { return }
         if crossfading { abortCrossfade() }
         primedNotLoaded = false
+        endStallTicks = 0; lastStallTime = -1.0      // Stall-Erkennung fuer neuen Track zuruecksetzen
         if autoplay { wantPlay = true }
         persistSnapshot()
         updateRemoteForContent()
@@ -718,6 +736,7 @@ final class PlayerController: ObservableObject {
                 if c.isFinite { self.currentTime = c; self.updateElapsed() }
                 self.applyFade()
                 self.checkSleep()
+                self.checkEndStall()
             }
         }
     }

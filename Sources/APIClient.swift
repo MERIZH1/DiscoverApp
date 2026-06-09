@@ -365,7 +365,8 @@ final class APIClient: ObservableObject {
     /// Mehrere Tracks auf einmal hinzufuegen (Mehrfachauswahl). Gibt Anzahl erfolgreich zurueck.
     @discardableResult func addTracks(playlistURI: String, tracks: [Track]) async -> Int {
         let arr = tracks.map { t -> [String: Any] in
-            ["track_uri": t.uri, "title": t.name, "artist": t.artist, "image": t.image ?? ""]
+            ["track_uri": t.uri, "title": t.name, "artist": t.artist, "image": t.image ?? "",
+             "duration_ms": t.duration_ms ?? 0, "album": t.album ?? "", "navidromeId": t.navidromeId ?? ""]
         }
         guard let d = try? await data("/api/add-tracks", method: "POST", json: ["playlist_uri": playlistURI, "tracks": arr]),
               let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return 0 }
@@ -378,6 +379,10 @@ final class APIClient: ObservableObject {
             "deezer_link": track.deezer_link ?? "",
             "playlist_name": playlistName,
             "title": track.name, "artist": track.artist,
+            "image": track.image ?? "",
+            "duration_ms": track.duration_ms ?? 0,
+            "album": track.album ?? "",
+            "navidromeId": track.navidromeId ?? "",
         ]
         guard let d = try? await data("/api/add-track", method: "POST", json: body),
               let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return false }
