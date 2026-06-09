@@ -359,13 +359,15 @@ final class PlayerController: ObservableObject {
     }
     private func prebufExt(mime: String?, urlExt: String?) -> String {
         if let m = mime?.lowercased() {
+            if m.contains("flac") { return "flac" }            // FEHLTE -> FLAC wurde als .m4a gespeichert = stumm
             if m.contains("mpeg") || m.contains("mp3") { return "mp3" }
             if m.contains("mp4") || m.contains("m4a") || m.contains("aac") { return "m4a" }
+            if m.contains("aiff") || m.contains("aif") { return "aiff" }
             if m.contains("ogg") || m.contains("opus") { return "ogg" }
             if m.contains("wav") { return "wav" }
         }
         let p = (urlExt ?? "").lowercased()
-        return ["m4a", "mp3", "aac", "mp4", "ogg", "opus", "wav"].contains(p) ? p : "m4a"
+        return ["m4a", "mp3", "aac", "mp4", "flac", "aiff", "aif", "ogg", "opus", "wav"].contains(p) ? p : "m4a"
     }
 
     /// Ueberblende abschliessen: Idle-Player (eingehend) wird aktiv, Queue-Status nachziehen.
@@ -723,6 +725,13 @@ final class PlayerController: ObservableObject {
                         // Offline-Datei spielt gerade nicht -> NUR diese Session streamen.
                         // Datei NICHT loeschen (bleibt in der Offline-Bibliothek).
                         self.failedOffline.insert(t.uri)
+                        self.source = ""
+                        self.loadCurrent(autoplay: true)
+                    } else if self.source == "buffer", let t = self.current {
+                        // Vorgepufferte Datei unspielbar (z.B. falsch erkannte Endung) -> verwerfen
+                        // und frisch streamen. Streaming nutzt den Content-Type -> kein Format-Raten.
+                        if let u = self.prebuf[t.uri] { try? FileManager.default.removeItem(at: u) }
+                        self.prebuf[t.uri] = nil
                         self.source = ""
                         self.loadCurrent(autoplay: true)
                     } else if let t = self.current, !self.streamRetried.contains(t.uri) {
