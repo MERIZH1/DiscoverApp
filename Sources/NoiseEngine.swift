@@ -47,6 +47,9 @@ final class NoiseDSP: @unchecked Sendable {
     var fadeTarget: Float = 1                         // 0 = ausblenden, 1 = einblenden
     private var fadeGain: Float = 0
     private let fadeStep: Float = 1.0 / (0.2 * 44100) // 0.2s Ein-/Ausblende
+    var duckTarget: Float = 1                         // 1 = voll, <1 = bei Musik leiser (Apple-Way)
+    private var duckGain: Float = 1
+    private let duckStep: Float = 1.0 / (0.4 * 44100) // 0.4s Duck-Uebergang
     private var rng: [UInt64] = [0x9E3779B97F4A7C15, 0xD1B54A32D192ED03]
     private var brown: [Float] = [0, 0]
     private var pk: [[Float]] = [[Float](repeating: 0, count: 7), [Float](repeating: 0, count: 7)]
@@ -76,7 +79,7 @@ final class NoiseDSP: @unchecked Sendable {
         }
     }
     func render(_ frames: Int, _ abl: UnsafeMutableAudioBufferListPointer) {
-        let vol = volume * 1.3, ty = type                      // +30 % Pegel
+        let vol = volume * 1.6, ty = type                      // Pegel hoch
         let nch = abl.count
         if enabled == 0 {                                       // aus -> Stille + Fade fuer naechsten Start zuruecksetzen
             fadeGain = 0
@@ -90,7 +93,9 @@ final class NoiseDSP: @unchecked Sendable {
         for f in 0..<frames {
             if fadeGain < fadeTarget { fadeGain = min(fadeTarget, fadeGain + fadeStep) }
             else if fadeGain > fadeTarget { fadeGain = max(fadeTarget, fadeGain - fadeStep) }
-            let g = fadeGain
+            if duckGain < duckTarget { duckGain = min(duckTarget, duckGain + duckStep) }
+            else if duckGain > duckTarget { duckGain = max(duckTarget, duckGain - duckStep) }
+            let g = fadeGain * duckGain
             for ch in 0..<nch {
                 guard let p = abl[ch].mData?.assumingMemoryBound(to: Float.self) else { continue }
                 let c = ch % 2
@@ -111,8 +116,19 @@ final class NoiseEngine: ObservableObject {
         didSet {
             UserDefaults.standard.set(volume, forKey: "noiseVolume")
             dsp.volume = Float(volume)
-            filePlayer?.volume = Float(volume)
+            filePlayer?.volume = Float(fileTargetVolume)
         }
+    }
+    /// Apple-Way: laeuft ein Song, wird der Hintergrund-Sound leiser gefahren.
+    /// Wird vom PlayerController gesetzt.
+    var musicPlaying = false {
+        didSet { guard musicPlaying != oldValue else { return }; applyDuck() }
+    }
+    private let duckFactor: Double = 0.6        // bei Musik auf 60% runter
+    private var fileTargetVolume: Double { volume * (musicPlaying ? duckFactor : 1.0) }
+    private func applyDuck() {
+        dsp.duckTarget = musicPlaying ? Float(duckFactor) : 1.0
+        filePlayer?.setVolume(Float(fileTargetVolume), fadeDuration: 0.4)
     }
     private let engine = AVAudioEngine()
     private let dsp = NoiseDSP()
@@ -209,7 +225,7 @@ final class NoiseEngine: ObservableObject {
             p.numberOfLoops = -1                 // gapless endlos
             p.volume = 0
             p.prepareToPlay(); p.play()
-            p.setVolume(Float(volume), fadeDuration: 0.2)   // 0.2s einblenden
+            p.setVolume(Float(fileTargetVolume), fadeDuration: 0.2)   // 0.2s einblenden (ggf. geduckt)
             filePlayer = p
         } catch { if activeId == id { activeId = nil } }
     }
