@@ -63,13 +63,10 @@ final class HealthMonitor {
             notifyMsg("Discover (Test)", pt.msg.isEmpty ? "Test-Benachrichtigung ✓ — Push-Hinweise funktionieren." : pt.msg, delay: 5)
         }
         guard enabled else { return }
-        // War weg, ist wieder da -> "wieder online"-Meldung (deckt Server-Reboot ab)
-        if !wasReachable {
-            wasReachable = true
-            lastDown = []   // Ausfaelle nach Wiederkehr neu bewerten
-            notifyMsg("Discover", "Der Server ist wieder online ✓")
-            return
-        }
+        // Server-Ausfaelle mit echten Zeiten -> "Server war offline von X bis Y Uhr"
+        // (vom Server protokolliert, hier nur abgeholt + lokal gemeldet).
+        await reportOutages(api)
+        if !wasReachable { wasReachable = true; lastDown = [] }   // Ausfaelle neu bewerten
         var down: Set<String> = []
         if !s.spotify.ok   && wants("alertSpotify")   { down.insert("Spotify") }
         if !s.deezer.ok    && wants("alertDeezer")    { down.insert("Deezer") }
@@ -81,6 +78,28 @@ final class HealthMonitor {
         let list = newlyDown.sorted()
         notifyMsg("Discover: Server-Problem",
                   list.joined(separator: ", ") + (list.count == 1 ? " antwortet nicht mehr." : " antworten nicht mehr."))
+    }
+
+    /// Holt vom Server protokollierte Ausfaelle und meldet neue lokal mit echten
+    /// Zeiten. Erster Lauf setzt nur eine Baseline (keine historischen Ausfaelle spammen).
+    private func reportOutages(_ api: APIClient) async {
+        let key = "lastOutageId"
+        var since = UserDefaults.standard.integer(forKey: key)
+        if since == 0 {                                   // Baseline: nur KUENFTIGE Ausfaelle melden
+            since = Int(Date().timeIntervalSince1970)
+            UserDefaults.standard.set(since, forKey: key)
+        }
+        let outs = (await api.outages(since: since))
+            .filter { $0.type == "server" }.sorted { $0.id < $1.id }
+        guard !outs.isEmpty else { return }
+        let df = DateFormatter(); df.dateFormat = "HH:mm"
+        for o in outs {
+            let d = df.string(from: Date(timeIntervalSince1970: TimeInterval(o.down)))
+            let u = df.string(from: Date(timeIntervalSince1970: TimeInterval(o.up)))
+            let mins = max(1, (o.up - o.down) / 60)
+            notifyMsg("Server war offline", "Von \(d) bis \(u) Uhr (\(mins) Min)")
+        }
+        if let maxId = outs.map({ $0.id }).max() { UserDefaults.standard.set(maxId, forKey: key) }
     }
 
     private func notifyMsg(_ title: String, _ body: String, delay: Double = 0) {

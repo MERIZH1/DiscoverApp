@@ -21,6 +21,8 @@ struct StatusLogItem: Codable, Identifiable {
     var id: Int { ts }
 }
 struct StatusLogResponse: Codable { let items: [StatusLogItem] }
+struct Outage: Codable { let id: Int; let type: String; let down: Int; let up: Int }
+struct OutagesResponse: Codable { let outages: [Outage] }
 
 // MARK: - Konsole 2.0 (Logs / Ressourcen / Statistik / Token-Alter)
 struct LogItem: Codable, Identifiable {

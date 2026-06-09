@@ -84,6 +84,11 @@ final class APIClient: ObservableObject {
     func systemStatus() async -> SystemStatus? {
         try? await get("/api/status")
     }
+    /// Server-Ausfaelle (id = down-Zeitstempel) nach `since` -> fuer "war offline von X bis Y".
+    func outages(since: Int) async -> [Outage] {
+        let r: OutagesResponse? = try? await get("/api/outages?since=\(since)")
+        return r?.outages ?? []
+    }
     func statusLog(limit: Int = 40) async -> [StatusLogItem] {
         let r: StatusLogResponse? = try? await get("/api/status-log?limit=\(limit)")
         return r?.items ?? []
