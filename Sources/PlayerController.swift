@@ -466,6 +466,19 @@ final class PlayerController: ObservableObject {
     /// sauberes .AVPlayerItemDidPlayToEndTime. Wenn wir am BEKANNTEN Track-Ende stehen
     /// und die Position ~1.5s nicht mehr vorankommt, selbst weiterschalten. Schneidet
     /// nie zu frueh ab: setzt Stillstand am Ende voraus (laufende Songs ticken weiter).
+    /// Haelt die angezeigte Dauer mit dem Player synchron. Manche FLAC-Header geben
+    /// eine zu KURZE Laenge an -> die Linie war „fertig", der Ton lief noch weiter.
+    /// Wir uebernehmen die echte Player-Dauer und ziehen, falls der Ton ueber die
+    /// bekannte Dauer hinauslaeuft, die Linie nach (statt am Ende zu kleben).
+    private func syncDuration() {
+        guard !isRadio else { return }
+        if let item = player.currentItem {
+            let d = CMTimeGetSeconds(item.duration)
+            if d.isFinite, d > 0, abs(d - duration) > 0.75 { duration = d }
+        }
+        if duration > 0, currentTime > duration + 0.3 { duration = currentTime }
+    }
+
     private func checkEndStall() {
         // Nur ganz am Ende (<=0.6s Rest) und nach laengerem Stillstand -> EOF kriegt
         // klar Vorrang, kein verfruehtes Abschneiden. Doppel-Advance faengt der
@@ -755,6 +768,7 @@ final class PlayerController: ObservableObject {
             Task { @MainActor in
                 let c = CMTimeGetSeconds(t)
                 if c.isFinite { self.currentTime = c; self.updateElapsed() }
+                self.syncDuration()
                 self.applyFade()
                 self.checkSleep()
                 self.checkEndStall()
