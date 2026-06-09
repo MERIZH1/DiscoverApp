@@ -55,9 +55,9 @@ final class NoiseDSP: @unchecked Sendable {
     @inline(__always) private func sample(_ ty: Int32, _ c: Int) -> Float {
         let w = white(c)
         switch ty {
-        case 0:
-            return w * 0.45
-        case 1:
+        case 0:                                   // White (lauter + ausbalanciert)
+            return w * 0.85
+        case 1:                                   // Pink (war deutlich zu leise)
             pk[c][0] = 0.99886*pk[c][0] + w*0.0555179
             pk[c][1] = 0.99332*pk[c][1] + w*0.0750759
             pk[c][2] = 0.96900*pk[c][2] + w*0.1538520
@@ -66,10 +66,10 @@ final class NoiseDSP: @unchecked Sendable {
             pk[c][5] = -0.7616*pk[c][5] - w*0.0168980
             let out = pk[c][0]+pk[c][1]+pk[c][2]+pk[c][3]+pk[c][4]+pk[c][5]+pk[c][6]+w*0.5362
             pk[c][6] = w*0.115926
-            return out * 0.11
-        default:
+            return out * 0.24
+        default:                                  // Brown / Dark
             brown[c] = (brown[c] + 0.02*w) / 1.02
-            return brown[c] * 3.2
+            return brown[c] * 3.6
         }
     }
     func render(_ frames: Int, _ abl: UnsafeMutableAudioBufferListPointer) {
@@ -110,6 +110,16 @@ final class NoiseEngine: ObservableObject {
 
     static func colorId(_ t: NoiseType) -> String { "color:" + t.rawValue }
     static func fileId(_ s: AmbientSound) -> String { "file:" + s.id }
+    static func audioExt(mime: String?, fallback: String) -> String {
+        let m = (mime ?? "").lowercased()
+        if m.contains("mp4") || m.contains("m4a") || m.contains("aac") { return "m4a" }
+        if m.contains("mpeg") || m.contains("mp3") { return "mp3" }
+        if m.contains("flac") { return "flac" }
+        if m.contains("wav") { return "wav" }
+        if m.contains("aiff") || m.contains("aif") { return "aiff" }
+        let f = fallback.lowercased()
+        return ["m4a","mp3","aac","flac","wav","aiff","aif","caf"].contains(f) ? f : "m4a"
+    }
     func isActive(_ id: String) -> Bool { activeId == id }
 
     func loadAmbient() {
@@ -159,10 +169,13 @@ final class NoiseEngine: ObservableObject {
         Task {
             var req = URLRequest(url: url)
             if let pid = api.profileId { req.setValue(pid, forHTTPHeaderField: "X-Profile-Id") }
-            guard let (data, _) = try? await URLSession.shared.data(for: req), data.count > 1000 else {
+            guard let (data, resp) = try? await URLSession.shared.data(for: req), data.count > 1000 else {
                 if activeId == id { activeId = nil }; return
             }
-            let dest = FileManager.default.temporaryDirectory.appendingPathComponent("amb_" + s.id)
+            // Endung aus Content-Type (Server liefert normalisiertes m4a) -> kein Format-Raten
+            let ext = Self.audioExt(mime: resp.mimeType, fallback: (s.id as NSString).pathExtension)
+            let dest = FileManager.default.temporaryDirectory
+                .appendingPathComponent("amb_\(abs(s.id.hashValue)).\(ext)")
             try? data.write(to: dest)
             fileCache[s.id] = dest
             if activeId == id { playLoop(dest, id: id) }     // noch gewuenscht?
