@@ -73,11 +73,15 @@ final class NoiseDSP: @unchecked Sendable {
         }
     }
     func render(_ frames: Int, _ abl: UnsafeMutableAudioBufferListPointer) {
-        let on = enabled != 0, vol = volume, ty = type
+        let on = enabled != 0, vol = volume * 1.3, ty = type   // +30 % Pegel
         for ch in 0..<abl.count {
             guard let p = abl[ch].mData?.assumingMemoryBound(to: Float.self) else { continue }
             let c = ch % 2
-            for f in 0..<frames { p[f] = on ? sample(ty, c) * vol : 0 }
+            for f in 0..<frames {
+                var s = on ? sample(ty, c) * vol : 0
+                if s > 1 { s = 1 } else if s < -1 { s = -1 }   // begrenzen statt harter Verzerrung
+                p[f] = s
+            }
         }
     }
 }
