@@ -366,7 +366,8 @@ final class APIClient: ObservableObject {
     @discardableResult func addTracks(playlistURI: String, tracks: [Track]) async -> Int {
         let arr = tracks.map { t -> [String: Any] in
             ["track_uri": t.uri, "title": t.name, "artist": t.artist, "image": t.image ?? "",
-             "duration_ms": t.duration_ms ?? 0, "album": t.album ?? "", "navidromeId": t.navidromeId ?? ""]
+             "duration_ms": t.duration_ms ?? 0, "album": t.album ?? "", "album_uri": t.album_uri ?? "",
+             "navidromeId": t.navidromeId ?? ""]
         }
         guard let d = try? await data("/api/add-tracks", method: "POST", json: ["playlist_uri": playlistURI, "tracks": arr]),
               let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return 0 }
@@ -382,6 +383,7 @@ final class APIClient: ObservableObject {
             "image": track.image ?? "",
             "duration_ms": track.duration_ms ?? 0,
             "album": track.album ?? "",
+            "album_uri": track.album_uri ?? "",
             "navidromeId": track.navidromeId ?? "",
         ]
         guard let d = try? await data("/api/add-track", method: "POST", json: body),
