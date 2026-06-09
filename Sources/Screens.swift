@@ -2902,6 +2902,8 @@ struct PlayerView: View {
     @State private var showSendUser = false
     @State private var showFixYT = false
     @State private var showDevices = false
+    @State private var showNoise = false
+    @ObservedObject private var noise = NoiseEngine.shared
     private var syncMgr: SyncManager? { DiscoverServices.app?.sync }
 
     var body: some View {
@@ -2939,6 +2941,12 @@ struct PlayerView: View {
                         Image(systemName: (p.sleepRemaining > 0 || p.sleepAtEnd) ? "moon.fill" : "moon")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle((p.sleepRemaining > 0 || p.sleepAtEnd) ? Theme.accent : Theme.text)
+                            .glassIconCircle(glass)
+                    }.padding(.trailing, 10)
+                    Button { showNoise = true } label: {
+                        Image(systemName: noise.active != nil ? "speaker.wave.2.fill" : "speaker.wave.2")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(noise.active != nil ? Theme.accent : Theme.text)
                             .glassIconCircle(glass)
                     }.padding(.trailing, 10)
                     Button { showDevices = true } label: {
@@ -3064,6 +3072,7 @@ struct PlayerView: View {
         .sheet(isPresented: $showSendUser) { if let t = player.current { SendToUserSheet(track: t) } }
         .sheet(isPresented: $showFixYT) { if let t = player.current { YTMatchSheet(track: t) } }
         .sheet(isPresented: $showDevices) { if let s = syncMgr { DevicePickerSheet().environmentObject(s) } }
+        .sheet(isPresented: $showNoise) { NoiseSheet() }
         .sheet(isPresented: $showArtist) {
             if let t = player.current, let u = t.artists?.first?.uri {
                 NavigationStack { ArtistView(uri: u, name: t.artists?.first?.name ?? t.artist, image: t.image) }
