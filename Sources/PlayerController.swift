@@ -465,18 +465,29 @@ final class PlayerController: ObservableObject {
     /// und die Position ~1.5s nicht mehr vorankommt, selbst weiterschalten. Schneidet
     /// nie zu frueh ab: setzt Stillstand am Ende voraus (laufende Songs ticken weiter).
     private func checkEndStall() {
+        // Nur ganz am Ende (<=0.6s Rest) und nach laengerem Stillstand -> EOF kriegt
+        // klar Vorrang, kein verfruehtes Abschneiden. Doppel-Advance faengt der
+        // Debounce in next(auto:) ab, falls EOF doch noch kommt.
         guard isPlaying, !isRadio, !crossfading, duration > 1,
-              currentTime >= duration - 1.5 else { endStallTicks = 0; return }
+              currentTime >= duration - 0.6 else { endStallTicks = 0; return }
         if abs(currentTime - lastStallTime) < 0.05 { endStallTicks += 1 } else { endStallTicks = 0 }
         lastStallTime = currentTime
-        if endStallTicks >= 3 {        // ~1.5s Stillstand am Ende -> EOF kam offenbar nicht
+        if endStallTicks >= 6 {        // ~3s Stillstand am Ende -> EOF kam offenbar nicht
             endStallTicks = 0
             next(auto: true)
         }
     }
 
+    private var lastAutoAdvance = Date.distantPast   // Doppel-Advance-Schutz (EOF + Stall-Fallback)
     func next(auto: Bool = false) {
         if crossfading { completeCrossfade(); return }
+        if auto {
+            // EOF und der Stall-Fallback koennen fast gleichzeitig next() rufen ->
+            // Doppel-Advance (springt 1 Song zu weit ODER trifft das Queue-Ende und
+            // pausiert faelschlich -> Stille). Innerhalb 1.2s nur EINEN Advance zulassen.
+            if Date().timeIntervalSince(lastAutoAdvance) < 1.2 { return }
+            lastAutoAdvance = Date()
+        }
         if auto && sleepAtEnd { sleepAtEnd = false; pause(); return }
         if isRadio { return }
         if auto && repeatMode == .one { seek(0); resume(); return }
@@ -615,6 +626,7 @@ final class PlayerController: ObservableObject {
         updateRemoteForContent()
         loading = true; currentTime = 0; duration = track.durationSec; source = ""; streamCache = ""
         player.volume = 1                                   // aktiver Track immer voll (Einblenden nur in der Ueberblende)
+        try? AVAudioSession.sharedInstance().setActive(true) // nach Stall/Track-Ende sicher reaktivieren -> kein stummer Folge-Song
         updateNowPlaying(title: track.name, artist: track.artist, album: track.album,
                          dur: track.durationSec, art: track.image, live: false)
         // Offline vorhanden (und diese Session nicht als fehlerhaft markiert)? -> lokal abspielen

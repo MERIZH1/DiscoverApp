@@ -58,7 +58,9 @@ final class HealthMonitor {
         // Feuert IMMER (unabhaengig von den Alert-Toggles), damit man Push-Hinweise testen kann.
         if let pt = s.push_test, pt.id != 0, pt.id != lastPushTestId {
             lastPushTestId = pt.id
-            notifyMsg("Discover (Test)", pt.msg.isEmpty ? "Test-Benachrichtigung ✓ — Push-Hinweise funktionieren." : pt.msg)
+            // 5s Verzoegerung -> nach dem curl bleibt Zeit, das Handy zu sperren,
+            // dann erscheint die Mitteilung auf dem Lockscreen (nicht nur als In-App-Banner).
+            notifyMsg("Discover (Test)", pt.msg.isEmpty ? "Test-Benachrichtigung ✓ — Push-Hinweise funktionieren." : pt.msg, delay: 5)
         }
         guard enabled else { return }
         // War weg, ist wieder da -> "wieder online"-Meldung (deckt Server-Reboot ab)
@@ -81,12 +83,14 @@ final class HealthMonitor {
                   list.joined(separator: ", ") + (list.count == 1 ? " antwortet nicht mehr." : " antworten nicht mehr."))
     }
 
-    private func notifyMsg(_ title: String, _ body: String) {
+    private func notifyMsg(_ title: String, _ body: String, delay: Double = 0) {
         let c = UNMutableNotificationContent()
         c.title = title; c.body = body; c.sound = .default
+        let trig: UNNotificationTrigger? = delay > 0
+            ? UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false) : nil
         UNUserNotificationCenter.current().add(
             UNNotificationRequest(identifier: "health-\(Int(Date().timeIntervalSince1970))",
-                                  content: c, trigger: nil),
+                                  content: c, trigger: trig),
             withCompletionHandler: nil)
     }
 }
