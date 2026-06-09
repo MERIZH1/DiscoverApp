@@ -44,6 +44,9 @@ final class NoiseDSP: @unchecked Sendable {
     var enabled: Int32 = 0
     var type: Int32 = 2
     var volume: Float = 0.4
+    var fadeTarget: Float = 1                         // 0 = ausblenden, 1 = einblenden
+    private var fadeGain: Float = 0
+    private let fadeStep: Float = 1.0 / (0.2 * 44100) // 0.2s Ein-/Ausblende
     private var rng: [UInt64] = [0x9E3779B97F4A7C15, 0xD1B54A32D192ED03]
     private var brown: [Float] = [0, 0]
     private var pk: [[Float]] = [[Float](repeating: 0, count: 7), [Float](repeating: 0, count: 7)]
@@ -73,12 +76,25 @@ final class NoiseDSP: @unchecked Sendable {
         }
     }
     func render(_ frames: Int, _ abl: UnsafeMutableAudioBufferListPointer) {
-        let on = enabled != 0, vol = volume * 1.3, ty = type   // +30 % Pegel
-        for ch in 0..<abl.count {
-            guard let p = abl[ch].mData?.assumingMemoryBound(to: Float.self) else { continue }
-            let c = ch % 2
-            for f in 0..<frames {
-                var s = on ? sample(ty, c) * vol : 0
+        let vol = volume * 1.3, ty = type                      // +30 % Pegel
+        let nch = abl.count
+        if enabled == 0 {                                       // aus -> Stille + Fade fuer naechsten Start zuruecksetzen
+            fadeGain = 0
+            for ch in 0..<nch {
+                if let p = abl[ch].mData?.assumingMemoryBound(to: Float.self) {
+                    for f in 0..<frames { p[f] = 0 }
+                }
+            }
+            return
+        }
+        for f in 0..<frames {
+            if fadeGain < fadeTarget { fadeGain = min(fadeTarget, fadeGain + fadeStep) }
+            else if fadeGain > fadeTarget { fadeGain = max(fadeTarget, fadeGain - fadeStep) }
+            let g = fadeGain
+            for ch in 0..<nch {
+                guard let p = abl[ch].mData?.assumingMemoryBound(to: Float.self) else { continue }
+                let c = ch % 2
+                var s = sample(ty, c) * vol * g
                 if s > 1 { s = 1 } else if s < -1 { s = -1 }   // begrenzen statt harter Verzerrung
                 p[f] = s
             }
@@ -139,6 +155,7 @@ final class NoiseEngine: ObservableObject {
         stopFile()
         ensureEngine()
         dsp.type = t.dspIndex
+        dsp.fadeTarget = 1            // 0.2s einblenden (Fade aus enabled==0 startet bei 0)
         dsp.enabled = 1
         activeId = id
         if !engine.isRunning {
@@ -190,15 +207,31 @@ final class NoiseEngine: ObservableObject {
             try AVAudioSession.sharedInstance().setActive(true)
             let p = try AVAudioPlayer(contentsOf: url)
             p.numberOfLoops = -1                 // gapless endlos
-            p.volume = Float(volume)
+            p.volume = 0
             p.prepareToPlay(); p.play()
+            p.setVolume(Float(volume), fadeDuration: 0.2)   // 0.2s einblenden
             filePlayer = p
         } catch { if activeId == id { activeId = nil } }
     }
 
     // MARK: Stop
-    private func stopEngine() { dsp.enabled = 0; if engine.isRunning { engine.pause() } }
-    private func stopFile() { filePlayer?.stop(); filePlayer = nil }
+    private func stopEngine() {
+        guard engine.isRunning, dsp.enabled != 0 else { dsp.enabled = 0; return }
+        dsp.fadeTarget = 0                                  // 0.2s ausblenden
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            guard let self else { return }
+            if self.dsp.fadeTarget == 0 {                  // nicht inzwischen neu gestartet?
+                self.dsp.enabled = 0
+                if self.engine.isRunning { self.engine.pause() }
+            }
+        }
+    }
+    private func stopFile() {
+        guard let p = filePlayer else { return }
+        filePlayer = nil
+        p.setVolume(0, fadeDuration: 0.2)                  // 0.2s ausblenden, dann stoppen
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) { p.stop() }
+    }
     func stopAll() { stopEngine(); stopFile(); activeId = nil }
 }
 
