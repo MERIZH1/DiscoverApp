@@ -89,6 +89,11 @@ final class APIClient: ObservableObject {
         let r: OutagesResponse? = try? await get("/api/outages?since=\(since)")
         return r?.outages ?? []
     }
+    /// Hintergrund-Sound-Dateien (static/ambient/, Auto-Discovery).
+    func ambientSounds() async -> [AmbientSound] {
+        let r: AmbientResponse? = try? await get("/api/ambient")
+        return r?.sounds ?? []
+    }
     func statusLog(limit: Int = 40) async -> [StatusLogItem] {
         let r: StatusLogResponse? = try? await get("/api/status-log?limit=\(limit)")
         return r?.items ?? []

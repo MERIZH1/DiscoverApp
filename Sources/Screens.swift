@@ -2944,9 +2944,9 @@ struct PlayerView: View {
                             .glassIconCircle(glass)
                     }.padding(.trailing, 10)
                     Button { showNoise = true } label: {
-                        Image(systemName: noise.active != nil ? "speaker.wave.2.fill" : "speaker.wave.2")
+                        Image(systemName: noise.activeId != nil ? "speaker.wave.2.fill" : "speaker.wave.2")
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(noise.active != nil ? Theme.accent : Theme.text)
+                            .foregroundStyle(noise.activeId != nil ? Theme.accent : Theme.text)
                             .glassIconCircle(glass)
                     }.padding(.trailing, 10)
                     Button { showDevices = true } label: {
