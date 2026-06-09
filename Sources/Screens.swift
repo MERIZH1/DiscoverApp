@@ -2751,9 +2751,10 @@ struct YTBadge: View {
 }
 
 struct TrackRow: View {
-    let track: Track; let playing: Bool; let tap: () -> Void
+    let track: Track; let playing: Bool
     var selecting: Bool = false
     var selected: Bool = false
+    let tap: () -> Void
     @State private var showArtist = false
     @State private var showAlbum = false
     @State private var showAddPlaylist = false
