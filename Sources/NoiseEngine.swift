@@ -79,7 +79,7 @@ final class NoiseDSP: @unchecked Sendable {
         }
     }
     func render(_ frames: Int, _ abl: UnsafeMutableAudioBufferListPointer) {
-        let vol = volume * 1.0, ty = type                      // an Ambient-Pegel angeglichen
+        let vol = volume * 1.7, ty = type                      // lauter (Ambient wird serverseitig dran angeglichen)
         let nch = abl.count
         if enabled == 0 {                                       // aus -> Stille + Fade fuer naechsten Start zuruecksetzen
             fadeGain = 0
@@ -124,10 +124,12 @@ final class NoiseEngine: ObservableObject {
     var musicPlaying = false {
         didSet { guard musicPlaying != oldValue else { return }; applyDuck() }
     }
-    private let duckFactor: Double = 0.85       // bei Musik nur leicht runter (auf 85%)
-    private var fileTargetVolume: Double { volume * (musicPlaying ? duckFactor : 1.0) }
+    @Published var duckLevel: Double {          // Lautstaerke waehrend Musik (1 = nicht ducken) — Live-Regler
+        didSet { UserDefaults.standard.set(duckLevel, forKey: "noiseDuck"); applyDuck() }
+    }
+    private var fileTargetVolume: Double { volume * (musicPlaying ? duckLevel : 1.0) }
     private func applyDuck() {
-        dsp.duckTarget = musicPlaying ? Float(duckFactor) : 1.0
+        dsp.duckTarget = musicPlaying ? Float(duckLevel) : 1.0
         filePlayer?.setVolume(Float(fileTargetVolume), fadeDuration: 0.4)
     }
     private let engine = AVAudioEngine()
@@ -141,6 +143,7 @@ final class NoiseEngine: ObservableObject {
     private init() {
         let v = UserDefaults.standard.object(forKey: "noiseVolume") as? Double ?? 0.4
         self.volume = v
+        self.duckLevel = UserDefaults.standard.object(forKey: "noiseDuck") as? Double ?? 0.85
         self.dsp.volume = Float(v)
     }
 
@@ -299,11 +302,21 @@ struct NoiseSheet: View {
                     }
 
                     if noise.activeId != nil {
+                        Text("LAUTSTAERKE").font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(Theme.sub).tracking(1).padding(.horizontal).padding(.top, 4)
                         HStack(spacing: 12) {
                             Image(systemName: "speaker.fill").foregroundStyle(Theme.sub).font(.system(size: 13))
                             Slider(value: $noise.volume, in: 0...1).tint(Theme.accent)
                             Image(systemName: "speaker.wave.3.fill").foregroundStyle(Theme.sub).font(.system(size: 13))
-                        }.padding(.horizontal).padding(.top, 4)
+                        }.padding(.horizontal)
+                        HStack(spacing: 12) {
+                            Image(systemName: "music.note").foregroundStyle(Theme.sub).font(.system(size: 13))
+                            Slider(value: $noise.duckLevel, in: 0.3...1.0).tint(Theme.accent)
+                            Text("\(Int(noise.duckLevel*100))%").font(.system(size: 12)).foregroundStyle(Theme.sub).frame(width: 40)
+                        }.padding(.horizontal)
+                        Text("Lautstaerke, waehrend ein Song laeuft (100% = nicht leiser)")
+                            .font(.system(size: 11)).foregroundStyle(Theme.mute)
+                            .frame(maxWidth: .infinity, alignment: .center)
                         Button { noise.stopAll() } label: {
                             Label("Sound aus", systemImage: "stop.circle.fill").font(.system(size: 15, weight: .semibold))
                         }.foregroundStyle(Theme.accent).frame(maxWidth: .infinity)
