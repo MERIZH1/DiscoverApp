@@ -1264,45 +1264,7 @@ struct SearchView: View {
                 ScrollView {
                     if busy { LoadingView().padding(.top, 40) }
                     else if let r = res {
-                        LazyVStack(alignment: .leading, spacing: 18) {
-                            if scope == "all", let hit = r.top_hit, !hit.realURI.isEmpty {
-                                SectionHeader("Top-Ergebnis")
-                                TopHitCard(hit: hit)
-                            }
-                            if scope == "all" || scope == "tracks", let tracks = r.tracks, !tracks.isEmpty {
-                                SectionHeader("Songs")
-                                ForEach(Array(tracks.prefix(scope == "tracks" ? 50 : 6).enumerated()), id: \.offset) { i, t in
-                                    TrackRow(track: t, playing: player.current?.id == t.id,
-                                             selecting: selecting, selected: selected.contains(t.uri)) {
-                                        tapTrack(t, in: tracks, at: i, context: "Suche")
-                                    }
-                                }
-                            }
-                            if scope == "all" || scope == "playlists", let pls = r.playlists, !pls.isEmpty {
-                                SectionHeader("Playlists"); CardRows(cards: pls, isAlbum: false)
-                            }
-                            if scope == "all" || scope == "albums", let als = r.albums, !als.isEmpty {
-                                SectionHeader("Alben"); CardRows(cards: als, isAlbum: true)
-                            }
-                            if scope == "all" || scope == "artists", let ars = r.artists, !ars.isEmpty {
-                                SectionHeader("Künstler"); CardRows(cards: ars, isAlbum: false)
-                            }
-                            if scope == "all" || scope == "shows", let shs = r.shows, !shs.isEmpty {
-                                SectionHeader("Podcasts"); CardRows(cards: shs, isAlbum: false)
-                            }
-                            if scope == "all" || scope == "lokal", let loc = r.local, !loc.isEmpty {
-                                SectionHeader("Auf dem Server")
-                                ForEach(Array(loc.prefix(scope == "lokal" ? 50 : 6).enumerated()), id: \.offset) { i, t in
-                                    TrackRow(track: t, playing: player.current?.id == t.id,
-                                             selecting: selecting, selected: selected.contains(t.uri)) {
-                                        tapTrack(t, in: loc, at: i, context: "Server")
-                                    }
-                                }
-                            }
-                            if scope == "all" || scope == "lokal", let la = r.local_albums, !la.isEmpty {
-                                SectionHeader("Alben auf dem Server"); CardRows(cards: la, isAlbum: true)
-                            }
-                        }.padding(.bottom, 130).padding(.top, 4)
+                        searchResults(r)
                     } else if !recentItems.isEmpty {
                         LazyVStack(alignment: .leading, spacing: 0) {
                             HStack {
@@ -1379,6 +1341,47 @@ struct SearchView: View {
                     }
                 }
                 .onAppear { pushRecentItem(RecentSearchItem(uri: c.uri, name: c.name, image: c.image ?? "", sub: cardSub(c.uri))) }
+            }
+        }
+    }
+    /// Komplette Ergebnis-Liste — ausgelagert, damit die body-ViewBuilder
+    /// nicht ueber die Compiler-Komplexitaetsgrenze rutscht.
+    @ViewBuilder private func searchResults(_ r: SearchResponse) -> some View {
+        LazyVStack(alignment: .leading, spacing: 18) {
+            if scope == "all", let hit = r.top_hit, !hit.realURI.isEmpty {
+                SectionHeader("Top-Ergebnis")
+                TopHitCard(hit: hit)
+            }
+            if scope == "all" || scope == "tracks", let tracks = r.tracks, !tracks.isEmpty {
+                SectionHeader("Songs")
+                songRows(tracks, context: "Suche", limit: scope == "tracks" ? 50 : 6)
+            }
+            if scope == "all" || scope == "playlists", let pls = r.playlists, !pls.isEmpty {
+                SectionHeader("Playlists"); CardRows(cards: pls, isAlbum: false)
+            }
+            if scope == "all" || scope == "albums", let als = r.albums, !als.isEmpty {
+                SectionHeader("Alben"); CardRows(cards: als, isAlbum: true)
+            }
+            if scope == "all" || scope == "artists", let ars = r.artists, !ars.isEmpty {
+                SectionHeader("Künstler"); CardRows(cards: ars, isAlbum: false)
+            }
+            if scope == "all" || scope == "shows", let shs = r.shows, !shs.isEmpty {
+                SectionHeader("Podcasts"); CardRows(cards: shs, isAlbum: false)
+            }
+            if scope == "all" || scope == "lokal", let loc = r.local, !loc.isEmpty {
+                SectionHeader("Auf dem Server")
+                songRows(loc, context: "Server", limit: scope == "lokal" ? 50 : 6)
+            }
+            if scope == "all" || scope == "lokal", let la = r.local_albums, !la.isEmpty {
+                SectionHeader("Alben auf dem Server"); CardRows(cards: la, isAlbum: true)
+            }
+        }.padding(.bottom, 130).padding(.top, 4)
+    }
+    @ViewBuilder private func songRows(_ list: [Track], context: String, limit: Int) -> some View {
+        ForEach(Array(list.prefix(limit).enumerated()), id: \.offset) { i, t in
+            TrackRow(track: t, playing: player.current?.id == t.id,
+                     selecting: selecting, selected: selected.contains(t.uri)) {
+                tapTrack(t, in: list, at: i, context: context)
             }
         }
     }
