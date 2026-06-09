@@ -6,11 +6,13 @@ struct ServiceStatus: Codable, Hashable {
     let ok: Bool
     let error: String?
 }
+struct PushTest: Codable { let id: Int; let msg: String }
 struct SystemStatus: Codable {
     let spotify: ServiceStatus
     let deezer: ServiceStatus
     let navidrome: ServiceStatus
     let youtube: ServiceStatus
+    let push_test: PushTest?   // Debug: vom Server (curl) ausgeloeste Test-Benachrichtigung
 }
 struct StatusLogItem: Codable, Identifiable {
     let ts: Int

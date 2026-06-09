@@ -48,11 +48,19 @@ final class HealthMonitor {
 
     // MARK: - Kern: Status pruefen + bei NEU ausgefallenem Dienst benachrichtigen
     private var wasReachable = true   // war der Server beim letzten Check erreichbar?
+    private var lastPushTestId = 0    // Debug: zuletzt gesehene Test-Push-ID (vom Server/curl)
     private func wants(_ key: String) -> Bool { UserDefaults.standard.object(forKey: key) as? Bool ?? true }
     func check() async {
-        guard enabled, let api = DiscoverServices.app?.api else { return }
+        guard let api = DiscoverServices.app?.api else { return }
         // Server nicht erreichbar (z.B. kompletter Server-Neustart laeuft)
         guard let s = await api.systemStatus() else { wasReachable = false; return }
+        // Debug: vom Server per `curl /api/push-test` ausgeloeste Test-Benachrichtigung.
+        // Feuert IMMER (unabhaengig von den Alert-Toggles), damit man Push-Hinweise testen kann.
+        if let pt = s.push_test, pt.id != 0, pt.id != lastPushTestId {
+            lastPushTestId = pt.id
+            notifyMsg("Discover (Test)", pt.msg.isEmpty ? "Test-Benachrichtigung ✓ — Push-Hinweise funktionieren." : pt.msg)
+        }
+        guard enabled else { return }
         // War weg, ist wieder da -> "wieder online"-Meldung (deckt Server-Reboot ab)
         if !wasReachable {
             wasReachable = true
