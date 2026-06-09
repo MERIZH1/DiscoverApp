@@ -73,6 +73,10 @@ struct AdminConsoleView: View {
     @State private var tokens: [TokenInfo] = []
     @State private var disks: [DiskInfo] = []
     @AppStorage("serverAlerts") private var serverAlerts = true
+    @AppStorage("alertSpotify") private var alertSpotify = true
+    @AppStorage("alertDeezer") private var alertDeezer = true
+    @AppStorage("alertNavidrome") private var alertNavidrome = true
+    @AppStorage("alertYouTube") private var alertYouTube = true
     @State private var smartCache = SmartCacheConfig(min_listened_sec: 45, min_listened_pct: 0, min_play_count: 4, enabled: true)
     @State private var smartCacheLoaded = false
     @State private var serverConfig: ServerConfig?
@@ -226,6 +230,13 @@ struct AdminConsoleView: View {
                             Text("Bei Server-Problemen benachrichtigen")
                                 .font(.system(size: 15)).foregroundStyle(Theme.text)
                         }.tint(Theme.accent)
+                        if serverAlerts {
+                            Text("Fuer welche Dienste:").font(.caption2).foregroundStyle(Theme.mute).padding(.top, 2)
+                            Toggle(isOn: $alertSpotify)   { Text("Spotify").font(.system(size: 14)).foregroundStyle(Theme.text) }.tint(Theme.accent)
+                            Toggle(isOn: $alertDeezer)    { Text("Deezer").font(.system(size: 14)).foregroundStyle(Theme.text) }.tint(Theme.accent)
+                            Toggle(isOn: $alertNavidrome) { Text("Navidrome").font(.system(size: 14)).foregroundStyle(Theme.text) }.tint(Theme.accent)
+                            Toggle(isOn: $alertYouTube)   { Text("YouTube").font(.system(size: 14)).foregroundStyle(Theme.text) }.tint(Theme.accent)
+                        }
                         Text("Lokale Mitteilung, wenn ein Dienst ausfaellt — im Vordergrund sofort, im Hintergrund wann iOS es zulaesst (kein Push-Server noetig).")
                             .font(.caption2).foregroundStyle(Theme.mute)
                     }
@@ -266,9 +277,16 @@ struct AdminConsoleView: View {
                                         Text("Admin").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.accent)
                                     }
                                     Spacer()
+                                    if p.is_admin != true {
+                                        Button { promoteAdmin(p) } label: {
+                                            Image(systemName: "crown").font(.system(size: 13)).foregroundStyle(Theme.accent)
+                                                .frame(width: 30, height: 30)
+                                        }.buttonStyle(.plain)
+                                    }
                                     if p.id != app.profile?.id {
                                         Button { confirmDeleteProfile(p) } label: {
                                             Image(systemName: "trash").font(.system(size: 14)).foregroundStyle(Color(hex6: 0xFF6B6B))
+                                                .frame(width: 30, height: 30)
                                         }.buttonStyle(.plain)
                                     } else {
                                         Text("aktuell").font(.system(size: 11)).foregroundStyle(Theme.mute)
@@ -292,7 +310,9 @@ struct AdminConsoleView: View {
                                         logDot("NV", it.nv); logDot("YT", it.yt)
                                     }
                                     if let e = firstErr(it) {
-                                        Text(e).font(.caption2).foregroundStyle(Color(hex6: 0xFF6B6B)).lineLimit(1)
+                                        Text("Problem: " + e).font(.caption2).foregroundStyle(Color(hex6: 0xFF6B6B)).lineLimit(2)
+                                    } else {
+                                        Text("✓ Wieder alle Dienste erreichbar").font(.caption2).foregroundStyle(Theme.accent).lineLimit(1)
                                     }
                                 }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 4)
                                 Divider().background(Theme.input)
@@ -316,6 +336,7 @@ struct AdminConsoleView: View {
             }
         }
         .task { await reload() }
+        .task { await liveResources() }
         .sheet(isPresented: $showLogs) { LogsSheet(items: logs) }
     }
 
@@ -350,6 +371,21 @@ struct AdminConsoleView: View {
             Task {
                 let ok = await app.api.createProfile(name: n)
                 toast = ok ? "Profil angelegt ✓" : "Anlegen fehlgeschlagen"
+                profiles = (try? await app.api.profiles()) ?? profiles
+                try? await Task.sleep(nanoseconds: 1_500_000_000); toast = ""
+            }
+        })
+        present(ac)
+    }
+    private func promoteAdmin(_ p: Profile) {
+        let ac = UIAlertController(title: "Zum Admin machen?",
+                                   message: "„\(p.name)“ bekommt volle Admin-Rechte (Konsole, Server steuern).",
+                                   preferredStyle: .alert)
+        ac.addAction(UIAlertAction(title: "Abbrechen", style: .cancel))
+        ac.addAction(UIAlertAction(title: "Befördern", style: .default) { _ in
+            Task {
+                let ok = await app.api.setProfileAdmin(p.id, true)
+                toast = ok ? "\(p.name) ist jetzt Admin ✓" : "Fehlgeschlagen"
                 profiles = (try? await app.api.profiles()) ?? profiles
                 try? await Task.sleep(nanoseconds: 1_500_000_000); toast = ""
             }
@@ -395,6 +431,14 @@ struct AdminConsoleView: View {
     }
     private func diskColor(_ pct: Int) -> Color {
         pct >= 90 ? Color(hex6: 0xFF3B30) : (pct >= 75 ? Color(hex6: 0xFF9500) : Theme.accent)
+    }
+    /// Ressourcen live aktualisieren, solange die Konsole offen ist (docker stats braucht ~1-2s/Abruf).
+    private func liveResources() async {
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            let r = await app.api.adminResources()
+            if !r.isEmpty { resources = r }
+        }
     }
     private func doSyncAll() async {
         busy = true

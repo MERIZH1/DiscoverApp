@@ -162,6 +162,9 @@ final class APIClient: ObservableObject {
     @discardableResult func deleteProfile(_ pid: String) async -> Bool {
         (try? await data("/api/profiles/\(enc(pid))", method: "DELETE")) != nil
     }
+    @discardableResult func setProfileAdmin(_ pid: String, _ admin: Bool) async -> Bool {
+        (try? await data("/api/profiles/\(enc(pid))", method: "PUT", json: ["is_admin": admin])) != nil
+    }
     /// Leichter Health-Check.
     func ping() async -> Bool {
         guard let url = URL(string: base + "/api/ping") else { return false }

@@ -3,6 +3,15 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.20 — Konsole-Feinschliff + 2 Bugfixes
+- **Bugfix:** Lokalen (Navidrome-)Song zu einer Playlist hinzufuegen ging schief → wird jetzt automatisch zum passenden Spotify-Track aufgeloest und hinzugefuegt.
+- **Bugfix:** Server-Logs blieben leer (das Sekunden-Sync-Polling flutete das Log-Fenster) → jetzt 2000 Zeilen Tiefe, Aktivitaet ist wieder sichtbar.
+- **HW-Monitor live:** Ressourcen aktualisieren sich laufend (CPU/RAM in Echtzeit).
+- **Speicher:** zeigt jetzt auch externe Platten unter /mnt (sofern in den Container gemountet).
+- **Profil zum Admin befoerdern** (Krone) — fehlte komplett.
+- **Verlauf erklaert sich:** gruene Eintraege zeigen „✓ Wieder alle Dienste erreichbar".
+- **Benachrichtigungen pro Dienst waehlbar** (Spotify/Deezer/Navidrome/YouTube) + Meldung, wenn der **ganze Server wieder online** ist.
+
 ## v2.19 — Profile verwalten
 - Konsole: Profile **auflisten, anlegen und loeschen** direkt aus der App (Admin).
 

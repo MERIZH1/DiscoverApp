@@ -47,25 +47,35 @@ final class HealthMonitor {
     func stopForeground() { fgTimer?.invalidate(); fgTimer = nil }
 
     // MARK: - Kern: Status pruefen + bei NEU ausgefallenem Dienst benachrichtigen
+    private var wasReachable = true   // war der Server beim letzten Check erreichbar?
+    private func wants(_ key: String) -> Bool { UserDefaults.standard.object(forKey: key) as? Bool ?? true }
     func check() async {
         guard enabled, let api = DiscoverServices.app?.api else { return }
-        guard let s = await api.systemStatus() else { return }
+        // Server nicht erreichbar (z.B. kompletter Server-Neustart laeuft)
+        guard let s = await api.systemStatus() else { wasReachable = false; return }
+        // War weg, ist wieder da -> "wieder online"-Meldung (deckt Server-Reboot ab)
+        if !wasReachable {
+            wasReachable = true
+            lastDown = []   // Ausfaelle nach Wiederkehr neu bewerten
+            notifyMsg("Discover", "Der Server ist wieder online ✓")
+            return
+        }
         var down: Set<String> = []
-        if !s.spotify.ok   { down.insert("Spotify") }
-        if !s.deezer.ok    { down.insert("Deezer") }
-        if !s.navidrome.ok { down.insert("Navidrome") }
-        if !s.youtube.ok   { down.insert("YouTube") }
+        if !s.spotify.ok   && wants("alertSpotify")   { down.insert("Spotify") }
+        if !s.deezer.ok    && wants("alertDeezer")    { down.insert("Deezer") }
+        if !s.navidrome.ok && wants("alertNavidrome") { down.insert("Navidrome") }
+        if !s.youtube.ok   && wants("alertYouTube")   { down.insert("YouTube") }
         let newlyDown = down.subtracting(lastDown)
         lastDown = down
         guard !newlyDown.isEmpty else { return }
-        notify(newlyDown.sorted())
+        let list = newlyDown.sorted()
+        notifyMsg("Discover: Server-Problem",
+                  list.joined(separator: ", ") + (list.count == 1 ? " antwortet nicht mehr." : " antworten nicht mehr."))
     }
 
-    private func notify(_ services: [String]) {
+    private func notifyMsg(_ title: String, _ body: String) {
         let c = UNMutableNotificationContent()
-        c.title = "Discover: Server-Problem"
-        c.body = services.joined(separator: ", ") + (services.count == 1 ? " antwortet nicht mehr." : " antworten nicht mehr.")
-        c.sound = .default
+        c.title = title; c.body = body; c.sound = .default
         UNUserNotificationCenter.current().add(
             UNNotificationRequest(identifier: "health-\(Int(Date().timeIntervalSince1970))",
                                   content: c, trigger: nil),
