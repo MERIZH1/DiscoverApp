@@ -1274,10 +1274,7 @@ struct SearchView: View {
                                 ForEach(Array(tracks.prefix(scope == "tracks" ? 50 : 6).enumerated()), id: \.offset) { i, t in
                                     TrackRow(track: t, playing: player.current?.id == t.id,
                                              selecting: selecting, selected: selected.contains(t.uri)) {
-                                        if selecting { toggleSel(t.uri); return }
-                                        searchFocused = false   // Tastatur weg beim Song-Tippen
-                                        pushRecentItem(RecentSearchItem(uri: t.uri, name: t.name, image: t.image ?? "", sub: t.artist))
-                                        player.play(tracks: tracks, startAt: i, contextName: "Suche", contextURI: "")
+                                        tapTrack(t, in: tracks, at: i, context: "Suche")
                                     }
                                 }
                             }
@@ -1298,10 +1295,7 @@ struct SearchView: View {
                                 ForEach(Array(loc.prefix(scope == "lokal" ? 50 : 6).enumerated()), id: \.offset) { i, t in
                                     TrackRow(track: t, playing: player.current?.id == t.id,
                                              selecting: selecting, selected: selected.contains(t.uri)) {
-                                        if selecting { toggleSel(t.uri); return }
-                                        searchFocused = false   // Tastatur weg beim Song-Tippen
-                                        pushRecentItem(RecentSearchItem(uri: t.uri, name: t.name, image: t.image ?? "", sub: t.artist))
-                                        player.play(tracks: loc, startAt: i, contextName: "Server", contextURI: "")
+                                        tapTrack(t, in: loc, at: i, context: "Server")
                                     }
                                 }
                             }
@@ -1387,6 +1381,14 @@ struct SearchView: View {
                 .onAppear { pushRecentItem(RecentSearchItem(uri: c.uri, name: c.name, image: c.image ?? "", sub: cardSub(c.uri))) }
             }
         }
+    }
+    /// Tap auf eine Song-Zeile: im Auswahl-Modus toggeln, sonst abspielen.
+    /// Ausgelagert, damit die SearchView.body nicht zu komplex zum Typchecken wird.
+    private func tapTrack(_ t: Track, in list: [Track], at i: Int, context: String) {
+        if selecting { toggleSel(t.uri); return }
+        searchFocused = false   // Tastatur weg beim Song-Tippen
+        pushRecentItem(RecentSearchItem(uri: t.uri, name: t.name, image: t.image ?? "", sub: t.artist))
+        player.play(tracks: list, startAt: i, contextName: context, contextURI: "")
     }
     private func label(_ s: String) -> String {
         ["all":"Alle","tracks":"Songs","playlists":"Playlists","albums":"Alben","artists":"Künstler","shows":"Podcasts","lokal":"Lokal"][s] ?? s
