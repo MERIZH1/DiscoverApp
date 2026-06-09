@@ -14,7 +14,7 @@ final class DownloadManager: ObservableObject {
     @Published private(set) var tracks: [Track] = []          // Offline-Bibliothek
 
     private let api: APIClient
-    private let exts = ["m4a", "mp3", "aac", "mp4", "ogg", "opus", "wav"]
+    private let exts = ["m4a", "mp3", "aac", "mp4", "flac", "aiff", "aif", "ogg", "opus", "wav"]
 
     // Hintergrund-Session: EINMALIG, ueberlebt App-Suspend. Delegate ist ein
     // separates, nicht isoliertes Objekt; es ruft uns auf dem MainActor zurueck.
@@ -72,8 +72,10 @@ final class DownloadManager: ObservableObject {
     /// Endung aus MIME-Typ / Quell-URL ableiten (Podcasts sind oft .mp3, Songs .m4a).
     private func ext(mime: String?, urlExt: String?) -> String {
         if let mime = mime?.lowercased() {
+            if mime.contains("flac") { return "flac" }            // sonst FLAC -> .m4a = stumm
             if mime.contains("mpeg") || mime.contains("mp3") { return "mp3" }
             if mime.contains("mp4") || mime.contains("m4a") || mime.contains("aac") { return "m4a" }
+            if mime.contains("aiff") || mime.contains("aif") { return "aiff" }
             if mime.contains("ogg") || mime.contains("opus") { return "ogg" }
             if mime.contains("wav") { return "wav" }
         }
