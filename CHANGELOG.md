@@ -3,6 +3,10 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.22 — Robustheit: Song ohne Stream haengt nicht mehr
+- **Bugfix:** Bekommt ein einzelner Song keine Stream-URL (Server-Schluckauf, kaputter YT-Match), springt der Player nach ~1s automatisch zum naechsten Song statt einzufrieren. Bei zu vielen Fehlern in Folge (Server komplett down) pausiert er sauber statt endlos zu skippen.
+- **Brown/Dark Noise minimal leiser** — Pegel an die (server-normalisierten) Ambient-Sounds angeglichen.
+
 ## v2.21 — Mehrfachauswahl: Songs zusammen zur Playlist
 - In **Suche, Playlist und Empfehlungen** oben rechts den Auswahl-Button (Haken-Symbol) antippen → Songs ankreuzen → unten **„Zu Playlist hinzufuegen (N)"**.
 - Funktioniert auch fuer **lokale Navidrome-Songs** (werden beim Hinzufuegen zu Spotify-Treffern aufgeloest, sonst lokal eingefuegt).

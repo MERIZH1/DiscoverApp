@@ -77,6 +77,7 @@ final class PlayerController: ObservableObject {
     private var failedOffline: Set<String> = []   // Offline-Dateien, die diese Session nicht liefen -> streamen
     private var streamRetried: Set<String> = []   // gestreamte Tracks, die nach Fehler schon 1x frisch geladen wurden
     private var wantPlay = false                   // Absicht zu spielen -> beim readyToPlay durchsetzen (gegen 2x-play)
+    private var streamFailStreak = 0               // Skip-on-Error: Stream-Fehler in Folge (Cap gegen Endlos-Skip)
     private var endStallTicks = 0                  // Auto-Advance-Fallback: Ticks am Track-Ende ohne Fortschritt
     private var lastStallTime = -1.0               // letzte Position fuer die Stillstands-Erkennung
     var profileScope = ""                 // fuer profil-spezifische Persistenz
@@ -675,7 +676,11 @@ final class PlayerController: ObservableObject {
             do {
                 let r = try await api.streamURL(for: track)
                 guard myIndex == index, !isRadio else { return }
-                guard r.ok, let rel = r.url, let url = api.absoluteURL(rel) else { loading = false; return }
+                guard r.ok, let rel = r.url, let url = api.absoluteURL(rel) else {
+                    loading = false
+                    skipAfterStreamFailure()
+                    return
+                }
                 source = r.source ?? ""
                 streamCache = r.stream_cache ?? ""
                 UserDefaults.standard.set(source, forKey: "lastSource_\(profileScope)")
@@ -686,8 +691,34 @@ final class PlayerController: ObservableObject {
                 player.replaceCurrentItem(with: item)
                 applyEQ(to: item, thenResume: autoplay)
                 loading = false
+                streamFailStreak = 0
                 prefetchUpcoming()
-            } catch { loading = false }
+            } catch {
+                guard myIndex == index, !isRadio else { return }
+                loading = false
+                skipAfterStreamFailure()
+            }
+        }
+    }
+
+    /// Robustheits-Netz: ein einzelner Song ohne Stream-URL darf die Wiedergabe
+    /// nicht einfrieren -> kurz warten (Server-Schluckauf abfedern), dann zum
+    /// naechsten Song. Der Streak-Cap stoppt nach zu vielen Fehlern in Folge
+    /// (z.B. Server komplett down) mit Pause statt einer Endlos-Skip-Schleife.
+    private func skipAfterStreamFailure() {
+        guard wantPlay, !isRadio, queue.count > 1 else { return }
+        streamFailStreak += 1
+        if streamFailStreak >= min(queue.count, 8) {
+            streamFailStreak = 0
+            pause()
+            return
+        }
+        let failedIdx = index
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            guard let self, self.wantPlay, !self.isRadio,
+                  self.index == failedIdx, !self.isPlaying, !self.loading else { return }
+            self.next()
         }
     }
 

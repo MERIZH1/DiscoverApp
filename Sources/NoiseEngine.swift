@@ -75,7 +75,9 @@ final class NoiseDSP: @unchecked Sendable {
             return out * 0.28
         default:                                  // Brown / Dark
             brown[c] = (brown[c] + 0.02*w) / 1.02
-            return brown[c] * 3.0
+            // 2.7 statt 3.0: Brown/Dark war minimal lauter als die (server-
+            // normalisierten) Ambient-Dateien -> ~1 dB runter, Pegel angeglichen.
+            return brown[c] * 2.7
         }
     }
     func render(_ frames: Int, _ abl: UnsafeMutableAudioBufferListPointer) {
