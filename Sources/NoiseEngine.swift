@@ -61,8 +61,8 @@ final class NoiseDSP: @unchecked Sendable {
     @inline(__always) private func sample(_ ty: Int32, _ c: Int) -> Float {
         let w = white(c)
         switch ty {
-        case 0:                                   // White (lauter + ausbalanciert)
-            return w * 0.85
+        case 0:                                   // White
+            return w * 0.9
         case 1:                                   // Pink (war deutlich zu leise)
             pk[c][0] = 0.99886*pk[c][0] + w*0.0555179
             pk[c][1] = 0.99332*pk[c][1] + w*0.0750759
@@ -72,14 +72,14 @@ final class NoiseDSP: @unchecked Sendable {
             pk[c][5] = -0.7616*pk[c][5] - w*0.0168980
             let out = pk[c][0]+pk[c][1]+pk[c][2]+pk[c][3]+pk[c][4]+pk[c][5]+pk[c][6]+w*0.5362
             pk[c][6] = w*0.115926
-            return out * 0.24
+            return out * 0.28
         default:                                  // Brown / Dark
             brown[c] = (brown[c] + 0.02*w) / 1.02
-            return brown[c] * 3.6
+            return brown[c] * 3.0
         }
     }
     func render(_ frames: Int, _ abl: UnsafeMutableAudioBufferListPointer) {
-        let vol = volume * 1.7, ty = type                      // lauter (Ambient wird serverseitig dran angeglichen)
+        let vol = volume * 1.0, ty = type
         let nch = abl.count
         if enabled == 0 {                                       // aus -> Stille + Fade fuer naechsten Start zuruecksetzen
             fadeGain = 0
@@ -99,9 +99,7 @@ final class NoiseDSP: @unchecked Sendable {
             for ch in 0..<nch {
                 guard let p = abl[ch].mData?.assumingMemoryBound(to: Float.self) else { continue }
                 let c = ch % 2
-                var s = sample(ty, c) * vol * g
-                if s > 1 { s = 1 } else if s < -1 { s = -1 }   // begrenzen statt harter Verzerrung
-                p[f] = s
+                p[f] = tanhf(sample(ty, c) * vol * g)          // weiches Saturieren -> KEINE harte Verzerrung
             }
         }
     }
