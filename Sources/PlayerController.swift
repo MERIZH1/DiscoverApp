@@ -784,6 +784,12 @@ final class PlayerController: ObservableObject {
                         // Gestreamter Track (z.B. abgelaufene YouTube-URL) -> einmal frische URL holen
                         self.streamRetried.insert(t.uri)
                         self.loadCurrent(autoplay: self.wantPlay)
+                    } else {
+                        // Auch der frische Versuch schlug fehl (toter YT-Match,
+                        // unspielbares Format) -> nicht einfrieren, sondern zum
+                        // naechsten Song. Vorher war hier ein No-Op = Player haengt.
+                        self.loading = false
+                        self.skipAfterStreamFailure()
                     }
                 }
             }
