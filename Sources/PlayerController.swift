@@ -758,7 +758,17 @@ final class PlayerController: ObservableObject {
             Task { @MainActor in
                 if it.status == .readyToPlay {
                     let d = CMTimeGetSeconds(it.duration)
-                    if d.isFinite, d > 0 { self.duration = d }
+                    if d.isFinite, d > 0 {
+                        // iOS-Doppel-Dauer-Bug: bei m4a mit eingebetteter Cover-
+                        // Bild-Spur (mjpeg) meldet AVFoundation die DOPPELTE Dauer
+                        // (6:20 statt 3:10) -> Leiste falsch, Seeking springt ins
+                        // Leere. Wenn die Metadaten-Laenge bekannt ist und die
+                        // Player-Dauer deutlich groesser (>1.5x), der Metadaten-
+                        // Laenge vertrauen. (Datei selbst ist korrekt, nur Apples
+                        // Decoder verzaehlt sich an der Bild-Spur.)
+                        let meta = self.current?.durationSec ?? 0
+                        self.duration = (meta > 0 && d > meta * 1.5) ? meta : d
+                    }
                     if let t = self.current { self.streamRetried.remove(t.uri) }
                     // Wiedergabe durchsetzen, falls play() vor readyToPlay kam (sonst 2x play noetig)
                     if self.wantPlay {

@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.24 — Doppelte Songdauer / kaputtes Vorspulen behoben
+- **Bugfix:** Bei manchen Songs zeigte die Leiste die doppelte Laenge (z.B. 6:20 statt 3:10) und Vorspulen blieb haengen. Ursache: Apples Media-Stack verzaehlt sich bei Audiodateien mit eingebettetem Cover-Bild und meldet die doppelte Dauer. Die App nimmt jetzt die bekannte Track-Laenge, wenn der Player offensichtlich daneben liegt -> korrekte Leiste + Seeking. (Server/Datei waren immer korrekt.)
+
 ## v2.23 — Wiedergabe haengt nicht mehr bei unspielbaren Songs
 - **Bugfix:** Wenn ein Song auch nach dem automatischen Neuversuch nicht abspielbar ist (toter Match, unspielbares Format), springt die App jetzt automatisch zum naechsten Song — vorher blieb der Player haengen ("wackelte" und tat nichts).
 - Greift zusammen mit dem Server-Fix (aktuelles yt-dlp -> echte Audiospur statt 360p-Video), der die eigentliche Ursache behebt.
