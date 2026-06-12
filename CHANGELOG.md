@@ -3,6 +3,10 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.27 — Update-Prompt auch beim Entsperren + nicht mehr nervig
+- **Verbessert:** Die App prueft jetzt nicht nur beim Start auf neue Versionen, sondern bei **jedem Entsperren** (Zurueck-in-den-Vordergrund) — ein neues Update wird also fast sofort angeboten.
+- **Verbessert:** Tippst du beim Prompt auf „Spaeter", fragt die App beim **naechsten Entsperren nochmal**. Lehnst du **zweimal** ab, gibt sie fuer **diese** Version Ruhe — erst ab der **naechsten neuen** Version fragt sie wieder.
+
 ## v2.26 — In-App-Updates + Rollback ueber eigenen Signier-Server
 - **Neu:** Beim Start prueft die App, ob eine neuere signierte Version bereitsteht, und fragt „Neue Version verfuegbar — installieren?". Ein Tipp installiert sie per OTA ueber deinen eigenen Server (kein App Store, kein Dashboard).
 - **Neu:** In der Konsole unter „APP-VERSION" siehst du die installierte Version, kannst aktualisieren und auf eine der letzten 5 Versionen **zurueckspringen** (Rollback). Daten bleiben (gleiche Bundle-ID).

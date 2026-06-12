@@ -41,12 +41,41 @@ final class AppUpdater: ObservableObject {
         return (Int(l.build) ?? 0) > Self.installedBuild
     }
 
+    // Wie oft der User dieses Update schon weggetippt hat. 1× Abbrechen ->
+    // beim naechsten Entsperren nochmal fragen. 2× -> fuer DIESEN Build merken
+    // und Ruhe geben, bis ein NEUERER Build erscheint (dann zaehlt es neu).
+    private let kDismissBuild = "updateDismissBuild"
+    private let kDismissCount = "updateDismissCount"
+    private let maxNags = 2
+
+    private var dismissedBuild: Int {
+        get { UserDefaults.standard.integer(forKey: kDismissBuild) }
+        set { UserDefaults.standard.set(newValue, forKey: kDismissBuild) }
+    }
+    private var dismissCount: Int {
+        get { UserDefaults.standard.integer(forKey: kDismissCount) }
+        set { UserDefaults.standard.set(newValue, forKey: kDismissCount) }
+    }
+
+    private func suppressed(_ build: Int) -> Bool {
+        dismissedBuild == build && dismissCount >= maxNags
+    }
+
     func check(api: APIClient, prompt: Bool = true) async {
         guard let resp = try? await api.appVersions() else { return }
         latest = resp.latest
         versions = resp.versions
         loaded = true
-        if prompt, hasUpdate { showPrompt = true }
+        guard prompt, hasUpdate, let b = latest.flatMap({ Int($0.build) }) else { return }
+        if !suppressed(b) { showPrompt = true }
+    }
+
+    /// „Spaeter": Abbruch zaehlen. Ab dem 2. Mal fuer diesen Build verstummen.
+    func dismissCurrent() {
+        showPrompt = false
+        guard let b = latest.flatMap({ Int($0.build) }) else { return }
+        if dismissedBuild != b { dismissedBuild = b; dismissCount = 0 }
+        dismissCount += 1
     }
 
     func open(_ v: AppVersionInfo) {

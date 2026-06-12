@@ -4,6 +4,7 @@ struct ContentView: View {
     @StateObject private var app = AppState()
     @StateObject private var updater = AppUpdater()
     @State private var booting = true
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -37,9 +38,15 @@ struct ContentView: View {
             // Nach dem Start pruefen, ob eine neuere signierte Version bereitsteht.
             if app.connected { await updater.check(api: app.api) }
         }
+        .onChange(of: scenePhase) { _, phase in
+            // Bei jedem Entsperren / Zurueck-in-den-Vordergrund erneut pruefen.
+            if phase == .active, app.connected, !booting {
+                Task { await updater.check(api: app.api) }
+            }
+        }
         .alert("Neue Version verfügbar", isPresented: $updater.showPrompt, presenting: updater.latest) { v in
             Button("Installieren") { updater.open(v) }
-            Button("Später", role: .cancel) {}
+            Button("Später", role: .cancel) { updater.dismissCurrent() }
         } message: { v in
             Text("Discover \(v.version) steht bereit. Nach „Installieren“ laedt iOS die App ueber den eigenen Server — deine Daten bleiben.")
         }
