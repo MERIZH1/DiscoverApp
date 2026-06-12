@@ -62,6 +62,14 @@ targets:
       - path: Shared
     info:
       path: WatchApp/Info.plist
+      properties:
+        CFBundleDisplayName: Discover
+        CFBundleName: Discover
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        MinimumOSVersion: "11.0"
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: com.discover.app
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.discover.app.watchkitapp

@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.32 — Watch-App-Installation repariert (Info.plist)
+- **Bugfix:** Die eingebettete Watch-App hatte durch die Projekt-Generierung eine unvollständige Info.plist (ohne `WKApplication`/`WKCompanionAppBundleIdentifier`) — dadurch lehnte iOS die ganze Installation ab (App-Updates ab v2.29 kamen nicht durch). Jetzt korrekt gesetzt.
+
 ## v2.31 — Update: nur noch ein Dialog (Apples Installations-Dialog)
 - **Verbessert:** Der eigene „Neue Version verfügbar?"-Dialog ist weg. Bei einem neuen Build öffnet die App jetzt direkt Apples Installations-Dialog — ein Schritt statt zwei. Pro Version wird das automatisch nur einmal angeboten (manuell jederzeit über die Konsole → APP-VERSION).
 
