@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.33 — Apple-Watch-App wieder entfernt
+- Die Watch-App ist vorerst raus: Der Signier-Dienst (Signulous) unterstützt offiziell nur iOS/tvOS, keine Apple Watch — eine eingebettete Watch-App lässt sich darüber nicht aufs Gerät bringen und blockierte sogar die normale Installation der iPhone-App. Der iPhone-Teil ist unverändert und läuft wie gewohnt.
+
 ## v2.32 — Watch-App-Installation repariert (Info.plist)
 - **Bugfix:** Die eingebettete Watch-App hatte durch die Projekt-Generierung eine unvollständige Info.plist (ohne `WKApplication`/`WKCompanionAppBundleIdentifier`) — dadurch lehnte iOS die ganze Installation ab (App-Updates ab v2.29 kamen nicht durch). Jetzt korrekt gesetzt.
 
