@@ -29,6 +29,9 @@ jobs:
           VER="1.0.${{ github.run_number }}"
           plutil -replace CFBundleShortVersionString -string "$VER" Sources/Info.plist
           plutil -replace CFBundleVersion -string "${{ github.run_number }}" Sources/Info.plist
+          # Watch-App auf dieselbe Version (Host + eingebettete Watch-App muessen synchron sein)
+          plutil -replace CFBundleShortVersionString -string "$VER" WatchApp/Info.plist
+          plutil -replace CFBundleVersion -string "${{ github.run_number }}" WatchApp/Info.plist
           echo "VER=$VER" >> "$GITHUB_ENV"
 
       - name: Archive app (unsigned)

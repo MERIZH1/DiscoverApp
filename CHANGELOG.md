@@ -3,6 +3,13 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.29 — Apple-Watch-App (Fernbedienung + Queue + Playlists)
+- **Neu:** Eine Apple-Watch-App als Fernbedienung fürs iPhone — gespiegelt über WatchConnectivity (kein LTE/Netz auf der Watch nötig).
+  - **Now Playing:** Cover, Titel/Künstler, Fortschritt, Play/Pause, Vor/Zurück, Shuffle & Repeat.
+  - **Warteschlange:** „Als Nächstes" ansehen und antippen, um direkt dorthin zu springen.
+  - **Playlists:** deine Bibliothek durchblättern und mit einem Tipp auf der Watch starten.
+- Steuert die Wiedergabe auf dem iPhone (das iPhone bleibt die Tonquelle/Lockscreen-Audio).
+
 ## v2.28 — Liquid Glass voll ausgereizt (iOS 26)
 - **Neu:** Mindest-iOS auf 26 angehoben → die App nutzt jetzt das echte Liquid-Glass-System von iOS 26 statt einer Material-Nachbildung.
 - **Verbessert:** Die Icon-Gruppe oben im Player (Sleep-Timer, Ambient, Geräte, „…") liegt jetzt in einem `GlassEffectContainer` und verschmilzt flüssig zu einer Glas-Fläche, statt als einzelne Blasen zu schweben.

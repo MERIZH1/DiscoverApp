@@ -28,6 +28,7 @@ struct ContentView: View {
         .environment(\.liquidGlass, app.liquidGlass)
         .task {
             DiscoverServices.app = app   // fuer Siri/Kurzbefehle
+            WatchBridge.shared.start(app: app)   // Apple-Watch-Fernbedienung
             await app.restore()
             if let t = PendingPlay.track {   // per Siri kalt gestartet
                 app.player.play(tracks: [t], contextName: "Siri", contextURI: "")
