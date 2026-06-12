@@ -38,7 +38,7 @@ struct ContentView: View {
             // Nach dem Start pruefen, ob eine neuere signierte Version bereitsteht.
             if app.connected { await updater.check(api: app.api) }
         }
-        .onChange(of: scenePhase) { _, phase in
+        .onChange(of: scenePhase) { phase in
             // Bei jedem Entsperren / Zurueck-in-den-Vordergrund erneut pruefen.
             if phase == .active, app.connected, !booting {
                 Task { await updater.check(api: app.api) }
