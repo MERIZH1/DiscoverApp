@@ -37,11 +37,15 @@ jobs:
       - name: Archive app (unsigned)
         run: |
           set -eo pipefail
+          # WICHTIG: -destination statt -sdk iphoneos. -sdk wuerde die iOS-SDK auf
+          # ALLE Targets zwingen (auch die eingebettete Watch-App) -> deren
+          # watchOS-Icons gelten dann als "nicht anwendbar". Mit -destination
+          # baut jedes Target mit seiner eigenen Plattform (iOS + watchOS).
           xcodebuild \
             -project DiscoverApp.xcodeproj \
             -scheme DiscoverApp \
             -configuration Release \
-            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
             -archivePath "$PWD/build/DiscoverApp.xcarchive" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
