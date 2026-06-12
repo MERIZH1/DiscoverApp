@@ -3,6 +3,11 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.28 — Liquid Glass voll ausgereizt (iOS 26)
+- **Neu:** Mindest-iOS auf 26 angehoben → die App nutzt jetzt das echte Liquid-Glass-System von iOS 26 statt einer Material-Nachbildung.
+- **Verbessert:** Die Icon-Gruppe oben im Player (Sleep-Timer, Ambient, Geräte, „…") liegt jetzt in einem `GlassEffectContainer` und verschmilzt flüssig zu einer Glas-Fläche, statt als einzelne Blasen zu schweben.
+- **Verbessert:** Bei aktivem Liquid Glass bekommt auch die untere Tab-Leiste das native durchscheinende Glas-Design (vorher immer schwarz). Über den Schalter „Liquid Glass" in den Einstellungen abschaltbar.
+
 ## v2.27 — Update-Prompt auch beim Entsperren + nicht mehr nervig
 - **Verbessert:** Die App prueft jetzt nicht nur beim Start auf neue Versionen, sondern bei **jedem Entsperren** (Zurueck-in-den-Vordergrund) — ein neues Update wird also fast sofort angeboten.
 - **Verbessert:** Tippst du beim Prompt auf „Spaeter", fragt die App beim **naechsten Entsperren nochmal**. Lehnst du **zweimal** ab, gibt sie fuer **diese** Version Ruhe — erst ab der **naechsten neuen** Version fragt sie wieder.

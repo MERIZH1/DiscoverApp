@@ -47,7 +47,7 @@ enum Haptics {
 }
 
 // MARK: - Appearance
-func configureAppearance() {
+func configureAppearance(glass: Bool = false) {
     let nav = UINavigationBarAppearance()
     nav.configureWithOpaqueBackground()
     nav.backgroundColor = .black; nav.shadowColor = .clear
@@ -64,11 +64,15 @@ func configureAppearance() {
     UINavigationBar.appearance().standardAppearance = nav
     UINavigationBar.appearance().scrollEdgeAppearance = nav
     UINavigationBar.appearance().compactAppearance = nav
-    let tab = UITabBarAppearance()
-    tab.configureWithOpaqueBackground()
-    tab.backgroundColor = .black; tab.shadowColor = .clear
-    UITabBar.appearance().standardAppearance = tab
-    UITabBar.appearance().scrollEdgeAppearance = tab
+    // Tab-Bar: bei Liquid Glass NICHT anfassen -> iOS 26 rendert die native
+    // Liquid-Glass-Tab-Bar (durchscheinend). Nur ohne Glas opakes Schwarz erzwingen.
+    if !glass {
+        let tab = UITabBarAppearance()
+        tab.configureWithOpaqueBackground()
+        tab.backgroundColor = .black; tab.shadowColor = .clear
+        UITabBar.appearance().standardAppearance = tab
+        UITabBar.appearance().scrollEdgeAppearance = tab
+    }
 }
 
 /// Durchschnittsfarbe eines Covers (fuer den Playlist-Hero-Verlauf wie in der PWA).
@@ -137,7 +141,7 @@ struct MainView: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: app.toast)
-        .onAppear(perform: configureAppearance)
+        .onAppear { configureAppearance(glass: app.liquidGlass) }
         .sheet(isPresented: $showPlayer) { PlayerView() }
     }
 }
@@ -924,9 +928,10 @@ struct SettingsView: View {
                         Toggle(isOn: $app.liquidGlass) {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Liquid Glass").font(.system(size: 15)).foregroundStyle(Theme.text)
-                                Text("Durchscheinendes Glas-Design (iOS 26)").font(.caption2).foregroundStyle(Theme.mute)
+                                Text("Durchscheinendes Glas-Design (iOS 26). Tab-Leiste passt sich nach Neustart an.").font(.caption2).foregroundStyle(Theme.mute)
                             }
                         }.tint(Theme.accent)
+                        .onChange(of: app.liquidGlass) { _ in configureAppearance(glass: app.liquidGlass) }
                     }
                     // Sync / Geraete-Name
                     SettingsGroup("GERÄT (SYNC)") {
@@ -2928,36 +2933,42 @@ struct PlayerView: View {
                         Text(p.displayTitle).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
                     }
                     Spacer()
-                    Menu {
-                        if p.sleepRemaining > 0 || p.sleepAtEnd {
-                            Button("Sleep-Timer aus", role: .destructive) { p.cancelSleep() }
+                    // Rechte Icon-Gruppe: auf iOS 26 verschmelzen die Glas-Kreise
+                    // zu einer fluessigen Flaeche (GlassEffectContainer).
+                    GlassCluster(on: glass, spacing: 6) {
+                      HStack(spacing: 6) {
+                        Menu {
+                            if p.sleepRemaining > 0 || p.sleepAtEnd {
+                                Button("Sleep-Timer aus", role: .destructive) { p.cancelSleep() }
+                            }
+                            Button("15 Minuten") { p.setSleep(minutes: 15) }
+                            Button("30 Minuten") { p.setSleep(minutes: 30) }
+                            Button("45 Minuten") { p.setSleep(minutes: 45) }
+                            Button("60 Minuten") { p.setSleep(minutes: 60) }
+                            Button("Ende des Songs") { p.setSleepEndOfTrack() }
+                        } label: {
+                            Image(systemName: (p.sleepRemaining > 0 || p.sleepAtEnd) ? "moon.fill" : "moon")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle((p.sleepRemaining > 0 || p.sleepAtEnd) ? Theme.accent : Theme.text)
+                                .glassIconCircle(glass)
                         }
-                        Button("15 Minuten") { p.setSleep(minutes: 15) }
-                        Button("30 Minuten") { p.setSleep(minutes: 30) }
-                        Button("45 Minuten") { p.setSleep(minutes: 45) }
-                        Button("60 Minuten") { p.setSleep(minutes: 60) }
-                        Button("Ende des Songs") { p.setSleepEndOfTrack() }
-                    } label: {
-                        Image(systemName: (p.sleepRemaining > 0 || p.sleepAtEnd) ? "moon.fill" : "moon")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle((p.sleepRemaining > 0 || p.sleepAtEnd) ? Theme.accent : Theme.text)
-                            .glassIconCircle(glass)
-                    }.padding(.trailing, 10)
-                    Button { showNoise = true } label: {
-                        Image(systemName: noise.activeId != nil ? "speaker.wave.2.fill" : "speaker.wave.2")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(noise.activeId != nil ? Theme.accent : Theme.text)
-                            .glassIconCircle(glass)
-                    }.padding(.trailing, 10)
-                    Button { showDevices = true } label: {
-                        Image(systemName: "hifispeaker.2.fill")
-                            .font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.text)
-                            .glassIconCircle(glass)
-                    }.padding(.trailing, 10)
-                    Menu { if let t = p.current { TrackMenu(track: t, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }) } } label: {
-                        Image(systemName: "ellipsis").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
-                            .glassIconCircle(glass)
-                    }.disabled(p.current == nil)
+                        Button { showNoise = true } label: {
+                            Image(systemName: noise.activeId != nil ? "speaker.wave.2.fill" : "speaker.wave.2")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(noise.activeId != nil ? Theme.accent : Theme.text)
+                                .glassIconCircle(glass)
+                        }
+                        Button { showDevices = true } label: {
+                            Image(systemName: "hifispeaker.2.fill")
+                                .font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.text)
+                                .glassIconCircle(glass)
+                        }
+                        Menu { if let t = p.current { TrackMenu(track: t, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }) } } label: {
+                            Image(systemName: "ellipsis").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
+                                .glassIconCircle(glass)
+                        }.disabled(p.current == nil)
+                      }
+                    }
                 }.padding(.horizontal, 4).padding(.top, 8)
                 Spacer()
                 Artwork(url: p.displayImage, size: 300, corner: 12).shadow(radius: 24)

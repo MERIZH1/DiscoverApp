@@ -43,3 +43,21 @@ extension View {
             .contentShape(Circle())
     }
 }
+
+/// Gruppiert mehrere benachbarte Glas-Elemente, damit sie auf iOS 26 fluessig
+/// ineinander verschmelzen und beim Erscheinen/Verschwinden morphen (das eigentliche
+/// „Liquid"-Verhalten) — statt als einzelne Glas-Blasen nebeneinander zu stehen.
+/// Ohne Glas oder unter iOS 26 ist es nur ein transparenter Pass-Through.
+struct GlassCluster<Content: View>: View {
+    let on: Bool
+    var spacing: CGFloat = 8
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        if on, #available(iOS 26.0, *) {
+            GlassEffectContainer(spacing: spacing) { content }
+        } else {
+            content
+        }
+    }
+}
