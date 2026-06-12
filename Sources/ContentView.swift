@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var app = AppState()
+    @StateObject private var updater = AppUpdater()
     @State private var booting = true
 
     var body: some View {
@@ -33,6 +34,14 @@ struct ContentView: View {
             }
             try? await Task.sleep(nanoseconds: 500_000_000)   // kurze Mindestanzeige
             withAnimation(.easeOut(duration: 0.4)) { booting = false }
+            // Nach dem Start pruefen, ob eine neuere signierte Version bereitsteht.
+            if app.connected { await updater.check(api: app.api) }
+        }
+        .alert("Neue Version verfügbar", isPresented: $updater.showPrompt, presenting: updater.latest) { v in
+            Button("Installieren") { updater.open(v) }
+            Button("Später", role: .cancel) {}
+        } message: { v in
+            Text("Discover \(v.version) steht bereit. Nach „Installieren“ laedt iOS die App ueber den eigenen Server — deine Daten bleiben.")
         }
         .preferredColorScheme(.dark)
     }

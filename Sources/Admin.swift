@@ -85,6 +85,7 @@ struct AdminConsoleView: View {
     @State private var smartCacheLoaded = false
     @State private var serverConfig: ServerConfig?
     @State private var profiles: [Profile] = []
+    @StateObject private var updater = AppUpdater()
 
     var body: some View {
         NavigationStack {
@@ -125,6 +126,44 @@ struct AdminConsoleView: View {
                                 .background(Theme.accent).clipShape(RoundedRectangle(cornerRadius: 10))
                         }.buttonStyle(.plain).disabled(busy)
                         Text("Stößt die sp_dc-Erneuerung auf DIESEM Server an (cookie-keeper).")
+                            .font(.caption2).foregroundStyle(Theme.mute)
+                    }
+
+                    // App-Updates / Rollback (eigener Signier-Server)
+                    SettingsGroup("APP-VERSION") {
+                        HStack {
+                            Text("Installiert").font(.system(size: 14)).foregroundStyle(Theme.text)
+                            Spacer()
+                            Text("v\(AppUpdater.installedVersion)").font(.system(size: 13)).foregroundStyle(Theme.sub)
+                        }
+                        if updater.hasUpdate, let l = updater.latest {
+                            Button { updater.open(l) } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "arrow.down.circle.fill")
+                                    Text("Neue Version v\(l.version) installieren").font(.system(size: 15, weight: .semibold))
+                                    Spacer()
+                                }.foregroundStyle(.black).padding(.vertical, 11).padding(.horizontal, 14)
+                                    .background(Theme.accent).clipShape(RoundedRectangle(cornerRadius: 10))
+                            }.buttonStyle(.plain)
+                        } else if updater.loaded {
+                            Text("Du bist auf dem neuesten Stand.").font(.caption2).foregroundStyle(Theme.mute)
+                        }
+                        if updater.versions.count > 1 {
+                            Text("Frühere Versionen (Rollback):").font(.caption2).foregroundStyle(Theme.mute).padding(.top, 4)
+                            ForEach(updater.versions) { v in
+                                if v.build != String(AppUpdater.installedBuild) {
+                                    Button { updater.open(v) } label: {
+                                        HStack {
+                                            Text("v\(v.version)").font(.system(size: 14)).foregroundStyle(Theme.text)
+                                            Spacer()
+                                            Text("installieren").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.accent)
+                                        }.padding(.vertical, 9).padding(.horizontal, 12)
+                                            .background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 9))
+                                    }.buttonStyle(.plain)
+                                }
+                            }
+                        }
+                        Text("Updates kommen ueber deinen eigenen Signier-Server. Rollback installiert eine aeltere Version drueber (Daten bleiben).")
                             .font(.caption2).foregroundStyle(Theme.mute)
                     }
 
@@ -357,6 +396,7 @@ struct AdminConsoleView: View {
         if let sc = await app.api.smartCacheConfig() { smartCache = sc; smartCacheLoaded = true }
         serverConfig = await app.api.serverConfig()
         profiles = (try? await app.api.profiles()) ?? []
+        await updater.check(api: app.api, prompt: false)
     }
     private func present(_ ac: UIAlertController) {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }

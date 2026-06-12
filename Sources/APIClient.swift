@@ -84,6 +84,10 @@ final class APIClient: ObservableObject {
     func systemStatus() async -> SystemStatus? {
         try? await get("/api/status")
     }
+    /// Verfuegbare App-Versionen (aktuell + Rollback-Historie) vom Signier-Server.
+    func appVersions() async throws -> AppVersionsResponse {
+        try await get("/api/app/versions")
+    }
     /// Server-Ausfaelle (id = down-Zeitstempel) nach `since` -> fuer "war offline von X bis Y".
     func outages(since: Int) async -> [Outage] {
         let r: OutagesResponse? = try? await get("/api/outages?since=\(since)")

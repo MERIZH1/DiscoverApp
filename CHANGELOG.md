@@ -3,6 +3,10 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.26 — In-App-Updates + Rollback ueber eigenen Signier-Server
+- **Neu:** Beim Start prueft die App, ob eine neuere signierte Version bereitsteht, und fragt „Neue Version verfuegbar — installieren?". Ein Tipp installiert sie per OTA ueber deinen eigenen Server (kein App Store, kein Dashboard).
+- **Neu:** In der Konsole unter „APP-VERSION" siehst du die installierte Version, kannst aktualisieren und auf eine der letzten 5 Versionen **zurueckspringen** (Rollback). Daten bleiben (gleiche Bundle-ID).
+
 ## v2.25 — Doppelte Dauer endgueltig behoben (zweite Stelle)
 - **Bugfix-Nachzug:** In v2.24 sprang die Dauer trotzdem zurueck auf doppelt, weil eine zweite Funktion (`syncDuration`, laeuft alle 0,5s) den korrigierten Wert wieder ueberschrieb. Jetzt respektiert auch sie die bekannte Track-Laenge -> Leiste bleibt korrekt, Vorspulen funktioniert.
 
