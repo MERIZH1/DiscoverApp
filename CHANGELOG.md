@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.30 — Update-Installation: keine Endlosschleife mehr
+- **Bugfix:** Nach „Installieren" hielt sich die App nicht zurück und fragte beim Zurückkehren aus dem Apple-Installations-Dialog sofort wieder „Neue Version verfügbar?". Ein erneutes Tippen brach den laufenden Download ab → die Installation kam nie durch. Jetzt verstummt die Abfrage, sobald die Installation gestartet ist.
+
 ## v2.29 — Apple-Watch-App (Fernbedienung + Queue + Playlists)
 - **Neu:** Eine Apple-Watch-App als Fernbedienung fürs iPhone — gespiegelt über WatchConnectivity (kein LTE/Netz auf der Watch nötig).
   - **Now Playing:** Cover, Titel/Künstler, Fortschritt, Play/Pause, Vor/Zurück, Shuffle & Repeat.

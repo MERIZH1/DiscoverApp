@@ -79,6 +79,12 @@ final class AppUpdater: ObservableObject {
     }
 
     func open(_ v: AppVersionInfo) {
+        // WICHTIG: Sobald die Installation angestossen ist, nicht erneut nachfragen.
+        // Sonst kommt beim Zurueckkehren aus Apples System-Install-Dialog sofort
+        // wieder unser Prompt -> ein weiteres Tippen startet den Download neu und
+        // bricht den laufenden ab (Endlosschleife, nichts installiert).
+        if let b = Int(v.build) { dismissedBuild = b; dismissCount = maxNags }
+        showPrompt = false
         if let url = URL(string: v.itms_url) { UIApplication.shared.open(url) }
     }
 }
