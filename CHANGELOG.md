@@ -3,6 +3,10 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.36 — Profilfarbe wählbar (wie auf der Webseite)
+- **Neu:** In den Einstellungen unter „Profil" lässt sich jetzt die Profilfarbe wählen (Hellblau/Orange/Rot/Gelb) — dieselben Farben wie in der Web-App, gespeichert auf dem Server.
+- **Verbessert:** Das Account-Avatar nutzt jetzt überall die Profilfarbe als Verlauf (vorher fest goldfarben), inklusive Profilauswahl und Konto-Menü — passend zur Web-Oberfläche.
+
 ## v2.35 — Echte Umlaute in der Oberfläche
 - Vereinzelte Behelfsschreibweisen (ae/oe/ue/ss) in UI-Texten durch echte Umlaute ersetzt (z.B. „Ungültige", „hinzufügen", „nächste", „Lautstärke", „Läuft zusätzlich", „zulässt … nötig"). Rein kosmetisch, keine Funktionsänderung.
 

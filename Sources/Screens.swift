@@ -566,16 +566,32 @@ struct YTMatchSheet: View {
 // MARK: - Account-Avatar
 struct AvatarCircle: View {
     let name: String
+    var color: String? = nil          // Profilfarbe (Hex) -> Gradient wie in der PWA
     var size: CGFloat = 38
     var body: some View {
         let letter = String(name.prefix(1)).uppercased()
         Circle()
-            .fill(LinearGradient(colors: [Color(hex6: 0xCBA552), Color(hex6: 0x7E6326)],
+            .fill(LinearGradient(colors: avatarGradient(color),
                                  startPoint: .topLeading, endPoint: .bottomTrailing))
             .frame(width: size, height: size)
             .overlay(Text(letter.isEmpty ? "?" : letter)
                 .font(.system(size: size * 0.42, weight: .bold)).foregroundStyle(.white))
     }
+}
+
+/// Gradient aus der Profilfarbe (hell oben-links -> dunkler unten-rechts), genau
+/// wie das Avatar in der PWA. Ohne/ungueltige Farbe: das bisherige Gold.
+func avatarGradient(_ hex: String?) -> [Color] {
+    guard let hex = hex, let base = Color(hex: hex) else {
+        return [Color(hex6: 0xCBA552), Color(hex6: 0x7E6326)]
+    }
+    let h = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+    guard h.count == 6, let v = UInt64(h, radix: 16) else { return [base, base] }
+    let f = 0.55
+    let dark = Color(red: Double((v >> 16) & 0xff) * f / 255,
+                     green: Double((v >> 8) & 0xff) * f / 255,
+                     blue: Double(v & 0xff) * f / 255)
+    return [base, dark]
 }
 
 // MARK: - Home
@@ -607,7 +623,7 @@ struct HomeView: View {
                             .foregroundStyle(Theme.text).lineLimit(2)
                         Spacer(minLength: 8)
                         Button { showAccount = true } label: {
-                            AvatarCircle(name: app.profile?.name ?? "?")
+                            AvatarCircle(name: app.profile?.name ?? "?", color: app.profile?.color)
                         }.buttonStyle(.plain)
                     }.padding(.horizontal).padding(.top, 8)
 
@@ -769,7 +785,7 @@ struct AccountSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 14) {
-                        AvatarCircle(name: app.profile?.name ?? "?", size: 56)
+                        AvatarCircle(name: app.profile?.name ?? "?", color: app.profile?.color, size: 56)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(app.profile?.name ?? "Profil").font(.title3.bold()).foregroundStyle(Theme.text)
                             Text(isAdmin ? "Admin" : "User").font(.caption).foregroundStyle(Theme.accent)
@@ -781,7 +797,7 @@ struct AccountSheet: View {
                         ForEach(profiles) { p in
                             Button { app.switchProfile(p); dismiss() } label: {
                                 HStack(spacing: 12) {
-                                    AvatarCircle(name: p.name, size: 36)
+                                    AvatarCircle(name: p.name, color: p.color, size: 36)
                                     VStack(alignment: .leading, spacing: 1) {
                                         Text(p.name).font(.system(size: 16)).foregroundStyle(Theme.text)
                                         Text(p.is_admin == true ? "Admin" : "User").font(.caption2).foregroundStyle(Theme.mute)
@@ -849,7 +865,7 @@ struct AccountSheet: View {
 
     @ViewBuilder private func adminRow(_ p: Profile, showMenu: Bool) -> some View {
         HStack(spacing: 12) {
-            AvatarCircle(name: p.name, size: 32)
+            AvatarCircle(name: p.name, color: p.color, size: 32)
             Text(p.name).font(.system(size: 15)).foregroundStyle(Theme.text)
             Spacer()
             Text(p.is_admin == true ? "Admin" : "User").font(.caption2)
@@ -885,7 +901,13 @@ struct SettingsView: View {
     @State private var name = ""
     @State private var country = ""
     @State private var hideForeign = false
+    @State private var color = ""
     @State private var prebuffer = 5
+
+    // Profil-Farbpalette — identisch zur PWA (PROFILE_COLORS).
+    private let profileColors: [(hex: String, name: String)] = [
+        ("#5b8db8", "Hellblau"), ("#c47a55", "Orange"), ("#b85555", "Rot"), ("#b89e55", "Gelb"),
+    ]
     @State private var normalize = false
     @State private var bgKeepalive = false
     @State private var scEnabled = true
@@ -922,6 +944,32 @@ struct SettingsView: View {
                         Toggle(isOn: $hideForeign) {
                             Text("Fremdsprachige Playlists ausblenden").font(.system(size: 15)).foregroundStyle(Theme.text)
                         }.tint(Theme.accent).onChange(of: hideForeign) { _ in if loaded { saveProfile() } }
+                        // Profil-Farbe (wie in der PWA) — faerbt das Account-Avatar
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Farbe").font(.system(size: 15)).foregroundStyle(Theme.text)
+                            HStack(spacing: 14) {
+                                ForEach(profileColors, id: \.hex) { c in
+                                    let selected = color.caseInsensitiveCompare(c.hex) == .orderedSame
+                                    Circle()
+                                        .fill(LinearGradient(colors: avatarGradient(c.hex),
+                                                             startPoint: .topLeading, endPoint: .bottomTrailing))
+                                        .frame(width: 36, height: 36)
+                                        .overlay(Circle().strokeBorder(.white, lineWidth: selected ? 3 : 0))
+                                        .overlay {
+                                            if selected {
+                                                Image(systemName: "checkmark")
+                                                    .font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
+                                            }
+                                        }
+                                        .contentShape(Circle())
+                                        .onTapGesture {
+                                            color = c.hex; Haptics.tap()
+                                            if loaded { saveProfile() }
+                                        }
+                                }
+                                Spacer()
+                            }
+                        }
                     }
                     // Darstellung
                     SettingsGroup("DARSTELLUNG") {
@@ -1060,6 +1108,7 @@ struct SettingsView: View {
             name = app.profile?.name ?? ""
             country = app.profile?.country ?? "DE"
             hideForeign = app.profile?.hide_foreign_lang_playlists ?? false
+            color = app.profile?.color ?? ""
             if let s = try? await app.api.settings() {
                 prebuffer = s.prebuffer_count ?? 5; player.prebufferCount = prebuffer; UserDefaults.standard.set(prebuffer, forKey: "prebufferCount")
                 normalize = s.normalize_volume ?? false
@@ -1077,10 +1126,11 @@ struct SettingsView: View {
 
     private func saveProfile() {
         guard loaded, let id = app.profile?.id else { return }
-        let fields: [String: Any] = [
+        var fields: [String: Any] = [
             "name": name, "country": country.uppercased(),
             "hide_foreign_lang_playlists": hideForeign,
         ]
+        if !color.isEmpty { fields["color"] = color }
         Task {
             if let p = try? await app.api.updateProfile(id, fields: fields) { app.profile = p }
         }
@@ -1598,7 +1648,7 @@ struct SendToUserSheet: View {
                         ForEach(others) { p in
                             Button { send(p) } label: {
                                 HStack(spacing: 12) {
-                                    AvatarCircle(name: p.name, size: 40)
+                                    AvatarCircle(name: p.name, color: p.color, size: 40)
                                     Text(p.name).font(.system(size: 16)).foregroundStyle(Theme.text)
                                     Spacer()
                                     Image(systemName: "paperplane").foregroundStyle(Theme.sub)

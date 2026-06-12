@@ -132,7 +132,8 @@ struct ProfilePickerView: View {
                         Button { app.selectProfile(p) } label: {
                             VStack(spacing: 10) {
                                 Circle()
-                                    .fill(Color(hex: p.color) ?? .gray)
+                                    .fill(LinearGradient(colors: avatarGradient(p.color),
+                                                         startPoint: .topLeading, endPoint: .bottomTrailing))
                                     .frame(width: 84, height: 84)
                                     .overlay(Text(String(p.name.prefix(1)))
                                         .font(.largeTitle.bold()).foregroundStyle(.white))
