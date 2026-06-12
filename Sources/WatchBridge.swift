@@ -100,7 +100,7 @@ final class WatchBridge: NSObject, ObservableObject {
         st.artist = p.displayArtist
         st.image = absImage(p.displayImage)
         st.coverJPEG = await coverData(for: p.displayImage)
-        st.position = p.time
+        st.position = p.currentTime
         st.duration = p.duration
         st.ts = Date().timeIntervalSince1970
         st.shuffle = p.shuffle
