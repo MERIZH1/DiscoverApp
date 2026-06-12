@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.34 — Update-Dialog nur noch in Discover selbst
+- **Bugfix:** Der Installations-Dialog konnte über einer anderen App (z.B. TikTok) aufpoppen, weil der Versions-Check asynchron ist und erst zurückkam, als Discover schon im Hintergrund war. Jetzt erscheint er nur, wenn Discover gerade die aktive App im Vordergrund ist — sonst wird beim nächsten echten Öffnen erneut angeboten.
+
 ## v2.33 — Apple-Watch-App wieder entfernt
 - Die Watch-App ist vorerst raus: Der Signier-Dienst (Signulous) unterstützt offiziell nur iOS/tvOS, keine Apple Watch — eine eingebettete Watch-App lässt sich darüber nicht aufs Gerät bringen und blockierte sogar die normale Installation der iPhone-App. Der iPhone-Teil ist unverändert und läuft wie gewohnt.
 

@@ -59,6 +59,11 @@ final class AppUpdater: ObservableObject {
         // Installations-Dialog oeffnen — aber pro Build nur ein einziges Mal,
         // sonst poppt er bei jedem Vordergrund neu auf.
         guard prompt, hasUpdate, let v = latest, let b = Int(v.build), b != offeredBuild else { return }
+        // WICHTIG: Der Check ist async (Netzwerk). Bis er zurueckkommt, koennte der
+        // User laengst in einer ANDEREN App sein -> der Dialog wuerde dort aufpoppen.
+        // Nur anbieten, wenn Discover GERADE die aktive Vordergrund-App ist. Wenn
+        // nicht, NICHT als angeboten markieren -> beim naechsten echten Vordergrund neu.
+        guard UIApplication.shared.applicationState == .active else { return }
         offeredBuild = b
         open(v)
     }
