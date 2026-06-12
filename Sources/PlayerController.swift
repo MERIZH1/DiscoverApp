@@ -475,11 +475,22 @@ final class PlayerController: ObservableObject {
     /// bekannte Dauer hinauslaeuft, die Linie nach (statt am Ende zu kleben).
     private func syncDuration() {
         guard !isRadio else { return }
+        let meta = current?.durationSec ?? 0
         if let item = player.currentItem {
             let d = CMTimeGetSeconds(item.duration)
-            if d.isFinite, d > 0, abs(d - duration) > 0.75 { duration = d }
+            // iOS-Doppel-Dauer-Bug: bei m4a mit eingebetteter Cover-Bild-Spur
+            // (mjpeg) meldet AVFoundation die DOPPELTE item.duration. Wenn die
+            // Metadaten-Laenge bekannt ist und der Player-Wert >1.5x davon liegt,
+            // NICHT uebernehmen — sonst springt die Leiste alle 0.5s wieder auf
+            // doppelt und Seeking landet im leeren Phantom-Bereich.
+            let doubled = (meta > 0 && d.isFinite && d > meta * 1.5)
+            if d.isFinite, d > 0, !doubled, abs(d - duration) > 0.75 { duration = d }
         }
-        if duration > 0, currentTime > duration + 0.3 { duration = currentTime }
+        // Nachziehen (FLAC-Header zu kurz) — aber NICHT wenn wir die Dauer
+        // bewusst auf der kuerzeren Metadaten-Laenge halten (sonst wuerde
+        // Phantom-Stille nach dem echten Ende die Leiste wieder verlaengern).
+        let holdingMeta = (meta > 0 && duration > 0 && duration <= meta + 1.0)
+        if duration > 0, currentTime > duration + 0.3, !holdingMeta { duration = currentTime }
     }
 
     private func checkEndStall() {

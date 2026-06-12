@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.25 — Doppelte Dauer endgueltig behoben (zweite Stelle)
+- **Bugfix-Nachzug:** In v2.24 sprang die Dauer trotzdem zurueck auf doppelt, weil eine zweite Funktion (`syncDuration`, laeuft alle 0,5s) den korrigierten Wert wieder ueberschrieb. Jetzt respektiert auch sie die bekannte Track-Laenge -> Leiste bleibt korrekt, Vorspulen funktioniert.
+
 ## v2.24 — Doppelte Songdauer / kaputtes Vorspulen behoben
 - **Bugfix:** Bei manchen Songs zeigte die Leiste die doppelte Laenge (z.B. 6:20 statt 3:10) und Vorspulen blieb haengen. Ursache: Apples Media-Stack verzaehlt sich bei Audiodateien mit eingebettetem Cover-Bild und meldet die doppelte Dauer. Die App nimmt jetzt die bekannte Track-Laenge, wenn der Player offensichtlich daneben liegt -> korrekte Leiste + Seeking. (Server/Datei waren immer korrekt.)
 
