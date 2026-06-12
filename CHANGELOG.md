@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.31 — Update: nur noch ein Dialog (Apples Installations-Dialog)
+- **Verbessert:** Der eigene „Neue Version verfügbar?"-Dialog ist weg. Bei einem neuen Build öffnet die App jetzt direkt Apples Installations-Dialog — ein Schritt statt zwei. Pro Version wird das automatisch nur einmal angeboten (manuell jederzeit über die Konsole → APP-VERSION).
+
 ## v2.30 — Update-Installation: keine Endlosschleife mehr
 - **Bugfix:** Nach „Installieren" hielt sich die App nicht zurück und fragte beim Zurückkehren aus dem Apple-Installations-Dialog sofort wieder „Neue Version verfügbar?". Ein erneutes Tippen brach den laufenden Download ab → die Installation kam nie durch. Jetzt verstummt die Abfrage, sobald die Installation gestartet ist.
 

@@ -26,7 +26,6 @@ struct AppVersionsResponse: Codable {
 final class AppUpdater: ObservableObject {
     @Published var latest: AppVersionInfo?
     @Published var versions: [AppVersionInfo] = []
-    @Published var showPrompt = false
     @Published var loaded = false
 
     static var installedBuild: Int {
@@ -41,24 +40,14 @@ final class AppUpdater: ObservableObject {
         return (Int(l.build) ?? 0) > Self.installedBuild
     }
 
-    // Wie oft der User dieses Update schon weggetippt hat. 1× Abbrechen ->
-    // beim naechsten Entsperren nochmal fragen. 2× -> fuer DIESEN Build merken
-    // und Ruhe geben, bis ein NEUERER Build erscheint (dann zaehlt es neu).
-    private let kDismissBuild = "updateDismissBuild"
-    private let kDismissCount = "updateDismissCount"
-    private let maxNags = 2
+    // Pro Build oeffnen wir Apples Installations-Dialog automatisch nur EINMAL.
+    // Danach (z.B. wenn der User abbricht) verstummt es, bis ein NEUERER Build
+    // erscheint. Manuell anstossen geht jederzeit ueber die Konsole.
+    private let kOfferedBuild = "updateOfferedBuild"
 
-    private var dismissedBuild: Int {
-        get { UserDefaults.standard.integer(forKey: kDismissBuild) }
-        set { UserDefaults.standard.set(newValue, forKey: kDismissBuild) }
-    }
-    private var dismissCount: Int {
-        get { UserDefaults.standard.integer(forKey: kDismissCount) }
-        set { UserDefaults.standard.set(newValue, forKey: kDismissCount) }
-    }
-
-    private func suppressed(_ build: Int) -> Bool {
-        dismissedBuild == build && dismissCount >= maxNags
+    private var offeredBuild: Int {
+        get { UserDefaults.standard.integer(forKey: kOfferedBuild) }
+        set { UserDefaults.standard.set(newValue, forKey: kOfferedBuild) }
     }
 
     func check(api: APIClient, prompt: Bool = true) async {
@@ -66,25 +55,16 @@ final class AppUpdater: ObservableObject {
         latest = resp.latest
         versions = resp.versions
         loaded = true
-        guard prompt, hasUpdate, let b = latest.flatMap({ Int($0.build) }) else { return }
-        if !suppressed(b) { showPrompt = true }
-    }
-
-    /// „Spaeter": Abbruch zaehlen. Ab dem 2. Mal fuer diesen Build verstummen.
-    func dismissCurrent() {
-        showPrompt = false
-        guard let b = latest.flatMap({ Int($0.build) }) else { return }
-        if dismissedBuild != b { dismissedBuild = b; dismissCount = 0 }
-        dismissCount += 1
+        // Kein eigener Zwischen-Dialog: bei einem neuen Build direkt Apples
+        // Installations-Dialog oeffnen — aber pro Build nur ein einziges Mal,
+        // sonst poppt er bei jedem Vordergrund neu auf.
+        guard prompt, hasUpdate, let v = latest, let b = Int(v.build), b != offeredBuild else { return }
+        offeredBuild = b
+        open(v)
     }
 
     func open(_ v: AppVersionInfo) {
-        // WICHTIG: Sobald die Installation angestossen ist, nicht erneut nachfragen.
-        // Sonst kommt beim Zurueckkehren aus Apples System-Install-Dialog sofort
-        // wieder unser Prompt -> ein weiteres Tippen startet den Download neu und
-        // bricht den laufenden ab (Endlosschleife, nichts installiert).
-        if let b = Int(v.build) { dismissedBuild = b; dismissCount = maxNags }
-        showPrompt = false
+        if let b = Int(v.build) { offeredBuild = b }   // automatisches Wiederanbieten stoppen
         if let url = URL(string: v.itms_url) { UIApplication.shared.open(url) }
     }
 }
