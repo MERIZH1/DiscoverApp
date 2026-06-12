@@ -4,8 +4,8 @@ enum APIError: LocalizedError {
     case badURL, badResponse, http(Int), notConnected
     var errorDescription: String? {
         switch self {
-        case .badURL: return "Ungueltige Server-Adresse"
-        case .badResponse: return "Ungueltige Antwort"
+        case .badURL: return "Ungültige Server-Adresse"
+        case .badResponse: return "Ungültige Antwort"
         case .http(let c): return "Server-Fehler (\(c))"
         case .notConnected: return "Spotify nicht verbunden"
         }
@@ -212,7 +212,7 @@ final class APIClient: ObservableObject {
         if let target { body["target_device_id"] = target }
         _ = try? await data("/api/sync/command", method: "POST", json: body)
     }
-    /// Song an ein anderes Profil schicken (landet dort als "Als Naechstes" — auch in der PWA).
+    /// Song an ein anderes Profil schicken (landet dort als "Als Nächstes" — auch in der PWA).
     func pushToProfile(_ targetID: String, track: Track) async -> Bool {
         let body: [String: Any] = ["name": track.name, "artist": track.artist,
                                    "uri": track.uri, "image": track.image ?? ""]
@@ -227,7 +227,7 @@ final class APIClient: ObservableObject {
         return cmds
     }
 
-    /// Aktive Geraete des Profils (fuer "Wiedergabe-Geraet wechseln").
+    /// Aktive Geraete des Profils (fuer "Wiedergabe-Gerät wechseln").
     func syncDevices() async -> [SyncDevice] {
         guard let d = try? await data("/api/sync/devices"),
               let r = try? JSONDecoder().decode(SyncDevicesResponse.self, from: d) else { return [] }
@@ -574,7 +574,7 @@ final class APIClient: ObservableObject {
         return d != nil
     }
 
-    /// "Zuletzt geoeffnet" (Recents-Feed). Robust dekodiert — ein einzelnes
+    /// "Zuletzt geöffnet" (Recents-Feed). Robust dekodiert — ein einzelnes
     /// fehlerhaftes Item (z.B. ohne name) darf nicht die ganze Liste kippen.
     func recents(limit: Int = 20) async throws -> [HomeItem] {
         let d = try await data("/api/recents?limit=\(limit)")

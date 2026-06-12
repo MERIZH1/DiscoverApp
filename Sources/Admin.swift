@@ -163,7 +163,7 @@ struct AdminConsoleView: View {
                                 }
                             }
                         }
-                        Text("Updates kommen ueber deinen eigenen Signier-Server. Rollback installiert eine aeltere Version drueber (Daten bleiben).")
+                        Text("Updates kommen über deinen eigenen Signier-Server. Rollback installiert eine ältere Version drüber (Daten bleiben).")
                             .font(.caption2).foregroundStyle(Theme.mute)
                     }
 
@@ -183,7 +183,7 @@ struct AdminConsoleView: View {
                             }.foregroundStyle(Theme.text).padding(.vertical, 11).padding(.horizontal, 14)
                                 .background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 10))
                         }
-                        Text("Bei Haengern hilft meist Discover neustarten. Caches leeren erzwingt frische Daten.")
+                        Text("Bei Hängern hilft meist Discover neustarten. Caches leeren erzwingt frische Daten.")
                             .font(.caption2).foregroundStyle(Theme.mute)
                     }
 
@@ -280,22 +280,22 @@ struct AdminConsoleView: View {
                             Toggle(isOn: $alertNavidrome) { Text("Navidrome").font(.system(size: 14)).foregroundStyle(Theme.text) }.tint(Theme.accent)
                             Toggle(isOn: $alertYouTube)   { Text("YouTube").font(.system(size: 14)).foregroundStyle(Theme.text) }.tint(Theme.accent)
                         }
-                        Text("Lokale Mitteilung, wenn ein Dienst ausfaellt — im Vordergrund sofort, im Hintergrund wann iOS es zulaesst (kein Push-Server noetig).")
+                        Text("Lokale Mitteilung, wenn ein Dienst ausfällt — im Vordergrund sofort, im Hintergrund wann iOS es zulässt (kein Push-Server nötig).")
                             .font(.caption2).foregroundStyle(Theme.mute)
                     }
 
                     if smartCacheLoaded {
                         SettingsGroup("SMART-CACHE (Auto-Download)") {
                             Toggle(isOn: Binding(get: { smartCache.enabled }, set: { smartCache.enabled = $0; saveSmartCache() })) {
-                                Text("Vielgehoerte Songs automatisch speichern").font(.system(size: 15)).foregroundStyle(Theme.text)
+                                Text("Vielgehörte Songs automatisch speichern").font(.system(size: 15)).foregroundStyle(Theme.text)
                             }.tint(Theme.accent)
                             Stepper(value: Binding(get: { smartCache.min_listened_sec }, set: { smartCache.min_listened_sec = $0; saveSmartCache() }), in: 0...600, step: 5) {
-                                Text("Ab \(smartCache.min_listened_sec)s gehoert").font(.system(size: 14)).foregroundStyle(Theme.text)
+                                Text("Ab \(smartCache.min_listened_sec)s gehört").font(.system(size: 14)).foregroundStyle(Theme.text)
                             }
                             Stepper(value: Binding(get: { smartCache.min_play_count }, set: { smartCache.min_play_count = $0; saveSmartCache() }), in: 1...50) {
                                 Text("ODER \(smartCache.min_play_count)x abgespielt").font(.system(size: 14)).foregroundStyle(Theme.text)
                             }
-                            Text("Songs, die du oft oder lange hoerst, landen automatisch dauerhaft auf dem Server.")
+                            Text("Songs, die du oft oder lange hörst, landen automatisch dauerhaft auf dem Server.")
                                 .font(.caption2).foregroundStyle(Theme.mute)
                         }
                     }
@@ -336,7 +336,7 @@ struct AdminConsoleView: View {
                                     }
                                 }.padding(.vertical, 3)
                             }
-                            debugButton("Profil hinzufuegen", icon: "person.badge.plus") { promptNewProfile() }
+                            debugButton("Profil hinzufügen", icon: "person.badge.plus") { promptNewProfile() }
                         }
                     }
 
@@ -614,7 +614,7 @@ struct LogsSheet: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     if items.isEmpty {
-                        Text("Keine Eintraege.").font(.system(size: 14)).foregroundStyle(Theme.mute)
+                        Text("Keine Einträge.").font(.system(size: 14)).foregroundStyle(Theme.mute)
                             .frame(maxWidth: .infinity).padding(.top, 40)
                     }
                     ForEach(items.reversed()) { it in   // neueste oben

@@ -65,7 +65,7 @@ struct SongQuery: EntityStringQuery {
     }
 }
 
-/// "Hey Siri, spiele <Titel von Kuenstler> in Discover"
+/// "Hey Siri, spiele <Titel von Künstler> in Discover"
 struct PlayInDiscoverIntent: AppIntent {
     static var title: LocalizedStringResource = "In Discover abspielen"
     static var openAppWhenRun: Bool = true

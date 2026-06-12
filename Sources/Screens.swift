@@ -290,7 +290,7 @@ struct TrackMenu: View {
     }
     private func forgetCache() async {
         guard let api = app?.api else { return }
-        _ = await api.forgetYtCache(track.uri); Haptics.tap(); app?.flash("Cache zurückgesetzt — naechste Wiedergabe sucht neu")
+        _ = await api.forgetYtCache(track.uri); Haptics.tap(); app?.flash("Cache zurückgesetzt — nächste Wiedergabe sucht neu")
     }
     private func startRadio() {
         guard let api = app?.api, let player = app?.player else { return }
@@ -695,7 +695,7 @@ struct HomeView: View {
         }
     }
 
-    /// Baut "Zuletzt geoeffnet" aus dem Verlauf: zuletzt geoeffnete Playlists/Alben/Kuenstler/Podcasts.
+    /// Baut "Zuletzt geöffnet" aus dem Verlauf: zuletzt geoeffnete Playlists/Alben/Kuenstler/Podcasts.
     private func recentsFromHistory(_ hist: [HistoryEntry]) -> [HomeItem] {
         var seen = Set<String>(); var out: [HomeItem] = []
         for e in hist {

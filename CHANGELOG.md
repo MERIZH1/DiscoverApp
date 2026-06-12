@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v2.35 — Echte Umlaute in der Oberfläche
+- Vereinzelte Behelfsschreibweisen (ae/oe/ue/ss) in UI-Texten durch echte Umlaute ersetzt (z.B. „Ungültige", „hinzufügen", „nächste", „Lautstärke", „Läuft zusätzlich", „zulässt … nötig"). Rein kosmetisch, keine Funktionsänderung.
+
 ## v2.34 — Update-Dialog nur noch in Discover selbst
 - **Bugfix:** Der Installations-Dialog konnte über einer anderen App (z.B. TikTok) aufpoppen, weil der Versions-Check asynchron ist und erst zurückkam, als Discover schon im Hintergrund war. Jetzt erscheint er nur, wenn Discover gerade die aktive App im Vordergrund ist — sonst wird beim nächsten echten Öffnen erneut angeboten.
 

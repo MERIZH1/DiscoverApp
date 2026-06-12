@@ -279,7 +279,7 @@ struct NoiseSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("Laeuft zusaetzlich zum Song. Nochmal tippen = aus.")
+                    Text("Läuft zusätzlich zum Song. Nochmal tippen = aus.")
                         .font(.system(size: 13)).foregroundStyle(Theme.sub)
                         .frame(maxWidth: .infinity, alignment: .center).padding(.horizontal)
 
@@ -314,7 +314,7 @@ struct NoiseSheet: View {
                             Slider(value: $noise.duckLevel, in: 0.3...1.0).tint(Theme.accent)
                             Text("\(Int(noise.duckLevel*100))%").font(.system(size: 12)).foregroundStyle(Theme.sub).frame(width: 40)
                         }.padding(.horizontal)
-                        Text("Lautstaerke, waehrend ein Song laeuft (100% = nicht leiser)")
+                        Text("Lautstärke, während ein Song läuft (100% = nicht leiser)")
                             .font(.system(size: 11)).foregroundStyle(Theme.mute)
                             .frame(maxWidth: .infinity, alignment: .center)
                         Button { noise.stopAll() } label: {

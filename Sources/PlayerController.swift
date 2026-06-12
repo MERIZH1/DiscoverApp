@@ -563,7 +563,7 @@ final class PlayerController: ObservableObject {
         failedOffline.remove(uri)
         loadCurrent(autoplay: true)
     }
-    /// Tap auf einen Eintrag in "Als Naechstes" (manuelle Queue + Rest).
+    /// Tap auf einen Eintrag in "Als Nächstes" (manuelle Queue + Rest).
     func playUpNext(_ offset: Int) {
         if offset < manualQueue.count {
             let t = manualQueue.remove(at: offset)
@@ -613,7 +613,7 @@ final class PlayerController: ObservableObject {
         seek(t)
     }
 
-    /// "Als Naechstes spielen" -> vorne in die manuelle Queue (wird zuerst gespielt).
+    /// "Als Nächstes spielen" -> vorne in die manuelle Queue (wird zuerst gespielt).
     func playNext(_ t: Track) {
         if !hasContent || isRadio { play(tracks: [t]); return }
         manualQueue.insert(t, at: 0)
@@ -623,7 +623,7 @@ final class PlayerController: ObservableObject {
         if !hasContent || isRadio { play(tracks: [t]); return }
         manualQueue.append(t)
     }
-    /// "Als Naechstes" (manuelle Queue + Rest der Playback-Queue) umsortieren.
+    /// "Als Nächstes" (manuelle Queue + Rest der Playback-Queue) umsortieren.
     func moveUpNext(from source: IndexSet, to destination: Int) {
         var up = upNext
         guard !up.isEmpty else { return }
