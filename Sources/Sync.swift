@@ -113,8 +113,14 @@ final class SyncManager: ObservableObject {
                 lastPoll = now
                 let s = await api.syncGetState()
                 let nowMs = now * 1000
-                if let s, s.device_name != deviceName, let seen = s.owner_seen_at, (nowMs - seen) < 15000 {
-                    remote = s
+                if let s, s.device_name != deviceName, let seen = s.owner_seen_at {
+                    // Frische-Fenster: ein aktiv SPIELENDES Remote toleriert ein paar
+                    // verpasste Heartbeats (Netz-Hiccup, Heartbeat ~2.5s), ein
+                    // pausiertes/gestopptes Remote verschwindet dagegen zuegig — sonst
+                    // klebt das Banner nach dem Stoppen am PC viel zu lange (vorher 15s).
+                    let age = nowMs - seen
+                    let maxAge: Double = (s.playing == true) ? 6000 : 3000
+                    remote = (age < maxAge) ? s : nil
                 } else {
                     remote = nil
                 }

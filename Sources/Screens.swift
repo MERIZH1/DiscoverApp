@@ -3046,9 +3046,11 @@ struct PlayerView: View {
                 }.padding(.horizontal, 4)
                 if !p.isRadio {
                     VStack(spacing: 2) {
-                        Slider(value: Binding(get: { scrubbing ? scrub : clock.time }, set: { scrub = $0 }),
-                               in: 0...max(clock.duration, 1), onEditingChanged: { e in scrubbing = e; if !e { p.seek(scrub) } })
+                        Slider(value: $scrub, in: 0...max(clock.duration, 1),
+                               onEditingChanged: { e in scrubbing = e; if !e { p.seek(scrub) } })
                             .tint(Theme.accent)
+                            .onAppear { scrub = clock.time }
+                            .onChange(of: clock.time) { _, t in if !scrubbing { scrub = t } }
                         HStack {
                             Text(fmt(scrubbing ? scrub : clock.time)).font(.caption2).foregroundStyle(Theme.sub)
                             Spacer()
