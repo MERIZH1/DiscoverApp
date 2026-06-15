@@ -695,6 +695,11 @@ final class PlayerController: ObservableObject {
             prefetchUpcoming()
             return
         }
+        // Alten Track SOFORT stoppen, bevor wir (async) die Stream-URL holen.
+        // Sonst laeuft der vorherige Song weiter, waehrend Player-UI + Lockscreen
+        // schon die Metadaten des neuen (ggf. fehlschlagenden) Tracks zeigen ->
+        // "falsche Metadaten, aber alter Song spielt". Kurze Stille beim Laden ist ok.
+        player.replaceCurrentItem(with: nil)
         let myIndex = index
         Task {
             do {
