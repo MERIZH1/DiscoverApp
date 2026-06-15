@@ -494,11 +494,24 @@ final class PlayerController: ObservableObject {
     }
 
     private func checkEndStall() {
-        // Nur ganz am Ende (<=0.6s Rest) und nach laengerem Stillstand -> EOF kriegt
-        // klar Vorrang, kein verfruehtes Abschneiden. Doppel-Advance faengt der
+        guard isPlaying, !isRadio, !crossfading, duration > 1 else { endStallTicks = 0; return }
+        // Phantom-Stille nach Doppel-Dauer-Bug: item.duration ist DOPPELT, wir halten
+        // die Leiste auf der echten (Meta-)Dauer -> der Player spielt aber stumm in
+        // die zweite Haelfte weiter (currentTime laeuft ueber die echte Dauer, EOF
+        // kommt erst bei der doppelten). Der Stall-Fallback unten greift NICHT, weil
+        // die Position weiterzaehlt. Sobald sie klar uebers echte Ende laeuft UND die
+        // Roh-Dauer >1.5x der gehaltenen ist (= Doppel-Dauer bestaetigt), selbst
+        // weiterschalten -> kein minutenlanges stummes Nachlaufen mehr.
+        if let item = player.currentItem {
+            let raw = CMTimeGetSeconds(item.duration)
+            if raw.isFinite, raw > duration * 1.5, currentTime > duration + 1.5 {
+                next(auto: true); return
+            }
+        }
+        // Sonst: nur ganz am Ende (<=0.6s Rest) und nach laengerem Stillstand -> EOF
+        // kriegt klar Vorrang, kein verfruehtes Abschneiden. Doppel-Advance faengt der
         // Debounce in next(auto:) ab, falls EOF doch noch kommt.
-        guard isPlaying, !isRadio, !crossfading, duration > 1,
-              currentTime >= duration - 0.6 else { endStallTicks = 0; return }
+        guard currentTime >= duration - 0.6 else { endStallTicks = 0; return }
         if abs(currentTime - lastStallTime) < 0.05 { endStallTicks += 1 } else { endStallTicks = 0 }
         lastStallTime = currentTime
         if endStallTicks >= 6 {        // ~3s Stillstand am Ende -> EOF kam offenbar nicht
