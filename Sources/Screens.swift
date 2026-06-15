@@ -418,8 +418,19 @@ struct PlaylistMenu: View {
     }
     private func syncNow() {
         guard let app else { return }
-        app.flash("Synchronisiere…")
-        Task { app.flash(await app.api.syncPlaylistNow(uri) ? "Sync abgeschlossen ✓" : "Sync fehlgeschlagen") }
+        app.flash("Synchronisiere mit Spotify…")
+        Task {
+            // Wie PWA: frisch von Spotify ziehen (force=1 umgeht den Server-Cache,
+            // check=1 prueft lokal) -> neue Titel erscheinen. KEIN Deemix-Download,
+            // nur YT-Link + Zuordnung vorcachen -> sofort spielbar (gestreamt).
+            guard let resp = try? await app.api.playlistTracks(uri, check: true, force: true) else {
+                app.flash("Sync fehlgeschlagen"); return
+            }
+            app.flash("Cache Titel über YouTube…")
+            await app.api.prewarmPlaylist(resp.tracks)
+            app.flash("Sync fertig ✓ (\(resp.tracks.count) Titel über YouTube gecacht)")
+            NotificationCenter.default.post(name: .init("discoverPlaylistsChanged"), object: nil)
+        }
     }
     private func downloadAll() {
         guard let app else { return }
