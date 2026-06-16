@@ -3,34 +3,70 @@ import AVFoundation
 import UIKit
 import UserNotifications
 
+/// Quell-Sammlung eines Offline-Downloads (Playlist, Album, Podcast). Wird mit dem
+/// Track gespeichert, damit der Offline-Tab die Downloads als Ordner gruppieren kann.
+struct OfflineCollection: Codable, Hashable, Identifiable {
+    let id: String          // Playlist-/Podcast-URI
+    let name: String
+    let image: String?
+    let kind: String        // "playlist" | "album" | "podcast"
+}
+
+/// Ein Offline-Ordner (eine Sammlung) bzw. die losen Einzel-Songs (collection == nil).
+struct OfflineGroup: Identifiable {
+    let collection: OfflineCollection?
+    let tracks: [Track]
+    var id: String { collection?.id ?? "__singles__" }
+}
+
+/// Auf der Platte abgelegte Download-Metadaten (Track + optionale Sammlung).
+/// Aeltere Downloads enthalten nur einen blanken Track -> Decode faellt darauf zurueck.
+struct StoredDownload: Codable {
+    let track: Track
+    let coll: OfflineCollection?
+}
+
 /// Laedt Songs/Episoden lokal aufs Geraet (Offline-Wiedergabe) + Metadaten.
-/// Nutzt eine echte Hintergrund-URLSession -> Downloads laufen weiter, auch wenn
-/// die App im Hintergrund/geschlossen ist; meldet sich per lokaler Notification.
+/// Nutzt eine Vordergrund-URLSession (siehe session) und meldet Abschluss per
+/// lokaler Notification, falls die App nicht aktiv ist.
 @MainActor
 final class DownloadManager: ObservableObject {
     @Published private(set) var done: Set<String> = []        // track.uri
     @Published private(set) var busy: Set<String> = []
     @Published private(set) var progress: [String: Double] = [:]   // uri -> 0..1 (Download-Fortschritt)
     @Published private(set) var tracks: [Track] = []          // Offline-Bibliothek
-    @Published private(set) var debug: [String] = []          // Diagnose: letzte Download-Ereignisse
+    @Published private(set) var colls: [String: OfflineCollection] = [:]   // track.uri -> Quell-Sammlung (Playlist/Podcast)
 
-    /// Diagnose-Zeile anhaengen (MainActor) + ins System-Log.
-    func dbg(_ s: String) {
-        let line = DownloadManager.ts() + " " + s
-        debug.append(line)
-        if debug.count > 40 { debug.removeFirst(debug.count - 40) }
-        NSLog("[DL] %@", line)
-    }
-    private static func ts() -> String {
-        let f = DateFormatter(); f.dateFormat = "HH:mm:ss"; return f.string(from: Date())
-    }
+    /// Diagnose nur ins System-Log (nicht mehr in der UI).
+    func dbg(_ s: String) { NSLog("[DL] %@", s) }
     private func short(_ uri: String) -> String { String(uri.suffix(14)) }
+
+    /// Offline-Downloads nach Quell-Sammlung gruppiert (Ordner) + lose Einzel-Songs.
+    var groups: [OfflineGroup] {
+        var order: [String] = []
+        var byColl: [String: (coll: OfflineCollection, items: [Track])] = [:]
+        var singles: [Track] = []
+        for t in tracks {                       // tracks ist neueste-zuerst
+            if let c = colls[t.uri] {
+                if var entry = byColl[c.id] {
+                    entry.items.append(t); byColl[c.id] = entry
+                } else {
+                    byColl[c.id] = (c, [t]); order.append(c.id)
+                }
+            } else {
+                singles.append(t)
+            }
+        }
+        var result = order.compactMap { byColl[$0] }.map { OfflineGroup(collection: $0.coll, tracks: $0.items) }
+        if !singles.isEmpty { result.append(OfflineGroup(collection: nil, tracks: singles)) }
+        return result
+    }
 
     private let api: APIClient
     private let exts = ["m4a", "mp3", "aac", "mp4", "flac", "aiff", "aif", "ogg", "opus", "wav"]
 
-    // Hintergrund-Session: EINMALIG, ueberlebt App-Suspend. Delegate ist ein
-    // separates, nicht isoliertes Objekt; es ruft uns auf dem MainActor zurueck.
+    // Session-Delegate: separates, nicht isoliertes Objekt; ruft uns auf dem MainActor
+    // zurueck (siehe BGDownloadDelegate).
     private lazy var bgDelegate = BGDownloadDelegate(manager: self)
     private lazy var session: URLSession = {
         // Default- (Vordergrund-)Session statt Hintergrund-Session: der Hintergrund-
@@ -49,7 +85,7 @@ final class DownloadManager: ObservableObject {
     init(api: APIClient) {
         self.api = api
         scan()
-        _ = session     // sofort instanziieren -> verbindet sich nach Relaunch mit laufenden Tasks
+        _ = session     // Session/Delegate sofort instanziieren
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
@@ -89,9 +125,16 @@ final class DownloadManager: ObservableObject {
     func isBusy(_ uri: String) -> Bool { busy.contains(uri) }
     func progress(for uri: String) -> Double { progress[uri] ?? 0 }
 
-    func toggle(_ track: Track) {
+    func toggle(_ track: Track, collection: OfflineCollection? = nil) {
         if isDownloaded(track.uri) { delete(track.uri) }
-        else { Task { await download(track) } }
+        else { Task { await download(track, collection: collection) } }
+    }
+
+    /// Metadaten dekodieren — neues StoredDownload-Format, sonst blanker Track (alt).
+    private func decodeStored(_ d: Data) -> StoredDownload? {
+        if let s = try? JSONDecoder().decode(StoredDownload.self, from: d) { return s }
+        if let t = try? JSONDecoder().decode(Track.self, from: d) { return StoredDownload(track: t, coll: nil) }
+        return nil
     }
 
     /// Endung aus MIME-Typ / Quell-URL ableiten (Podcasts sind oft .mp3, Songs .m4a).
@@ -108,9 +151,10 @@ final class DownloadManager: ObservableObject {
         return exts.contains(p) ? p : "m4a"
     }
 
-    /// Reiht den Download in die Hintergrund-Session ein (kehrt sofort zurueck).
-    func download(_ track: Track) async {
+    /// Reiht den Download in die Session ein (kehrt sofort zurueck).
+    func download(_ track: Track, collection: OfflineCollection? = nil) async {
         guard !track.uri.isEmpty, !busy.contains(track.uri) else { return }
+        if let collection { colls[track.uri] = collection }   // Zuordnung sofort merken (auch falls schon geladen)
         // schon vorhanden UND abspielbar? -> fertig. Sonst (korrupt) neu laden.
         if let existing = localURL(for: track.uri) {
             if await isPlayable(existing) { done.insert(track.uri); return }
@@ -121,8 +165,8 @@ final class DownloadManager: ObservableObject {
             dbg("streamURL FAIL \(short(track.uri))"); return
         }
 
-        // Track-Metadaten sichern (fuer Nachbearbeitung, auch nach Relaunch)
-        if let m = try? JSONEncoder().encode(track) {
+        // Track-Metadaten (+ Sammlung) sichern (fuer Nachbearbeitung, auch nach Relaunch)
+        if let m = try? JSONEncoder().encode(StoredDownload(track: track, coll: collection)) {
             do { try m.write(to: pendingDir.appendingPathComponent(key(track.uri) + ".json")) }
             catch { dbg("pending-write FAIL \(short(track.uri)): \(error.localizedDescription)") }
         } else { dbg("encode FAIL \(short(track.uri))") }
@@ -163,11 +207,11 @@ final class DownloadManager: ObservableObject {
         let tmpSize = ((try? FileManager.default.attributesOfItem(atPath: tempFile.path))?[.size] as? Int) ?? 0
         dbg("finished \(short(uri)) tmp=\(tmpExists ? "ja" : "NEIN") \(tmpSize/1024)KB mime=\(mime ?? "?")")
         let pend = pendingDir.appendingPathComponent(key(uri) + ".json")
-        guard let d = try? Data(contentsOf: pend),
-              let track = try? JSONDecoder().decode(Track.self, from: d) else {
+        guard let d = try? Data(contentsOf: pend), let stored = decodeStored(d) else {
             dbg("ABBRUCH \(short(uri)): pending-JSON fehlt/kaputt")
             try? FileManager.default.removeItem(at: tempFile); return
         }
+        let track = stored.track
 
         let dest = dir.appendingPathComponent(key(uri) + "." + ext(mime: mime, urlExt: urlExt))
         for e in exts { try? FileManager.default.removeItem(at: dir.appendingPathComponent(key(uri) + "." + e)) }
@@ -199,6 +243,7 @@ final class DownloadManager: ObservableObject {
 
         done.insert(uri)
         diskKeys.insert(key(uri))
+        if let c = stored.coll { colls[uri] = c }
         if !tracks.contains(where: { $0.uri == uri }) { tracks.insert(track, at: 0) }
         dbg("OK gespeichert \(short(uri)) \(_size/1024)KB playable=\(_playable)")
 
@@ -219,6 +264,7 @@ final class DownloadManager: ObservableObject {
         try? FileManager.default.removeItem(at: dir.appendingPathComponent(key(uri) + ".json"))
         done.remove(uri)
         diskKeys.remove(key(uri))
+        colls[uri] = nil
         tracks.removeAll { $0.uri == uri }
     }
 
@@ -226,17 +272,20 @@ final class DownloadManager: ObservableObject {
         guard let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else { return }
         var t: [Track] = []
         var keys: Set<String> = []
+        var cs: [String: OfflineCollection] = [:]
         for f in files {
             let ex = f.pathExtension.lowercased()
             if ex == "json" {
-                if let d = try? Data(contentsOf: f), let tr = try? JSONDecoder().decode(Track.self, from: d) {
-                    t.append(tr); done.insert(tr.uri)
+                if let d = try? Data(contentsOf: f), let s = decodeStored(d) {
+                    t.append(s.track); done.insert(s.track.uri)
+                    if let c = s.coll { cs[s.track.uri] = c }
                 }
             } else if exts.contains(ex) {
                 keys.insert(f.deletingPathExtension().lastPathComponent)   // base-key der Audiodatei
             }
         }
         diskKeys = keys
+        colls = cs
         tracks = t
     }
 }

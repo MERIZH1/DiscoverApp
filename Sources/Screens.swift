@@ -437,7 +437,8 @@ struct PlaylistMenu: View {
         Task {
             guard let resp = try? await app.api.playlistTracks(uri) else { app.flash("Konnte Playlist nicht laden"); return }
             app.flash("\(resp.tracks.count) Songs werden geladen…")
-            for t in resp.tracks { await app.downloads.download(t) }
+            let coll = OfflineCollection(id: uri, name: name, image: resp.tracks.first?.image, kind: isAlbum ? "album" : "playlist")
+            for t in resp.tracks { await app.downloads.download(t, collection: coll) }
         }
     }
     private func confirmDelete() {
@@ -1866,19 +1867,19 @@ struct LibraryView: View {
                                 .font(.system(size: 14)).foregroundStyle(Theme.mute)
                                 .multilineTextAlignment(.center).frame(maxWidth: .infinity).padding(.top, 50)
                         }
-                        // Diagnose: zeigt, was bei den letzten Downloads passiert ist.
-                        if !downloads.debug.isEmpty {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("Download-Diagnose").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.sub)
-                                ForEach(Array(downloads.debug.suffix(20).enumerated()), id: \.offset) { _, line in
-                                    Text(line).font(.system(size: 11, design: .monospaced)).foregroundStyle(Theme.mute)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
+                        // Downloads nach Quelle gruppiert: Playlists/Podcasts als Ordner,
+                        // einzeln geladene Songs flach darunter.
+                        ForEach(downloads.groups) { g in
+                            if let c = g.collection {
+                                NavigationLink(value: c) {
+                                    OfflineFolderRow(collection: c, count: g.tracks.count, cover: g.tracks.first?.image)
+                                }.buttonStyle(.plain)
+                            } else {
+                                ForEach(Array(g.tracks.enumerated()), id: \.offset) { i, t in
+                                    TrackRow(track: t, playing: player.current?.id == t.id) {
+                                        player.play(tracks: g.tracks, startAt: i, contextName: "Offline", contextURI: "")
+                                    }
                                 }
-                            }.padding(.horizontal, 16).padding(.top, 20)
-                        }
-                        ForEach(Array(downloads.tracks.enumerated()), id: \.offset) { i, t in
-                            TrackRow(track: t, playing: player.current?.id == t.id) {
-                                player.play(tracks: downloads.tracks, startAt: i, contextName: "Offline", contextURI: "")
                             }
                         }
                     } else if tab == "history" {
@@ -1905,10 +1906,13 @@ struct LibraryView: View {
                 }.padding(.top, 10).padding(.bottom, 130)
             }
             .scrollContentBackground(.hidden).background(Theme.bg)
-            .overlay { if !loaded && playlists.isEmpty { LoadingView() } }
+            .overlay { if !loaded && playlists.isEmpty && tab != "offline" { LoadingView() } }   // Offline-Tab nie blockieren
             .navigationTitle("").navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: Playlist.self) { pl in
                 TrackListView(uri: pl.uri, title: pl.name, image: pl.image, isAlbum: false)
+            }
+            .navigationDestination(for: OfflineCollection.self) { c in
+                OfflineCollectionView(collection: c)
             }
             .navigationDestination(for: HomeItem.self) { it in
                 if (it.type ?? "") == "show" || it.uri.contains(":show:") {
@@ -2383,7 +2387,8 @@ struct TrackListView: View {
                     // Aktions-Reihe
                     HStack {
                         Button {
-                            Task { for t in tracks { await downloads.download(t) } }
+                            let coll = OfflineCollection(id: uri, name: title, image: image, kind: isAlbum ? "album" : "playlist")
+                            Task { for t in tracks { await downloads.download(t, collection: coll) } }
                         } label: {
                             let all = !tracks.isEmpty && tracks.allSatisfy { downloads.isDownloaded($0.uri) }
                             Image(systemName: all ? "arrow.down.circle.fill" : "arrow.down.circle")
@@ -2582,6 +2587,7 @@ struct PodcastView: View {
     private var episodeTracks: [Track] { (resp?.episodes ?? []).map { $0.track(podcast: showName, fallbackImage: showImage) } }
     private var allDownloaded: Bool { !episodeTracks.isEmpty && episodeTracks.allSatisfy { downloads.isDownloaded($0.uri) } }
     private var anyDownloaded: Bool { episodeTracks.contains { downloads.isDownloaded($0.uri) } }
+    private var podcastColl: OfflineCollection { OfflineCollection(id: uri, name: showName, image: showImage, kind: "podcast") }
 
     var body: some View {
         ScrollView {
@@ -2605,7 +2611,7 @@ struct PodcastView: View {
 
                     Button {
                         if anyDownloaded { for t in episodeTracks { downloads.delete(t.uri) } }
-                        else { Task { for t in episodeTracks { await downloads.download(t) } } }
+                        else { Task { for t in episodeTracks { await downloads.download(t, collection: podcastColl) } } }
                     } label: {
                         Label(anyDownloaded ? "Heruntergeladene entfernen" : "Alle Folgen herunterladen",
                               systemImage: anyDownloaded ? "trash" : "arrow.down.circle")
@@ -2618,6 +2624,7 @@ struct PodcastView: View {
                 LazyVStack(spacing: 0) {
                     ForEach(Array((resp?.episodes ?? []).enumerated()), id: \.element.id) { i, ep in
                         EpisodeRow(ep: ep, track: ep.track(podcast: showName, fallbackImage: showImage),
+                                   collection: podcastColl,
                                    playing: player.current?.uri == ep.uri) {
                             let q = (resp?.episodes ?? []).map { $0.track(podcast: showName, fallbackImage: showImage) }
                             player.play(tracks: q, startAt: i, contextName: showName, contextURI: uri)
@@ -2689,7 +2696,7 @@ struct PodcastFlipCard: View {
 }
 
 struct EpisodeRow: View {
-    let ep: Episode; let track: Track; let playing: Bool; let tap: () -> Void
+    let ep: Episode; let track: Track; var collection: OfflineCollection? = nil; let playing: Bool; let tap: () -> Void
     @EnvironmentObject var downloads: DownloadManager
     private var durText: String {
         let s = (ep.duration_ms ?? 0) / 1000
@@ -2728,7 +2735,7 @@ struct EpisodeRow: View {
                     ProgressView(value: downloads.progress(for: track.uri))
                         .progressViewStyle(.linear).tint(Theme.accent).frame(width: 70)
                 } else {
-                    Button { downloads.toggle(track) } label: {
+                    Button { downloads.toggle(track, collection: collection) } label: {
                         Image(systemName: downloads.isDownloaded(track.uri) ? "checkmark.circle.fill" : "arrow.down.circle")
                             .font(.system(size: 22))
                             .foregroundStyle(downloads.isDownloaded(track.uri) ? Theme.accent : Theme.sub)
@@ -2739,6 +2746,84 @@ struct EpisodeRow: View {
         .contentShape(Rectangle())
         .onTapGesture(perform: tap)
         .overlay(Rectangle().fill(Theme.input).frame(height: 0.5), alignment: .bottom)
+    }
+}
+
+// MARK: - Offline-Ordner (gruppierte Downloads)
+
+/// Zeile fuer eine Offline-Sammlung (Playlist/Album/Podcast) im Offline-Tab.
+struct OfflineFolderRow: View {
+    let collection: OfflineCollection
+    let count: Int
+    let cover: String?
+    private var unit: String { collection.kind == "podcast" ? "Folgen" : "Songs" }
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack(alignment: .bottomTrailing) {
+                Artwork(url: cover ?? collection.image, size: 52, corner: 6)
+                Image(systemName: collection.kind == "podcast" ? "mic.fill" : "folder.fill")
+                    .font(.system(size: 9, weight: .bold)).foregroundStyle(.white)
+                    .padding(4).background(Theme.accent).clipShape(Circle())
+                    .offset(x: 4, y: 4)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text(collection.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
+                Text("\(count) \(unit)").font(.system(size: 12)).foregroundStyle(Theme.sub)
+            }
+            Spacer(minLength: 8)
+            Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.mute)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 8).contentShape(Rectangle())
+    }
+}
+
+/// Inhalt eines Offline-Ordners — die heruntergeladenen Folgen/Songs einer Sammlung.
+/// Auch ohne Verbindung verfuegbar (alles aus dem lokalen Download-Index).
+struct OfflineCollectionView: View {
+    @EnvironmentObject var player: PlayerController
+    @EnvironmentObject var downloads: DownloadManager
+    let collection: OfflineCollection
+    private var items: [Track] { downloads.tracks.filter { downloads.colls[$0.uri]?.id == collection.id } }
+    private var unit: String { collection.kind == "podcast" ? "Folgen" : "Songs" }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                VStack(spacing: 12) {
+                    Artwork(url: items.first?.image ?? collection.image, size: 190, corner: 8)
+                        .shadow(color: .black.opacity(0.5), radius: 24, y: 8).padding(.top, 24)
+                    Text(collection.name).font(.system(size: 22, weight: .black)).foregroundStyle(Theme.text)
+                        .multilineTextAlignment(.center).padding(.horizontal)
+                    Text("\(items.count) \(unit) · offline").font(.system(size: 13)).foregroundStyle(Theme.sub)
+                    HStack(spacing: 12) {
+                        Button {
+                            if !items.isEmpty { player.shuffle = false; player.play(tracks: items, startAt: 0, contextName: collection.name, contextURI: collection.id) }
+                        } label: {
+                            Label("Abspielen", systemImage: "play.fill")
+                                .font(.system(size: 14, weight: .semibold)).foregroundStyle(.black)
+                                .padding(.horizontal, 22).padding(.vertical, 10).background(Theme.accent).clipShape(Capsule())
+                        }
+                        Button {
+                            if !items.isEmpty { player.shuffle = true; player.play(tracks: items.shuffled(), contextName: collection.name, contextURI: collection.id) }
+                        } label: {
+                            Image(systemName: "shuffle").font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
+                                .frame(width: 44, height: 44).background(Theme.input).clipShape(Circle())
+                        }
+                    }.padding(.top, 4)
+                }.frame(maxWidth: .infinity).padding(.bottom, 16)
+
+                LazyVStack(spacing: 2) {
+                    ForEach(Array(items.enumerated()), id: \.offset) { i, t in
+                        TrackRow(track: t, playing: player.current?.id == t.id) {
+                            player.play(tracks: items, startAt: i, contextName: collection.name, contextURI: collection.id)
+                        }
+                    }
+                }
+                Color.clear.frame(height: 130)
+            }
+        }
+        .scrollContentBackground(.hidden).background(Theme.bg)
+        .navigationTitle("").navigationBarTitleDisplayMode(.inline)
     }
 }
 
