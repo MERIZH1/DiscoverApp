@@ -12,6 +12,19 @@ final class DownloadManager: ObservableObject {
     @Published private(set) var busy: Set<String> = []
     @Published private(set) var progress: [String: Double] = [:]   // uri -> 0..1 (Download-Fortschritt)
     @Published private(set) var tracks: [Track] = []          // Offline-Bibliothek
+    @Published private(set) var debug: [String] = []          // Diagnose: letzte Download-Ereignisse
+
+    /// Diagnose-Zeile anhaengen (MainActor) + ins System-Log.
+    func dbg(_ s: String) {
+        let line = DownloadManager.ts() + " " + s
+        debug.append(line)
+        if debug.count > 40 { debug.removeFirst(debug.count - 40) }
+        NSLog("[DL] %@", line)
+    }
+    private static func ts() -> String {
+        let f = DateFormatter(); f.dateFormat = "HH:mm:ss"; return f.string(from: Date())
+    }
+    private func short(_ uri: String) -> String { String(uri.suffix(14)) }
 
     private let api: APIClient
     private let exts = ["m4a", "mp3", "aac", "mp4", "flac", "aiff", "aif", "ogg", "opus", "wav"]
@@ -95,13 +108,17 @@ final class DownloadManager: ObservableObject {
             try? FileManager.default.removeItem(at: existing)
         }
         guard let r = try? await api.streamURL(for: track), r.ok, let rel = r.url,
-              let url = api.absoluteURL(rel) else { return }
+              let url = api.absoluteURL(rel) else {
+            dbg("streamURL FAIL \(short(track.uri))"); return
+        }
 
         // Track-Metadaten sichern (fuer Nachbearbeitung, auch nach Relaunch)
         if let m = try? JSONEncoder().encode(track) {
-            try? m.write(to: pendingDir.appendingPathComponent(key(track.uri) + ".json"))
-        }
+            do { try m.write(to: pendingDir.appendingPathComponent(key(track.uri) + ".json")) }
+            catch { dbg("pending-write FAIL \(short(track.uri)): \(error.localizedDescription)") }
+        } else { dbg("encode FAIL \(short(track.uri))") }
         busy.insert(track.uri); progress[track.uri] = 0
+        dbg("enqueue \(short(track.uri)) -> \(url.host ?? "?")")
 
         var req = URLRequest(url: url)
         if let pid = api.profileId { req.setValue(pid, forHTTPHeaderField: "X-Profile-Id") }
@@ -124,7 +141,8 @@ final class DownloadManager: ObservableObject {
         progress[uri] = p
     }
 
-    func handleFailed(uri: String) {
+    func handleFailed(uri: String, reason: String = "") {
+        dbg("FEHLER \(short(uri)) \(reason)")
         busy.remove(uri); progress[uri] = nil
         try? FileManager.default.removeItem(at: pendingDir.appendingPathComponent(key(uri) + ".json"))
     }
@@ -132,16 +150,28 @@ final class DownloadManager: ObservableObject {
     /// Fertig heruntergeladene (stabile) Temp-Datei verarbeiten + Notification.
     func handleFinished(uri: String, tempFile: URL, mime: String?, urlExt: String?) async {
         defer { busy.remove(uri); progress[uri] = nil }
+        let tmpExists = FileManager.default.fileExists(atPath: tempFile.path)
+        let tmpSize = ((try? FileManager.default.attributesOfItem(atPath: tempFile.path))?[.size] as? Int) ?? 0
+        dbg("finished \(short(uri)) tmp=\(tmpExists ? "ja" : "NEIN") \(tmpSize/1024)KB mime=\(mime ?? "?")")
         let pend = pendingDir.appendingPathComponent(key(uri) + ".json")
         guard let d = try? Data(contentsOf: pend),
               let track = try? JSONDecoder().decode(Track.self, from: d) else {
+            dbg("ABBRUCH \(short(uri)): pending-JSON fehlt/kaputt")
             try? FileManager.default.removeItem(at: tempFile); return
         }
 
         let dest = dir.appendingPathComponent(key(uri) + "." + ext(mime: mime, urlExt: urlExt))
         for e in exts { try? FileManager.default.removeItem(at: dir.appendingPathComponent(key(uri) + "." + e)) }
-        do { try FileManager.default.moveItem(at: tempFile, to: dest) }
-        catch { try? FileManager.default.removeItem(at: pend); return }
+        // Verschieben; wenn das scheitert (z.B. Volume-Grenze bei Hintergrund-Session),
+        // auf Kopieren ausweichen.
+        var moved = false
+        do { try FileManager.default.moveItem(at: tempFile, to: dest); moved = true }
+        catch {
+            dbg("move FAIL \(short(uri)): \(error.localizedDescription) -> copy")
+            do { try FileManager.default.copyItem(at: tempFile, to: dest); moved = true; try? FileManager.default.removeItem(at: tempFile) }
+            catch { dbg("copy FAIL \(short(uri)): \(error.localizedDescription)") }
+        }
+        guard moved else { try? FileManager.default.removeItem(at: pend); return }
 
         // Behalten, wenn AVFoundation es als abspielbar erkennt ODER die Datei
         // gross genug ist. .load(.isPlayable) lehnt valides Audio manchmal
@@ -151,6 +181,7 @@ final class DownloadManager: ObservableObject {
         let _size = ((try? FileManager.default.attributesOfItem(atPath: dest.path))?[.size] as? Int) ?? 0
         let _playable = await isPlayable(dest)
         guard _playable || _size > 100_000 else {
+            dbg("VERWORFEN \(short(uri)): \(_size/1024)KB, playable=\(_playable)")
             try? FileManager.default.removeItem(at: dest)
             try? FileManager.default.removeItem(at: pend); return
         }
@@ -159,6 +190,7 @@ final class DownloadManager: ObservableObject {
 
         done.insert(uri)
         if !tracks.contains(where: { $0.uri == uri }) { tracks.insert(track, at: 0) }
+        dbg("OK gespeichert \(short(uri)) \(_size/1024)KB playable=\(_playable)")
 
         // Notification nur, wenn die App NICHT im Vordergrund ist (sonst sieht man die UI eh)
         if UIApplication.shared.applicationState != .active {
@@ -205,9 +237,12 @@ final class BGDownloadDelegate: NSObject, URLSessionDownloadDelegate {
     }
 
     func urlSession(_ s: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
-        // location wird nach Rueckkehr geloescht -> SOFORT (synchron) in stabilen Temp verschieben
+        // location wird nach Rueckkehr geloescht -> SOFORT (synchron) in stabilen Temp
+        // bringen. Verschieben kann bei Hintergrund-Sessions an Volume-Grenzen scheitern
+        // -> dann kopieren.
         let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + "_dl")
-        try? FileManager.default.moveItem(at: location, to: tmp)
+        do { try FileManager.default.moveItem(at: location, to: tmp) }
+        catch { try? FileManager.default.copyItem(at: location, to: tmp) }
         let uri = downloadTask.taskDescription ?? ""
         let mime = downloadTask.response?.mimeType
         let urlExt = downloadTask.response?.url?.pathExtension
@@ -218,14 +253,15 @@ final class BGDownloadDelegate: NSObject, URLSessionDownloadDelegate {
                 await m.handleFinished(uri: uri, tempFile: tmp, mime: mime, urlExt: urlExt)
             } else {
                 try? FileManager.default.removeItem(at: tmp)
-                m.handleFailed(uri: uri)
+                m.handleFailed(uri: uri, reason: "HTTP \(code)")
             }
         }
     }
 
     func urlSession(_ s: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         guard error != nil, let uri = task.taskDescription else { return }
-        Task { @MainActor in self.manager?.handleFailed(uri: uri) }
+        let msg = error?.localizedDescription ?? "unbekannt"
+        Task { @MainActor in self.manager?.handleFailed(uri: uri, reason: msg) }
     }
 
     /// Alle Hintergrund-Events abgearbeitet -> System-Completion-Handler aufrufen.

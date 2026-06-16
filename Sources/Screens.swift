@@ -1866,6 +1866,16 @@ struct LibraryView: View {
                                 .font(.system(size: 14)).foregroundStyle(Theme.mute)
                                 .multilineTextAlignment(.center).frame(maxWidth: .infinity).padding(.top, 50)
                         }
+                        // Diagnose: zeigt, was bei den letzten Downloads passiert ist.
+                        if !downloads.debug.isEmpty {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Download-Diagnose").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.sub)
+                                ForEach(Array(downloads.debug.suffix(20).enumerated()), id: \.offset) { _, line in
+                                    Text(line).font(.system(size: 11, design: .monospaced)).foregroundStyle(Theme.mute)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                            }.padding(.horizontal, 16).padding(.top, 20)
+                        }
                         ForEach(Array(downloads.tracks.enumerated()), id: \.offset) { i, t in
                             TrackRow(track: t, playing: player.current?.id == t.id) {
                                 player.play(tracks: downloads.tracks, startAt: i, contextName: "Offline", contextURI: "")
