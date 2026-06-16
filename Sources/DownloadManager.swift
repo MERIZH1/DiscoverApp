@@ -143,8 +143,14 @@ final class DownloadManager: ObservableObject {
         do { try FileManager.default.moveItem(at: tempFile, to: dest) }
         catch { try? FileManager.default.removeItem(at: pend); return }
 
-        // Nur behalten, wenn es echtes, abspielbares Audio ist (kein Fehlerseiten-Müll)
-        guard await isPlayable(dest) else {
+        // Behalten, wenn AVFoundation es als abspielbar erkennt ODER die Datei
+        // gross genug ist. .load(.isPlayable) lehnt valides Audio manchmal
+        // faelschlich ab (seit b4f91df ersetzte es die Groessenpruefung -> seither
+        // landete GAR kein Download mehr im Offline-Ordner). Nur winzige
+        // Antworten (HTML-/Fehlerseiten-Stubs) verwerfen.
+        let _size = ((try? FileManager.default.attributesOfItem(atPath: dest.path))?[.size] as? Int) ?? 0
+        let _playable = await isPlayable(dest)
+        guard _playable || _size > 100_000 else {
             try? FileManager.default.removeItem(at: dest)
             try? FileManager.default.removeItem(at: pend); return
         }
