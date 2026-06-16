@@ -1613,6 +1613,7 @@ private struct TrackNavSheets: ViewModifier {
                         ArtistView(uri: u, name: track.artists?.first?.name ?? track.artist, image: track.image)
                     }
                 }
+                .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $showAlbum) {
                 NavigationStack {
@@ -1620,6 +1621,7 @@ private struct TrackNavSheets: ViewModifier {
                         TrackListView(uri: u, title: track.album ?? "Album", image: track.image, isAlbum: true)
                     }
                 }
+                .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $showAddPlaylist) { AddToPlaylistSheet(track: track) }
             .sheet(isPresented: $showSendUser) { SendToUserSheet(track: track) }
@@ -2210,7 +2212,7 @@ struct ArtistView: View {
         .navigationBarBackButtonHidden(true)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar { ToolbarItem(placement: .topBarLeading) {
-            Button { dismiss() } label: { Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text) }
+            Button { dismiss() } label: { Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold)).foregroundStyle(hero.isLight ? .black : Theme.text) }
         } }
         .overlay { if loading { LoadingView() } }
         .task {
@@ -2472,7 +2474,7 @@ struct TrackListView: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button { dismiss() } label: {
-                    Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
+                    Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold)).foregroundStyle(hero.isLight ? .black : Theme.text)
                 }
             }
             if !isAlbum {
@@ -2480,14 +2482,14 @@ struct TrackListView: View {
                     Button { toggleSub() } label: {
                         Image(systemName: isSubscribed ? "bell.fill" : "bell")
                             .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(isSubscribed ? Theme.accent : Theme.text)
+                            .foregroundStyle(isSubscribed ? Theme.accent : (hero.isLight ? .black : Theme.text))
                     }
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { selecting.toggle(); if !selecting { selected = [] } } label: {
                     Image(systemName: selecting ? "xmark.circle" : "checklist")
-                        .font(.system(size: 17, weight: .semibold)).foregroundStyle(selecting ? Theme.accent : Theme.text)
+                        .font(.system(size: 17, weight: .semibold)).foregroundStyle(selecting ? Theme.accent : (hero.isLight ? .black : Theme.text))
                 }
             }
         }
@@ -2629,7 +2631,7 @@ struct PodcastView: View {
         .navigationBarBackButtonHidden(true)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar { ToolbarItem(placement: .topBarLeading) {
-            Button { dismiss() } label: { Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text) }
+            Button { dismiss() } label: { Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold)).foregroundStyle(hero.isLight ? .black : Theme.text) }
         } }
         .overlay { if loading { LoadingView() } }
         .task {
@@ -3150,11 +3152,13 @@ struct PlayerView: View {
         .sheet(isPresented: $showArtist) {
             if let t = player.current, let u = t.artists?.first?.uri {
                 NavigationStack { ArtistView(uri: u, name: t.artists?.first?.name ?? t.artist, image: t.image) }
+                    .presentationDragIndicator(.visible)
             }
         }
         .sheet(isPresented: $showAlbum) {
             if let t = player.current, let u = t.album_uri {
                 NavigationStack { TrackListView(uri: u, title: t.album ?? "Album", image: t.image, isAlbum: true) }
+                    .presentationDragIndicator(.visible)
             }
         }
         .task(id: player.displayImage) { if let c = await averageColor(player.displayImage) { hero = c } }

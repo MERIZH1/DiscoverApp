@@ -60,7 +60,10 @@ final class DownloadManager: ObservableObject {
         }
         return nil
     }
-    func isDownloaded(_ uri: String) -> Bool { done.contains(uri) }
+    // done-Set ODER echte Datei auf der Platte — faengt den Fall ab, dass das
+    // done-Set nach Relaunch/fehlender Metadaten-JSON nicht synchron ist
+    // (sonst zeigt ein bereits geladener Podcast faelschlich das graue Download-Icon).
+    func isDownloaded(_ uri: String) -> Bool { done.contains(uri) || localURL(for: uri) != nil }
     func isBusy(_ uri: String) -> Bool { busy.contains(uri) }
     func progress(for uri: String) -> Double { progress[uri] ?? 0 }
 
