@@ -33,11 +33,16 @@ final class DownloadManager: ObservableObject {
     // separates, nicht isoliertes Objekt; es ruft uns auf dem MainActor zurueck.
     private lazy var bgDelegate = BGDownloadDelegate(manager: self)
     private lazy var session: URLSession = {
-        let cfg = URLSessionConfiguration.background(withIdentifier: "com.discover.app.downloads")
-        cfg.sessionSendsLaunchEvents = true
-        cfg.isDiscretionary = false                 // soll sofort starten, nicht "irgendwann"
+        // Default- (Vordergrund-)Session statt Hintergrund-Session: der Hintergrund-
+        // Daemon nsurlsessiond scheiterte bei der sideloadeten App mit "Cannot create
+        // file" (fehlende Background-Berechtigung) -> JEDER Download brach ab, bevor er
+        // fertig war. Eine Vordergrund-Session laedt in-process + zuverlaessig.
+        // Nachteil: Downloads pausieren, wenn die App komplett geschlossen wird — ok,
+        // da man beim Runterladen ohnehin in der App ist.
+        let cfg = URLSessionConfiguration.default
         cfg.timeoutIntervalForResource = 3600       // 1h fuer grosse Folgen
         cfg.httpMaximumConnectionsPerHost = 3
+        cfg.allowsCellularAccess = true
         return URLSession(configuration: cfg, delegate: bgDelegate, delegateQueue: nil)
     }()
 
@@ -73,10 +78,14 @@ final class DownloadManager: ObservableObject {
         }
         return nil
     }
-    // done-Set ODER echte Datei auf der Platte — faengt den Fall ab, dass das
-    // done-Set nach Relaunch/fehlender Metadaten-JSON nicht synchron ist
-    // (sonst zeigt ein bereits geladener Podcast faelschlich das graue Download-Icon).
-    func isDownloaded(_ uri: String) -> Bool { done.contains(uri) || localURL(for: uri) != nil }
+    // base-keys aller Audiodateien auf der Platte — fuer eine O(1)-isDownloaded-Pruefung
+    // OHNE pro Aufruf das Dateisystem abzufragen (sonst laggt das Scrollen langer Listen).
+    private var diskKeys: Set<String> = []
+
+    // done-Set ODER Datei auf der Platte (via diskKeys, kein fileExists pro Aufruf) —
+    // faengt den Fall ab, dass das done-Set nach Relaunch/fehlender Metadaten-JSON nicht
+    // synchron ist (sonst zeigt ein bereits geladener Podcast faelschlich das graue Icon).
+    func isDownloaded(_ uri: String) -> Bool { done.contains(uri) || diskKeys.contains(key(uri)) }
     func isBusy(_ uri: String) -> Bool { busy.contains(uri) }
     func progress(for uri: String) -> Double { progress[uri] ?? 0 }
 
@@ -189,6 +198,7 @@ final class DownloadManager: ObservableObject {
         try? FileManager.default.removeItem(at: pend)
 
         done.insert(uri)
+        diskKeys.insert(key(uri))
         if !tracks.contains(where: { $0.uri == uri }) { tracks.insert(track, at: 0) }
         dbg("OK gespeichert \(short(uri)) \(_size/1024)KB playable=\(_playable)")
 
@@ -208,17 +218,25 @@ final class DownloadManager: ObservableObject {
         for e in exts { try? FileManager.default.removeItem(at: dir.appendingPathComponent(key(uri) + "." + e)) }
         try? FileManager.default.removeItem(at: dir.appendingPathComponent(key(uri) + ".json"))
         done.remove(uri)
+        diskKeys.remove(key(uri))
         tracks.removeAll { $0.uri == uri }
     }
 
     private func scan() {
         guard let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else { return }
         var t: [Track] = []
-        for f in files where f.pathExtension == "json" {
-            if let d = try? Data(contentsOf: f), let tr = try? JSONDecoder().decode(Track.self, from: d) {
-                t.append(tr); done.insert(tr.uri)
+        var keys: Set<String> = []
+        for f in files {
+            let ex = f.pathExtension.lowercased()
+            if ex == "json" {
+                if let d = try? Data(contentsOf: f), let tr = try? JSONDecoder().decode(Track.self, from: d) {
+                    t.append(tr); done.insert(tr.uri)
+                }
+            } else if exts.contains(ex) {
+                keys.insert(f.deletingPathExtension().lastPathComponent)   // base-key der Audiodatei
             }
         }
+        diskKeys = keys
         tracks = t
     }
 }

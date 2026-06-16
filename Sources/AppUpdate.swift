@@ -70,6 +70,15 @@ final class AppUpdater: ObservableObject {
 
     func open(_ v: AppVersionInfo) {
         if let b = Int(v.build) { offeredBuild = b }   // automatisches Wiederanbieten stoppen
-        if let url = URL(string: v.itms_url) { UIApplication.shared.open(url) }
+        guard let url = URL(string: v.itms_url) else { return }
+        UIApplication.shared.open(url) { ok in
+            guard ok else { return }
+            // Nach dem OTA-Link die App in den Hintergrund schicken -> der System-
+            // Installationsdialog + Fortschritt erscheinen auf dem Home-Screen (die
+            // laufende Instanz wird ohnehin gleich durch die neue ersetzt).
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                UIApplication.shared.perform(Selector(("suspend")))
+            }
+        }
     }
 }
