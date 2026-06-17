@@ -85,8 +85,13 @@ final class APIClient: ObservableObject {
         try? await get("/api/status")
     }
     /// Verfuegbare App-Versionen (aktuell + Rollback-Historie) vom Signier-Server.
+    /// Mehrgeraete-Signierung: jede signierte IPA bekommt einen "DiscoverOTASlot"
+    /// (Info.plist, von der Signier-Pipeline gesetzt). iPhone #2 (Slot 2) zieht damit
+    /// seine EIGENE, mit dem 2. Cert signierte IPA. Ohne Marker = Slot 1 (Standard).
     func appVersions() async throws -> AppVersionsResponse {
-        try await get("/api/app/versions")
+        let slot = (Bundle.main.object(forInfoDictionaryKey: "DiscoverOTASlot") as? String) ?? ""
+        let path = slot.isEmpty ? "/api/app/versions" : "/api/app/versions?slot=\(slot)"
+        return try await get(path)
     }
     /// Server-Ausfaelle (id = down-Zeitstempel) nach `since` -> fuer "war offline von X bis Y".
     func outages(since: Int) async -> [Outage] {
