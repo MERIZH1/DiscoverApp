@@ -19,11 +19,13 @@ struct OfflineGroup: Identifiable {
     var id: String { collection?.id ?? "__singles__" }
 }
 
-/// Auf der Platte abgelegte Download-Metadaten (Track + optionale Sammlung).
+/// Auf der Platte abgelegte Download-Metadaten (Track + optionale Sammlung + Position
+/// innerhalb der Sammlung, damit der Ordner die Playlist-/Podcast-Reihenfolge behaelt).
 /// Aeltere Downloads enthalten nur einen blanken Track -> Decode faellt darauf zurueck.
 struct StoredDownload: Codable {
     let track: Track
     let coll: OfflineCollection?
+    var order: Int? = nil
 }
 
 /// Laedt Songs/Episoden lokal aufs Geraet (Offline-Wiedergabe) + Metadaten.
@@ -36,28 +38,39 @@ final class DownloadManager: ObservableObject {
     @Published private(set) var progress: [String: Double] = [:]   // uri -> 0..1 (Download-Fortschritt)
     @Published private(set) var tracks: [Track] = []          // Offline-Bibliothek
     @Published private(set) var colls: [String: OfflineCollection] = [:]   // track.uri -> Quell-Sammlung (Playlist/Podcast)
+    private var orders: [String: Int] = [:]                                 // track.uri -> Position in der Sammlung
 
     /// Diagnose nur ins System-Log (nicht mehr in der UI).
     func dbg(_ s: String) { NSLog("[DL] %@", s) }
     private func short(_ uri: String) -> String { String(uri.suffix(14)) }
 
+    /// Tracks einer Sammlung in ihrer urspruenglichen Reihenfolge (Playlist-/Podcast-
+    /// Position). Tracks ohne gespeicherte Position (Altbestand) haengen stabil hinten an.
+    func collectionTracks(_ id: String) -> [Track] {
+        tracks.filter { colls[$0.uri]?.id == id }
+            .enumerated()
+            .sorted {
+                let a = orders[$0.element.uri] ?? Int.max
+                let b = orders[$1.element.uri] ?? Int.max
+                return a != b ? a < b : $0.offset < $1.offset
+            }
+            .map { $0.element }
+    }
+
     /// Offline-Downloads nach Quell-Sammlung gruppiert (Ordner) + lose Einzel-Songs.
     var groups: [OfflineGroup] {
         var order: [String] = []
-        var byColl: [String: (coll: OfflineCollection, items: [Track])] = [:]
+        var seen = Set<String>()
+        var byColl: [String: OfflineCollection] = [:]
         var singles: [Track] = []
         for t in tracks {                       // tracks ist neueste-zuerst
             if let c = colls[t.uri] {
-                if var entry = byColl[c.id] {
-                    entry.items.append(t); byColl[c.id] = entry
-                } else {
-                    byColl[c.id] = (c, [t]); order.append(c.id)
-                }
+                if seen.insert(c.id).inserted { order.append(c.id); byColl[c.id] = c }
             } else {
                 singles.append(t)
             }
         }
-        var result = order.compactMap { byColl[$0] }.map { OfflineGroup(collection: $0.coll, tracks: $0.items) }
+        var result = order.compactMap { id in byColl[id].map { OfflineGroup(collection: $0, tracks: collectionTracks(id)) } }
         if !singles.isEmpty { result.append(OfflineGroup(collection: nil, tracks: singles)) }
         return result
     }
@@ -125,9 +138,9 @@ final class DownloadManager: ObservableObject {
     func isBusy(_ uri: String) -> Bool { busy.contains(uri) }
     func progress(for uri: String) -> Double { progress[uri] ?? 0 }
 
-    func toggle(_ track: Track, collection: OfflineCollection? = nil) {
+    func toggle(_ track: Track, collection: OfflineCollection? = nil, order: Int? = nil) {
         if isDownloaded(track.uri) { delete(track.uri) }
-        else { Task { await download(track, collection: collection) } }
+        else { Task { await download(track, collection: collection, order: order) } }
     }
 
     /// Metadaten dekodieren — neues StoredDownload-Format, sonst blanker Track (alt).
@@ -152,16 +165,18 @@ final class DownloadManager: ObservableObject {
     }
 
     /// Reiht den Download in die Session ein (kehrt sofort zurueck).
-    func download(_ track: Track, collection: OfflineCollection? = nil) async {
+    /// `order` = Position in der Sammlung (fuer die Reihenfolge im Offline-Ordner).
+    func download(_ track: Track, collection: OfflineCollection? = nil, order: Int? = nil) async {
         guard !track.uri.isEmpty, !busy.contains(track.uri) else { return }
-        // schon vorhanden UND abspielbar? -> fertig (nur Sammlung nachtragen). Sonst (korrupt) neu laden.
+        // schon vorhanden UND abspielbar? -> NICHT neu laden, nur Sammlung+Position nachtragen.
         if let existing = localURL(for: track.uri) {
             if await isPlayable(existing) {
                 done.insert(track.uri); diskKeys.insert(key(track.uri))
-                // Sammlung nachtragen UND persistieren -> Gruppierung bleibt auch nach Relaunch.
+                // Sammlung/Position nachtragen UND persistieren -> bleibt auch nach Relaunch.
                 if let collection {
                     colls[track.uri] = collection
-                    if let m = try? JSONEncoder().encode(StoredDownload(track: track, coll: collection)) {
+                    if let order { orders[track.uri] = order }
+                    if let m = try? JSONEncoder().encode(StoredDownload(track: track, coll: collection, order: order)) {
                         try? m.write(to: dir.appendingPathComponent(key(track.uri) + ".json"))
                     }
                 }
@@ -175,8 +190,9 @@ final class DownloadManager: ObservableObject {
             dbg("streamURL FAIL \(short(track.uri))"); return
         }
 
-        // Track-Metadaten (+ Sammlung) sichern (fuer Nachbearbeitung, auch nach Relaunch)
-        if let m = try? JSONEncoder().encode(StoredDownload(track: track, coll: collection)) {
+        // Track-Metadaten (+ Sammlung + Position) sichern (auch fuer Relaunch)
+        if let order { orders[track.uri] = order }
+        if let m = try? JSONEncoder().encode(StoredDownload(track: track, coll: collection, order: order)) {
             do { try m.write(to: pendingDir.appendingPathComponent(key(track.uri) + ".json")) }
             catch { dbg("pending-write FAIL \(short(track.uri)): \(error.localizedDescription)") }
         } else { dbg("encode FAIL \(short(track.uri))") }
@@ -254,6 +270,7 @@ final class DownloadManager: ObservableObject {
         done.insert(uri)
         diskKeys.insert(key(uri))
         if let c = stored.coll { colls[uri] = c }
+        if let o = stored.order { orders[uri] = o }
         if !tracks.contains(where: { $0.uri == uri }) { tracks.insert(track, at: 0) }
         dbg("OK gespeichert \(short(uri)) \(_size/1024)KB playable=\(_playable)")
 
@@ -275,6 +292,7 @@ final class DownloadManager: ObservableObject {
         done.remove(uri)
         diskKeys.remove(key(uri))
         colls[uri] = nil
+        orders[uri] = nil
         tracks.removeAll { $0.uri == uri }
     }
 
@@ -283,12 +301,14 @@ final class DownloadManager: ObservableObject {
         var t: [Track] = []
         var keys: Set<String> = []
         var cs: [String: OfflineCollection] = [:]
+        var os: [String: Int] = [:]
         for f in files {
             let ex = f.pathExtension.lowercased()
             if ex == "json" {
                 if let d = try? Data(contentsOf: f), let s = decodeStored(d) {
                     t.append(s.track); done.insert(s.track.uri)
                     if let c = s.coll { cs[s.track.uri] = c }
+                    if let o = s.order { os[s.track.uri] = o }
                 }
             } else if exts.contains(ex) {
                 keys.insert(f.deletingPathExtension().lastPathComponent)   // base-key der Audiodatei
@@ -296,6 +316,7 @@ final class DownloadManager: ObservableObject {
         }
         diskKeys = keys
         colls = cs
+        orders = os
         tracks = t
     }
 }

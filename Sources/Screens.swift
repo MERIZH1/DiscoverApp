@@ -438,7 +438,7 @@ struct PlaylistMenu: View {
             guard let resp = try? await app.api.playlistTracks(uri) else { app.flash("Konnte Playlist nicht laden"); return }
             app.flash("\(resp.tracks.count) Songs werden geladen…")
             let coll = OfflineCollection(id: uri, name: name, image: resp.tracks.first?.image, kind: isAlbum ? "album" : "playlist")
-            for t in resp.tracks { await app.downloads.download(t, collection: coll) }
+            for (i, t) in resp.tracks.enumerated() { await app.downloads.download(t, collection: coll, order: i) }
         }
     }
     private func confirmDelete() {
@@ -2392,7 +2392,7 @@ struct TrackListView: View {
                                 for t in tracks { downloads.delete(t.uri) }   // alles geladen -> erneuter Druck loescht
                             } else {
                                 let coll = OfflineCollection(id: uri, name: title, image: image, kind: isAlbum ? "album" : "playlist")
-                                Task { for t in tracks { await downloads.download(t, collection: coll) } }
+                                Task { for (i, t) in tracks.enumerated() { await downloads.download(t, collection: coll, order: i) } }
                             }
                         } label: {
                             let all = !tracks.isEmpty && tracks.allSatisfy { downloads.isDownloaded($0.uri) }
@@ -2616,7 +2616,7 @@ struct PodcastView: View {
 
                     Button {
                         if anyDownloaded { for t in episodeTracks { downloads.delete(t.uri) } }
-                        else { Task { for t in episodeTracks { await downloads.download(t, collection: podcastColl) } } }
+                        else { Task { for (i, t) in episodeTracks.enumerated() { await downloads.download(t, collection: podcastColl, order: i) } } }
                     } label: {
                         Label(anyDownloaded ? "Heruntergeladene entfernen" : "Alle Folgen herunterladen",
                               systemImage: anyDownloaded ? "trash" : "arrow.down.circle")
@@ -2629,7 +2629,7 @@ struct PodcastView: View {
                 LazyVStack(spacing: 0) {
                     ForEach(Array((resp?.episodes ?? []).enumerated()), id: \.element.id) { i, ep in
                         EpisodeRow(ep: ep, track: ep.track(podcast: showName, fallbackImage: showImage),
-                                   collection: podcastColl,
+                                   collection: podcastColl, order: i,
                                    playing: player.current?.uri == ep.uri) {
                             let q = (resp?.episodes ?? []).map { $0.track(podcast: showName, fallbackImage: showImage) }
                             player.play(tracks: q, startAt: i, contextName: showName, contextURI: uri)
@@ -2701,7 +2701,7 @@ struct PodcastFlipCard: View {
 }
 
 struct EpisodeRow: View {
-    let ep: Episode; let track: Track; var collection: OfflineCollection? = nil; let playing: Bool; let tap: () -> Void
+    let ep: Episode; let track: Track; var collection: OfflineCollection? = nil; var order: Int? = nil; let playing: Bool; let tap: () -> Void
     @EnvironmentObject var downloads: DownloadManager
     private var durText: String {
         let s = (ep.duration_ms ?? 0) / 1000
@@ -2740,7 +2740,7 @@ struct EpisodeRow: View {
                     ProgressView(value: downloads.progress(for: track.uri))
                         .progressViewStyle(.linear).tint(Theme.accent).frame(width: 70)
                 } else {
-                    Button { downloads.toggle(track, collection: collection) } label: {
+                    Button { downloads.toggle(track, collection: collection, order: order) } label: {
                         Image(systemName: downloads.isDownloaded(track.uri) ? "checkmark.circle.fill" : "arrow.down.circle")
                             .font(.system(size: 22))
                             .foregroundStyle(downloads.isDownloaded(track.uri) ? Theme.accent : Theme.sub)
@@ -2788,7 +2788,7 @@ struct OfflineCollectionView: View {
     @EnvironmentObject var player: PlayerController
     @EnvironmentObject var downloads: DownloadManager
     let collection: OfflineCollection
-    private var items: [Track] { downloads.tracks.filter { downloads.colls[$0.uri]?.id == collection.id } }
+    private var items: [Track] { downloads.collectionTracks(collection.id) }
     private var unit: String { collection.kind == "podcast" ? "Folgen" : "Songs" }
 
     var body: some View {

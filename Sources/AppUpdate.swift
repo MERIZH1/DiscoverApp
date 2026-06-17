@@ -69,34 +69,12 @@ final class AppUpdater: ObservableObject {
     }
 
     func open(_ v: AppVersionInfo) {
-        guard let url = URL(string: v.itms_url) else { return }
-        // iOS verraet uns NICHT, ob im System-Dialog "Installieren" oder "Abbrechen"
-        // gedrueckt wurde (der open-Callback feuert schon beim Oeffnen des Links). Daher
-        // ein eigener Bestaetigungs-Dialog davor: nur bei "Installieren" schicken wir die
-        // App in den Hintergrund (Home-Screen zum Zusehen), bei "Abbrechen" bleibt sie offen.
-        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-        let keyWin = scenes.flatMap { $0.windows }.first { $0.isKeyWindow } ?? scenes.first?.windows.first
-        guard var top = keyWin?.rootViewController else {
-            if let b = Int(v.build) { offeredBuild = b }
-            UIApplication.shared.open(url); return
-        }
-        while let p = top.presentedViewController { top = p }
-        let ac = UIAlertController(
-            title: "Version \(v.version) installieren?",
-            message: "Die App wird ersetzt (deine Daten bleiben). Zum Installieren landest du kurz auf dem Home-Screen.",
-            preferredStyle: .alert)
-        ac.addAction(UIAlertAction(title: "Abbrechen", style: .cancel))
-        ac.addAction(UIAlertAction(title: "Installieren", style: .default) { _ in
-            if let b = Int(v.build) { self.offeredBuild = b }   // automatisches Wiederanbieten stoppen
-            UIApplication.shared.open(url) { ok in
-                guard ok else { return }
-                // App in den Hintergrund -> System-Installationsdialog + Fortschritt
-                // erscheinen auf dem Home-Screen (die laufende Instanz wird ohnehin ersetzt).
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    UIApplication.shared.perform(Selector(("suspend")))
-                }
-            }
-        })
-        top.present(ac, animated: true)
+        if let b = Int(v.build) { offeredBuild = b }   // automatisches Wiederanbieten stoppen
+        // iOS meldet der App nicht, ob im System-OTA-Dialog "Installieren" oder "Abbrechen"
+        // gewaehlt wurde (der open-Callback feuert schon beim Oeffnen des Links), und wirft
+        // sie bei "Installieren" auch nicht selbst auf den Home-Screen -> es gibt keinen
+        // verlaesslichen Hook, um NUR bei Install zu suspendieren. Daher schlicht den
+        // OTA-Link oeffnen; den Bestaetigungs-Dialog zeigt iOS selbst.
+        if let url = URL(string: v.itms_url) { UIApplication.shared.open(url) }
     }
 }
