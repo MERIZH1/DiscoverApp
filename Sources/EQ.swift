@@ -14,11 +14,22 @@ struct EQPreset: Equatable {
 
     static let all: [EQPreset] = [
         EQPreset(name: "Aus", bassDB: 0, trebleDB: 0),
+        // Technische Presets
         EQPreset(name: "Bass Boost", bassDB: 6, trebleDB: 0),
         EQPreset(name: "Höhen Boost", bassDB: 0, trebleDB: 5),
         EQPreset(name: "Loudness", bassDB: 5, trebleDB: 4),
         EQPreset(name: "Vocal", bassDB: -3, trebleDB: 3),
         EQPreset(name: "Warm", bassDB: 3, trebleDB: -3),
+        // Genre-Presets (Bass @100 Hz / Höhen @6 kHz)
+        EQPreset(name: "Hip-Hop", bassDB: 6, trebleDB: 2),
+        EQPreset(name: "R&B", bassDB: 4, trebleDB: 2),
+        EQPreset(name: "Dance", bassDB: 5, trebleDB: 5),
+        EQPreset(name: "House", bassDB: 6, trebleDB: 3),
+        EQPreset(name: "Electronic", bassDB: 4, trebleDB: 5),
+        EQPreset(name: "Rock", bassDB: 3, trebleDB: 3),
+        EQPreset(name: "Pop", bassDB: 2, trebleDB: 3),
+        EQPreset(name: "Jazz", bassDB: 2, trebleDB: 1),
+        EQPreset(name: "Klassik", bassDB: 1, trebleDB: 2),
     ]
 }
 
