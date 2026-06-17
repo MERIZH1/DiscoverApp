@@ -3114,6 +3114,7 @@ struct PlayerView: View {
     @State private var scrubbing = false
     @State private var page = 0
     @State private var scrollToLyrics = false
+    @State private var scrolledID: String?
     @State private var hero: Color = Theme.elev
     @State private var showAddPlaylist = false
     @State private var showArtist = false
@@ -3281,10 +3282,12 @@ struct PlayerView: View {
                 }
                 Spacer()
                  }.padding().frame(height: geo.size.height).id("player")
-                 LyricsView().frame(minHeight: geo.size.height, alignment: .top)
+                 LyricsView(proxy: proxy, isVisible: scrolledID == "lyrics")
+                    .frame(minHeight: geo.size.height, alignment: .top)
                     .background(Theme.bg).id("lyrics")
-                }
+                }.scrollTargetLayout()
                }
+               .scrollPosition(id: $scrolledID)
                .onChange(of: scrollToLyrics) { go in
                    if go { withAnimation(.easeInOut(duration: 0.35)) { proxy.scrollTo("lyrics", anchor: .top) }; scrollToLyrics = false }
                }
@@ -3390,6 +3393,8 @@ struct QueueRow: View {
 // MARK: - Songtext
 /// Songtext als Scroll-Sektion unter dem Player (hochwischen scrollt hin).
 struct LyricsView: View {
+    var proxy: ScrollViewProxy? = nil      // aeusserer Player-Scroll (fuer Auto-Scroll der synced Zeilen)
+    var isVisible: Bool = false            // ist der Lyrics-Bereich gerade sichtbar?
     @EnvironmentObject var app: AppState
     @EnvironmentObject var player: PlayerController
     @EnvironmentObject var clock: PlaybackClock
@@ -3420,6 +3425,7 @@ struct LyricsView: View {
                             .foregroundStyle(i == currentIndex ? Theme.text : Theme.sub.opacity(0.55))
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
+                            .id("lyricsline-\(i)")
                             .onTapGesture { player.seek(l.t) }   // antippen -> dahin springen
                     }
                 }
@@ -3431,6 +3437,20 @@ struct LyricsView: View {
         .padding(24).padding(.bottom, 60)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .task(id: player.current?.id) { await load() }
+        // Synced Lyrics: aktive Zeile ins Sichtfeld holen — beim Zeilenwechsel (folgen),
+        // beim Sichtbarwerden (Songtext geoeffnet) und wenn die Lyrics fertig geladen sind.
+        .onChange(of: currentIndex) { _, idx in scrollToCurrent(idx) }
+        .onChange(of: isVisible) { _, vis in if vis { scrollToCurrent(currentIndex) } }
+        .onChange(of: hasSynced) { _, on in if on { scrollToCurrent(currentIndex) } }
+    }
+
+    /// Aktive Zeile zentrieren — nur wenn der Lyrics-Bereich sichtbar ist, sonst
+    /// wuerde das Folgen den Now-Playing-Blick wegreissen.
+    private func scrollToCurrent(_ idx: Int) {
+        guard isVisible, hasSynced, idx >= 0 else { return }
+        withAnimation(.easeInOut(duration: 0.3)) {
+            proxy?.scrollTo("lyricsline-\(idx)", anchor: .center)
+        }
     }
 
     private func load() async {
