@@ -3401,14 +3401,11 @@ struct LyricsView: View {
     @State private var lines: [(t: Double, s: String)] = []   // synced LRC
     @State private var plain = "Lade Songtext…"
     @State private var hasSynced = false
-    // Manueller Sync-Versatz (Sek.): offizielle LRCs passen nicht immer exakt zur
-    // gestreamten Audioquelle (anderes Intro/Mastering). + = Text frueher (aufholen).
-    @AppStorage("lyricsSyncOffset") private var syncOffset: Double = 0
 
     private var currentIndex: Int {
         guard hasSynced else { return -1 }
         var idx = -1
-        for (i, l) in lines.enumerated() { if l.t <= clock.time + 0.2 + syncOffset { idx = i } else { break } }
+        for (i, l) in lines.enumerated() { if l.t <= clock.time + 0.2 { idx = i } else { break } }
         return idx
     }
 
@@ -3418,16 +3415,6 @@ struct LyricsView: View {
                 Text("Songtext").font(.system(size: 20, weight: .bold)).foregroundStyle(Theme.text)
                 if hasSynced {
                     Image(systemName: "waveform").font(.system(size: 13)).foregroundStyle(Theme.accent)
-                    Spacer()
-                    // Sync-Feinabstimmung: − = Text spaeter, + = Text frueher (aufholen)
-                    Button { syncOffset = max(-10, syncOffset - 0.25) } label: {
-                        Image(systemName: "minus.circle").font(.system(size: 19)).foregroundStyle(Theme.accent)
-                    }
-                    Text(String(format: "%+.2fs", syncOffset)).font(.system(size: 12, weight: .semibold))
-                        .monospacedDigit().foregroundStyle(Theme.sub).frame(minWidth: 54)
-                    Button { syncOffset = min(10, syncOffset + 0.25) } label: {
-                        Image(systemName: "plus.circle").font(.system(size: 19)).foregroundStyle(Theme.accent)
-                    }
                 }
             }
             if hasSynced {
@@ -3439,7 +3426,7 @@ struct LyricsView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
                             .id("lyricsline-\(i)")
-                            .onTapGesture { player.seek(max(0, l.t - syncOffset)) }   // antippen -> dahin (mit Sync-Versatz)
+                            .onTapGesture { player.seek(l.t) }   // antippen -> dahin springen
                     }
                 }
             } else {
@@ -3469,7 +3456,20 @@ struct LyricsView: View {
     private func load() async {
         hasSynced = false; lines = []; plain = "Lade Songtext…"
         guard let t = player.current else { plain = "Kein Song"; return }
-        guard let ly = try? await app.api.lyrics(title: t.name, artist: t.artist, duration: Int(t.durationSec)) else {
+        // Echte Audio-Laenge der LAUFENDEN Quelle abwarten (wie die PWA) -> trifft die
+        // richtig getimte LRC-Version. clock.duration wird erst gesetzt, wenn das Item
+        // geladen ist; bis ~2s warten, sonst Metadaten-Laenge als Fallback.
+        var dur = clock.duration
+        if dur <= 1 {
+            for _ in 0..<20 {
+                try? await Task.sleep(nanoseconds: 100_000_000)
+                if player.current?.id != t.id { return }       // Song gewechselt -> abbrechen
+                if clock.duration > 1 { break }
+            }
+            dur = clock.duration
+        }
+        if dur <= 1 { dur = t.durationSec }                      // Fallback: Metadaten-Laenge
+        guard let ly = try? await app.api.lyrics(title: t.name, artist: t.artist, duration: Int(dur)) else {
             plain = "Kein Songtext gefunden"; return
         }
         if let synced = ly.synced, !synced.isEmpty {
