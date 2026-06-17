@@ -154,10 +154,20 @@ final class DownloadManager: ObservableObject {
     /// Reiht den Download in die Session ein (kehrt sofort zurueck).
     func download(_ track: Track, collection: OfflineCollection? = nil) async {
         guard !track.uri.isEmpty, !busy.contains(track.uri) else { return }
-        if let collection { colls[track.uri] = collection }   // Zuordnung sofort merken (auch falls schon geladen)
-        // schon vorhanden UND abspielbar? -> fertig. Sonst (korrupt) neu laden.
+        // schon vorhanden UND abspielbar? -> fertig (nur Sammlung nachtragen). Sonst (korrupt) neu laden.
         if let existing = localURL(for: track.uri) {
-            if await isPlayable(existing) { done.insert(track.uri); return }
+            if await isPlayable(existing) {
+                done.insert(track.uri); diskKeys.insert(key(track.uri))
+                // Sammlung nachtragen UND persistieren -> Gruppierung bleibt auch nach Relaunch.
+                if let collection {
+                    colls[track.uri] = collection
+                    if let m = try? JSONEncoder().encode(StoredDownload(track: track, coll: collection)) {
+                        try? m.write(to: dir.appendingPathComponent(key(track.uri) + ".json"))
+                    }
+                }
+                if !tracks.contains(where: { $0.uri == track.uri }) { tracks.insert(track, at: 0) }
+                return
+            }
             try? FileManager.default.removeItem(at: existing)
         }
         guard let r = try? await api.streamURL(for: track), r.ok, let rel = r.url,

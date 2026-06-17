@@ -2387,11 +2387,16 @@ struct TrackListView: View {
                     // Aktions-Reihe
                     HStack {
                         Button {
-                            let coll = OfflineCollection(id: uri, name: title, image: image, kind: isAlbum ? "album" : "playlist")
-                            Task { for t in tracks { await downloads.download(t, collection: coll) } }
+                            let all = !tracks.isEmpty && tracks.allSatisfy { downloads.isDownloaded($0.uri) }
+                            if all {
+                                for t in tracks { downloads.delete(t.uri) }   // alles geladen -> erneuter Druck loescht
+                            } else {
+                                let coll = OfflineCollection(id: uri, name: title, image: image, kind: isAlbum ? "album" : "playlist")
+                                Task { for t in tracks { await downloads.download(t, collection: coll) } }
+                            }
                         } label: {
                             let all = !tracks.isEmpty && tracks.allSatisfy { downloads.isDownloaded($0.uri) }
-                            Image(systemName: all ? "arrow.down.circle.fill" : "arrow.down.circle")
+                            Image(systemName: all ? "checkmark.circle.fill" : "arrow.down.circle")
                                 .font(.title2).foregroundStyle(all ? Theme.accent : Theme.sub)
                         }
                         Menu {
