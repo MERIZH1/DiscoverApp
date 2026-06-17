@@ -3160,6 +3160,9 @@ struct PlayerView: View {
                             Button("30 Minuten") { p.setSleep(minutes: 30) }
                             Button("45 Minuten") { p.setSleep(minutes: 45) }
                             Button("60 Minuten") { p.setSleep(minutes: 60) }
+                            Button("2 Stunden") { p.setSleep(minutes: 120) }
+                            Button("3 Stunden") { p.setSleep(minutes: 180) }
+                            Button("4 Stunden") { p.setSleep(minutes: 240) }
                             Button("Ende des Songs") { p.setSleepEndOfTrack() }
                         } label: {
                             Image(systemName: (p.sleepRemaining > 0 || p.sleepAtEnd) ? "moon.fill" : "moon")
