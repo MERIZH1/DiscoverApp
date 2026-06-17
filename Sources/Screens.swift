@@ -783,6 +783,54 @@ struct BigCard: View {
 }
 
 // MARK: - Account
+/// Manuelles App-Update + Rollback — fuer ALLE User (auch ohne Admin/Konsole).
+/// Automatisch slot-korrekt: der updater fragt /api/app/versions mit dem OTA-Slot
+/// der installierten IPA ab (iPhone #2 -> slot=2), die Buttons installieren also
+/// die zum jeweiligen Geraet passende, mit dem richtigen Cert signierte IPA.
+struct AppUpdateCard: View {
+    @EnvironmentObject var app: AppState
+    @StateObject private var updater = AppUpdater()
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Installiert").font(.system(size: 14)).foregroundStyle(Theme.text)
+                Spacer()
+                Text("v\(AppUpdater.installedVersion)").font(.system(size: 13)).foregroundStyle(Theme.sub)
+            }.padding(.horizontal)
+            if updater.hasUpdate, let l = updater.latest {
+                Button { updater.open(l) } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "arrow.down.circle.fill")
+                        Text("Neue Version v\(l.version) installieren").font(.system(size: 15, weight: .semibold))
+                        Spacer()
+                    }.foregroundStyle(.black).padding(.vertical, 11).padding(.horizontal, 14)
+                        .background(Theme.accent).clipShape(RoundedRectangle(cornerRadius: 10))
+                }.buttonStyle(.plain).padding(.horizontal)
+            } else if updater.loaded {
+                Text("Du bist auf dem neuesten Stand.").font(.caption2).foregroundStyle(Theme.mute).padding(.horizontal)
+            }
+            if updater.versions.count > 1 {
+                Text("Frühere Versionen (Rollback):").font(.caption2).foregroundStyle(Theme.mute).padding(.horizontal).padding(.top, 4)
+                ForEach(updater.versions) { v in
+                    if v.build != String(AppUpdater.installedBuild) {
+                        Button { updater.open(v) } label: {
+                            HStack {
+                                Text("v\(v.version)").font(.system(size: 14)).foregroundStyle(Theme.text)
+                                Spacer()
+                                Text("installieren").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.accent)
+                            }.padding(.vertical, 9).padding(.horizontal, 12)
+                                .background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 9))
+                        }.buttonStyle(.plain).padding(.horizontal)
+                    }
+                }
+            }
+            Text("Updates kommen über deinen eigenen Signier-Server. Rollback installiert eine ältere Version drüber (Daten bleiben).")
+                .font(.caption2).foregroundStyle(Theme.mute).padding(.horizontal).padding(.top, 2)
+        }
+        .task { await updater.check(api: app.api, prompt: false) }
+    }
+}
+
 struct AccountSheet: View {
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
@@ -829,6 +877,9 @@ struct AccountSheet: View {
                         AccountAction(icon: "wrench.and.screwdriver.fill", label: "Konsole (Status & Befehle)") { showConsole = true }
                     }
                     AccountAction(icon: "person.2.fill", label: "Profil abmelden") { app.clearProfile(); dismiss() }
+
+                    AccountHeader("APP-VERSION")
+                    AppUpdateCard()
 
                     AccountHeader("SERVER")
                     ForEach(app.savedServers, id: \.self) { s in
