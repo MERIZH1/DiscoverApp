@@ -202,6 +202,18 @@ final class PlayerController: ObservableObject {
         loadCurrent(autoplay: true)
     }
 
+    func replaceQueueKeepingCurrent(with tracks: [Track], contextName: String = "", contextURI: String = "") {
+        guard !tracks.isEmpty, !isRadio, let cur = current else { return }
+        ctxName = contextName; ctxURI = contextURI
+        let rest = tracks.filter { $0.uri != cur.uri }
+        original = [cur] + rest
+        queue = [cur] + rest
+        index = 0
+        manualQueue = []
+        persistSnapshot()
+        prefetchUpcoming()
+    }
+
     func toggle() {
         if primedNotLoaded { loadCurrent(autoplay: true); return }
         isPlaying ? pause() : resume()

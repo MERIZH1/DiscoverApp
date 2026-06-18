@@ -295,6 +295,8 @@ struct TrackMenu: View {
     private func startRadio() {
         guard let api = app?.api, let player = app?.player else { return }
         Haptics.tap(); app?.flash("Radio wird erstellt…")
+        let radioName = "\(track.artist) — \(track.name)"
+        player.play(tracks: [track], contextName: "Radio", contextURI: "")
         Task {
             guard let r = try? await api.startRadio(track: track), r.ok,
                   let puri = r.playlist_uri else {
@@ -303,7 +305,11 @@ struct TrackMenu: View {
             }
             let tracks = r.tracks ?? ((try? await api.playlistTracks(puri))?.tracks ?? [])
             guard !tracks.isEmpty else { app?.flash("Radio konnte nicht erstellt werden"); return }
-            player.play(tracks: tracks, contextName: r.name ?? "Radio", contextURI: puri)
+            if player.current?.uri == track.uri {
+                player.replaceQueueKeepingCurrent(with: tracks, contextName: r.name ?? radioName, contextURI: puri)
+            } else {
+                player.play(tracks: tracks, contextName: r.name ?? radioName, contextURI: puri)
+            }
             app?.flash("Radio gestartet ✓")
             NotificationCenter.default.post(name: .init("discoverPlaylistsChanged"), object: nil)
         }
