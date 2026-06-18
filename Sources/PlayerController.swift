@@ -654,8 +654,17 @@ final class PlayerController: ObservableObject {
     }
     func seek(_ t: Double) {
         if crossfading { abortCrossfade() }
-        player.seek(to: CMTime(seconds: t, preferredTimescale: 600)) { [weak self] _ in
-            Task { @MainActor in self?.currentTime = t; self?.updateElapsed() }
+        var target = max(0, t)
+        if duration > 0 { target = min(target, duration) }
+        let cm = CMTime(seconds: target, preferredTimescale: 1000)
+        player.seek(to: cm, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
+            Task { @MainActor in
+                guard let self else { return }
+                let actual = CMTimeGetSeconds(self.player.currentTime())
+                self.currentTime = actual.isFinite ? actual : target
+                self.updateElapsed()
+                self.diag("play_seek", "\(self.trackDiag(self.current)) target=\(Int(target)) actual=\(Int(self.currentTime)) finished=\(finished)")
+            }
         }
     }
     func toggleShuffle() {
