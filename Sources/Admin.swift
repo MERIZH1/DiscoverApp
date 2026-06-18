@@ -68,6 +68,90 @@ struct SleepPlaylist: Codable, Identifiable {
 struct SleepPlaylistsResponse: Codable { let playlists: [SleepPlaylist] }
 struct AddSleepResponse: Codable { let ok: Bool; let name: String?; let count: Int?; let error: String? }
 
+// MARK: - Schlafen-Playlists (eigener Screen, von der Konsole/Account aus erreichbar)
+struct SleepConsoleView: View {
+    @EnvironmentObject var app: AppState
+    @Environment(\.dismiss) private var dismiss
+    @State private var url = ""
+    @State private var name = ""
+    @State private var busy = false
+    @State private var toast = ""
+    @State private var items: [SleepPlaylist] = []
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    SettingsGroup("NEUE SCHLAFEN-PLAYLIST") {
+                        TextField("YouTube-Playlist-Link", text: $url)
+                            .textInputAutocapitalization(.never).autocorrectionDisabled()
+                            .padding(10).background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8))
+                            .foregroundStyle(Theme.text)
+                        TextField("Name (z. B. PietSmiet - DayZ)", text: $name)
+                            .padding(10).background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8))
+                            .foregroundStyle(Theme.text)
+                        Button {
+                            Task {
+                                busy = true
+                                let r = await app.api.addSleepPlaylist(url: url, name: name)
+                                busy = false
+                                if r.ok {
+                                    toast = "Hinzugefügt: \(r.name ?? "") (\(r.count ?? 0) Folgen) — lädt im Hintergrund"
+                                    url = ""; name = ""
+                                } else { toast = r.error ?? "Fehlgeschlagen" }
+                                items = await app.api.sleepPlaylists()
+                                try? await Task.sleep(nanoseconds: 3_000_000_000); toast = ""
+                            }
+                        } label: {
+                            HStack(spacing: 10) {
+                                if busy { ProgressView().tint(.black) } else { Image(systemName: "moon.stars.fill") }
+                                Text("Zur „Schlafen\"-Rubrik hinzufügen").font(.system(size: 15, weight: .semibold))
+                                Spacer()
+                            }.foregroundStyle(.black).padding(.vertical, 11).padding(.horizontal, 14)
+                                .background(Theme.accent).clipShape(RoundedRectangle(cornerRadius: 10))
+                        }.buttonStyle(.plain).disabled(busy || url.isEmpty)
+                        Text("Erscheint im Home unter „Schlafen\" (Position 2) für alle Profile. Audio lädt im Hintergrund; abspielbar ist die Playlist sofort.")
+                            .font(.caption2).foregroundStyle(Theme.mute)
+                    }
+                    SettingsGroup("VORHANDEN") {
+                        if items.isEmpty {
+                            Text("Noch keine Schlafen-Playlists.").font(.system(size: 14)).foregroundStyle(Theme.mute)
+                        }
+                        ForEach(items) { pl in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(pl.name).font(.system(size: 15)).foregroundStyle(Theme.text).lineLimit(1)
+                                    Text("\(pl.downloaded)/\(pl.count) geladen" + (pl.downloading ? " · lädt…" : ""))
+                                        .font(.caption2).foregroundStyle(Theme.sub)
+                                }
+                                Spacer()
+                                Button { Task { _ = await app.api.deleteSleepPlaylist(lid: pl.lid); items = await app.api.sleepPlaylists() } } label: {
+                                    Image(systemName: "trash").foregroundStyle(Theme.mute).frame(width: 36, height: 36)
+                                }.buttonStyle(.plain)
+                            }.padding(.vertical, 4)
+                        }
+                    }
+                }.padding(.vertical, 16)
+            }
+            .scrollContentBackground(.hidden).background(Theme.bg)
+            .navigationTitle("Schlafen-Playlists").navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) { Button { Task { items = await app.api.sleepPlaylists() } } label: { Image(systemName: "arrow.clockwise") }.foregroundStyle(Theme.accent) }
+                ToolbarItem(placement: .topBarTrailing) { Button("Fertig") { dismiss() }.foregroundStyle(Theme.accent) }
+            }
+            .overlay(alignment: .bottom) {
+                if !toast.isEmpty {
+                    Text(toast).font(.system(size: 14, weight: .semibold)).foregroundStyle(.black)
+                        .padding(.horizontal, 18).padding(.vertical, 10)
+                        .background(Theme.accent).clipShape(Capsule()).padding(.bottom, 24)
+                        .multilineTextAlignment(.center)
+                }
+            }
+        }
+        .task { items = await app.api.sleepPlaylists() }
+    }
+}
+
 // MARK: - Admin-/Wartungs-Konsole (nur fuer Admins der eigenen Instanz)
 struct AdminConsoleView: View {
     @EnvironmentObject var app: AppState
@@ -93,10 +177,6 @@ struct AdminConsoleView: View {
     @State private var serverConfig: ServerConfig?
     @State private var profiles: [Profile] = []
     @StateObject private var updater = AppUpdater()
-    @State private var sleepUrl = ""
-    @State private var sleepName = ""
-    @State private var sleepBusy = false
-    @State private var sleepPlaylists: [SleepPlaylist] = []
 
     var body: some View {
         NavigationStack {
@@ -212,54 +292,6 @@ struct AdminConsoleView: View {
                             cacheChip("Home", "home")
                             cacheChip("Empfehlungen", "recs")
                         }
-                    }
-
-                    SettingsGroup("SCHLAFEN-PLAYLISTS") {
-                        TextField("YouTube-Playlist-Link", text: $sleepUrl)
-                            .textInputAutocapitalization(.never).autocorrectionDisabled()
-                            .padding(10).background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8))
-                            .foregroundStyle(Theme.text)
-                        TextField("Name (z. B. PietSmiet - DayZ)", text: $sleepName)
-                            .padding(10).background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8))
-                            .foregroundStyle(Theme.text)
-                        Button {
-                            Task {
-                                sleepBusy = true
-                                let r = await app.api.addSleepPlaylist(url: sleepUrl, name: sleepName)
-                                sleepBusy = false
-                                if r.ok {
-                                    toast = "Hinzugefügt: \(r.name ?? "") (\(r.count ?? 0) Folgen) — lädt im Hintergrund"
-                                    sleepUrl = ""; sleepName = ""
-                                } else { toast = r.error ?? "Fehlgeschlagen" }
-                                sleepPlaylists = await app.api.sleepPlaylists()
-                                try? await Task.sleep(nanoseconds: 2_500_000_000); toast = ""
-                            }
-                        } label: {
-                            HStack(spacing: 10) {
-                                if sleepBusy { ProgressView().tint(.black) } else { Image(systemName: "moon.stars.fill") }
-                                Text("Als Schlafen-Playlist hinzufügen").font(.system(size: 15, weight: .semibold))
-                                Spacer()
-                            }.foregroundStyle(.black).padding(.vertical, 11).padding(.horizontal, 14)
-                                .background(Theme.accent).clipShape(RoundedRectangle(cornerRadius: 10))
-                        }.buttonStyle(.plain).disabled(sleepBusy || sleepUrl.isEmpty)
-                        if !sleepPlaylists.isEmpty {
-                            Text("Vorhanden:").font(.caption2).foregroundStyle(Theme.mute).padding(.top, 4)
-                            ForEach(sleepPlaylists) { pl in
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 1) {
-                                        Text(pl.name).font(.system(size: 14)).foregroundStyle(Theme.text).lineLimit(1)
-                                        Text("\(pl.downloaded)/\(pl.count) geladen" + (pl.downloading ? " · lädt…" : ""))
-                                            .font(.caption2).foregroundStyle(Theme.sub)
-                                    }
-                                    Spacer()
-                                    Button {
-                                        Task { _ = await app.api.deleteSleepPlaylist(lid: pl.lid); sleepPlaylists = await app.api.sleepPlaylists() }
-                                    } label: { Image(systemName: "trash").foregroundStyle(Theme.mute) }.buttonStyle(.plain)
-                                }.padding(.vertical, 4)
-                            }
-                        }
-                        Text("Fügt eine YouTube-Playlist als globale „Schlafen\"-Rubrik (Home, Position 2) für alle Profile hinzu. Audio lädt im Hintergrund; abspielbar ist sie sofort.")
-                            .font(.caption2).foregroundStyle(Theme.mute)
                     }
 
                     if !stats.isEmpty {
@@ -456,7 +488,6 @@ struct AdminConsoleView: View {
         serverConfig = await app.api.serverConfig()
         profiles = (try? await app.api.profiles()) ?? []
         await updater.check(api: app.api, prompt: false)
-        sleepPlaylists = await app.api.sleepPlaylists()
     }
     private func present(_ ac: UIAlertController) {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }

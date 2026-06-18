@@ -837,6 +837,7 @@ struct AccountSheet: View {
     @State private var profiles: [Profile] = []
     @State private var showSettings = false
     @State private var showConsole = false
+    @State private var showSleep = false
 
     private var isAdmin: Bool { app.profile?.is_admin == true }
 
@@ -875,6 +876,7 @@ struct AccountSheet: View {
                     AccountAction(icon: "gearshape.fill", label: "Einstellungen") { showSettings = true }
                     if isAdmin {
                         AccountAction(icon: "wrench.and.screwdriver.fill", label: "Konsole (Status & Befehle)") { showConsole = true }
+                        AccountAction(icon: "moon.stars.fill", label: "Schlafen-Playlists") { showSleep = true }
                     }
                     AccountAction(icon: "person.2.fill", label: "Profil abmelden") { app.clearProfile(); dismiss() }
 
@@ -923,6 +925,7 @@ struct AccountSheet: View {
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
         .sheet(isPresented: $showConsole) { AdminConsoleView() }
+        .sheet(isPresented: $showSleep) { SleepConsoleView() }
         .task { profiles = (try? await app.api.profiles()) ?? [] }
     }
 
