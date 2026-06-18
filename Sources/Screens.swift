@@ -297,12 +297,13 @@ struct TrackMenu: View {
         Haptics.tap(); app?.flash("Radio wird erstellt…")
         Task {
             guard let r = try? await api.startRadio(track: track), r.ok,
-                  let puri = r.playlist_uri,
-                  let resp = try? await api.playlistTracks(puri) else {
+                  let puri = r.playlist_uri else {
                 app?.flash("Radio konnte nicht erstellt werden")   // z.B. lokaler/YT-Song ohne Spotify-Empfehlungen
                 return
             }
-            player.play(tracks: resp.tracks, contextName: r.name ?? "Radio", contextURI: puri)
+            let tracks = r.tracks ?? ((try? await api.playlistTracks(puri))?.tracks ?? [])
+            guard !tracks.isEmpty else { app?.flash("Radio konnte nicht erstellt werden"); return }
+            player.play(tracks: tracks, contextName: r.name ?? "Radio", contextURI: puri)
             app?.flash("Radio gestartet ✓")
             NotificationCenter.default.post(name: .init("discoverPlaylistsChanged"), object: nil)
         }
@@ -373,9 +374,10 @@ struct PlaylistMenu: View {
         app.flash("Radio wird erstellt…")
         Task {
             guard let r = await app.api.startPlaylistRadio(uri: uri, name: name), r.ok,
-                  let puri = r.playlist_uri,
-                  let resp = try? await app.api.playlistTracks(puri) else { app.flash("Radio fehlgeschlagen"); return }
-            app.player.play(tracks: resp.tracks, contextName: r.name ?? "Radio", contextURI: puri)
+                  let puri = r.playlist_uri else { app.flash("Radio fehlgeschlagen"); return }
+            let tracks = r.tracks ?? ((try? await app.api.playlistTracks(puri))?.tracks ?? [])
+            guard !tracks.isEmpty else { app.flash("Radio fehlgeschlagen"); return }
+            app.player.play(tracks: tracks, contextName: r.name ?? "Radio", contextURI: puri)
             app.flash("Radio gestartet ✓")
             NotificationCenter.default.post(name: .init("discoverPlaylistsChanged"), object: nil)
         }
@@ -1364,7 +1366,7 @@ struct SearchView: View {
                         .autocorrectionDisabled().textInputAutocapitalization(.never)
                         .submitLabel(.search)
                         .focused($searchFocused)
-                        .onSubmit { runSearch(); saveRecent() }
+                        .onSubmit { dismissSearchKeyboard(); runSearch(); saveRecent() }
                         .onChange(of: query) { _ in debounceSearch() }
                     if !query.isEmpty {
                         Button { query = ""; res = nil } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(glass ? Theme.sub : .black.opacity(0.5)) }
@@ -1377,7 +1379,7 @@ struct SearchView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(["all","tracks","playlists","albums","artists","shows","lokal"], id: \.self) { s in
-                            Pill(text: label(s), active: scope == s) { scope = s }
+                            Pill(text: label(s), active: scope == s) { dismissSearchKeyboard(); scope = s }
                         }
                     }.padding(.horizontal)
                 }
@@ -1416,9 +1418,11 @@ struct SearchView: View {
                 }
                 .scrollContentBackground(.hidden)
                 .scrollDismissesKeyboard(.interactively)
+                .simultaneousGesture(TapGesture().onEnded { dismissSearchKeyboard() })
             }
             .padding(.top, 6)
             .background(Theme.bg)
+            .onDisappear { dismissSearchKeyboard() }
             .navigationTitle("Suchen")
             .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
@@ -1461,7 +1465,10 @@ struct SearchView: View {
                         TrackListView(uri: c.uri, title: c.name, image: c.image, isAlbum: c.uri.contains(":album:") || c.uri.hasPrefix("navialbum:"))
                     }
                 }
-                .onAppear { pushRecentItem(RecentSearchItem(uri: c.uri, name: c.name, image: c.image ?? "", sub: cardSub(c.uri))) }
+                .onAppear {
+                    dismissSearchKeyboard()
+                    pushRecentItem(RecentSearchItem(uri: c.uri, name: c.name, image: c.image ?? "", sub: cardSub(c.uri)))
+                }
             }
         }
     }
@@ -1510,9 +1517,13 @@ struct SearchView: View {
     /// Ausgelagert, damit die SearchView.body nicht zu komplex zum Typchecken wird.
     private func tapTrack(_ t: Track, in list: [Track], at i: Int, context: String) {
         if selecting { toggleSel(t.uri); return }
-        searchFocused = false   // Tastatur weg beim Song-Tippen
+        dismissSearchKeyboard()
         pushRecentItem(RecentSearchItem(uri: t.uri, name: t.name, image: t.image ?? "", sub: t.artist))
         player.play(tracks: list, startAt: i, contextName: context, contextURI: "")
+    }
+    private func dismissSearchKeyboard() {
+        searchFocused = false
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
     private func label(_ s: String) -> String {
         ["all":"Alle","tracks":"Songs","playlists":"Playlists","albums":"Alben","artists":"Künstler","shows":"Podcasts","lokal":"Lokal"][s] ?? s
@@ -2392,9 +2403,10 @@ struct TrackListView: View {
     private func startPlaylistRadio() {
         Task {
             guard let r = await app.api.startPlaylistRadio(uri: uri, name: title), r.ok,
-                  let puri = r.playlist_uri,
-                  let resp = try? await app.api.playlistTracks(puri) else { return }
-            player.play(tracks: resp.tracks, contextName: r.name ?? "Radio", contextURI: puri)
+                  let puri = r.playlist_uri else { return }
+            let tracks = r.tracks ?? ((try? await app.api.playlistTracks(puri))?.tracks ?? [])
+            guard !tracks.isEmpty else { return }
+            player.play(tracks: tracks, contextName: r.name ?? "Radio", contextURI: puri)
         }
     }
 
@@ -3034,6 +3046,7 @@ struct NowPlayingBar: View {
     @State private var showDevices = false
     private var remote: RemoteState? { sync.remote }
     private var showRemote: Bool { remote?.track != nil }
+    private let swipeThreshold: CGFloat = 55
     private var progress: Double {
         if showRemote, let d = remote?.duration, d > 0, let p = remote?.position {
             return min(1, max(0, p / d))
@@ -3101,6 +3114,21 @@ struct NowPlayingBar: View {
             .shadow(color: .black.opacity(0.5), radius: 12, y: 4)
             .contentShape(Rectangle())
             .onTapGesture { if showRemote { showDevices = true } else { showPlayer = true } }
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 25)
+                    .onEnded { value in
+                        guard !showRemote else { return }
+                        let dx = value.translation.width
+                        let dy = abs(value.translation.height)
+                        guard abs(dx) >= swipeThreshold, abs(dx) > dy * 1.4 else { return }
+                        if dx < 0 {
+                            player.next()
+                        } else {
+                            player.prev()
+                        }
+                        Haptics.tap(.medium)
+                    }
+            )
             .sheet(isPresented: $showDevices) { DevicePickerSheet().environmentObject(sync) }
         }
     }

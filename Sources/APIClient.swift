@@ -675,5 +675,6 @@ struct RadioResponse: Codable {
     let playlist_uri: String?
     let name: String?
     let image: String?
+    let tracks: [Track]?
     let error: String?
 }
