@@ -76,6 +76,7 @@ final class PlayerController: ObservableObject {
     private var primedNotLoaded = false   // letzter Song wiederhergestellt, aber noch nicht gestreamt
     private var failedOffline: Set<String> = []   // Offline-Dateien, die diese Session nicht liefen -> streamen
     private var streamRetried: Set<String> = []   // gestreamte Tracks, die nach Fehler schon 1x frisch geladen wurden
+    private var streamDurations: [String: Double] = [:] // echte Dauer aus /api/stream-url, auch fuer Prebuffer
     private var wantPlay = false                   // Absicht zu spielen -> beim readyToPlay durchsetzen (gegen 2x-play)
     private var streamFailStreak = 0               // Skip-on-Error: Stream-Fehler in Folge (Cap gegen Endlos-Skip)
     private var endStallTicks = 0                  // Auto-Advance-Fallback: Ticks am Track-Ende ohne Fortschritt
@@ -304,6 +305,7 @@ final class PlayerController: ObservableObject {
                 let r = try await api.streamURL(for: nt)
                 guard crossfading, xfTarget?.uri == nt.uri,
                       r.ok, let rel = r.url, let url = api.absoluteURL(rel) else { abortCrossfade(); return }
+                if let d = r.duration, d > 0 { streamDurations[nt.uri] = Double(d) }
                 b.replaceCurrentItem(with: AVPlayerItem(url: url)); b.play()
             } catch { abortCrossfade() }
         }
@@ -329,6 +331,10 @@ final class PlayerController: ObservableObject {
         if let pre = prebuf[t.uri], FileManager.default.fileExists(atPath: pre.path) { return pre }
         return nil
     }
+    private func knownDuration(for t: Track?) -> Double {
+        guard let t else { return 0 }
+        return max(t.durationSec, streamDurations[t.uri] ?? 0)
+    }
     /// Laedt die naechsten N Tracks (Offline-Buffer) als Temp-Dateien vor; raeumt
     /// nicht mehr benoetigte Eintraege weg.
     private func prefetchUpcoming() {
@@ -349,6 +355,7 @@ final class PlayerController: ObservableObject {
         defer { prebufBusy.remove(t.uri) }
         guard let r = try? await api.streamURL(for: t), r.ok, let rel = r.url,
               let url = api.absoluteURL(rel) else { return }
+        if let d = r.duration, d > 0 { streamDurations[t.uri] = Double(d) }
         var req = URLRequest(url: url)
         if let pid = api.profileId { req.setValue(pid, forHTTPHeaderField: "X-Profile-Id") }
         req.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15",
@@ -670,11 +677,11 @@ final class PlayerController: ObservableObject {
         if autoplay { wantPlay = true }
         persistSnapshot()
         updateRemoteForContent()
-        loading = true; currentTime = 0; duration = track.durationSec; source = ""; streamCache = ""; metaDur = 0
+        loading = true; currentTime = 0; duration = track.durationSec; source = ""; streamCache = ""; metaDur = knownDuration(for: track)
         player.volume = 1                                   // aktiver Track immer voll (Einblenden nur in der Ueberblende)
         try? AVAudioSession.sharedInstance().setActive(true) // nach Stall/Track-Ende sicher reaktivieren -> kein stummer Folge-Song
         updateNowPlaying(title: track.name, artist: track.artist, album: track.album,
-                         dur: track.durationSec, art: track.image, live: false)
+                         dur: metaDur, art: track.image, live: false)
         // Offline vorhanden (und diese Session nicht als fehlerhaft markiert)? -> lokal abspielen
         if let local = downloads?.localURL(for: track.uri), !failedOffline.contains(track.uri) {
             source = "offline"
@@ -717,6 +724,7 @@ final class PlayerController: ObservableObject {
                 source = r.source ?? ""
                 streamCache = r.stream_cache ?? ""
                 metaDur = Double(r.duration ?? 0)
+                if metaDur > 0 { streamDurations[track.uri] = metaDur }
                 UserDefaults.standard.set(source, forKey: "lastSource_\(profileScope)")
                 let played = track
                 Task { await api.postHistory(played, contextName: ctxName, contextURI: ctxURI) }
