@@ -797,7 +797,15 @@ final class PlayerController: ObservableObject {
                         // Player-Dauer deutlich groesser (>1.5x), der Metadaten-
                         // Laenge vertrauen. (Datei selbst ist korrekt, nur Apples
                         // Decoder verzaehlt sich an der Bild-Spur.)
-                        let meta = max(self.current?.durationSec ?? 0, self.metaDur)
+                        var meta = max(self.current?.durationSec ?? 0, self.metaDur)
+                        // Kein Metadaten-/Server-Wert (z.B. prebuffered/offline ohne duration_ms)?
+                        // -> echte Audiospur-Dauer laden. Bei m4a mit Cover-Bild-/Video-Spur
+                        // meldet das Gesamt-Asset doppelt, die Audiospur selbst aber korrekt.
+                        if meta == 0, let at = try? await it.asset.loadTracks(withMediaType: .audio).first,
+                           let tr = try? await at.load(.timeRange) {
+                            let ad = CMTimeGetSeconds(tr.duration)
+                            if ad.isFinite, ad > 0, d > ad * 1.5 { meta = ad }
+                        }
                         self.duration = (meta > 0 && d > meta * 1.5) ? meta : d
                     }
                     if let t = self.current { self.streamRetried.remove(t.uri) }
