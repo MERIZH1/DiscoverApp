@@ -346,6 +346,19 @@ final class PlayerController: ObservableObject {
         guard let t else { return 0 }
         return max(t.durationSec, streamDurations[t.uri] ?? 0)
     }
+    private func backfillDurationIfNeeded(for t: Track) {
+        guard knownDuration(for: t) <= 0 else { return }
+        Task(priority: .userInitiated) {
+            guard let r = try? await api.streamURL(for: t),
+                  let d = r.duration, d > 0,
+                  self.current?.uri == t.uri else { return }
+            streamDurations[t.uri] = Double(d)
+            metaDur = Double(d)
+            duration = Double(d)
+            diag("play_duration_backfill", "\(trackDiag(t)) respDur=\(d) video=\(r.videoId ?? "")")
+            updateElapsed()
+        }
+    }
     /// Laedt die naechsten N Tracks (Offline-Buffer) als Temp-Dateien vor; raeumt
     /// nicht mehr benoetigte Eintraege weg.
     private func cancelPrebuffers(except keep: Set<String> = []) {
@@ -532,7 +545,8 @@ final class PlayerController: ObservableObject {
         // bewusst auf der kuerzeren Metadaten-Laenge halten (sonst wuerde
         // Phantom-Stille nach dem echten Ende die Leiste wieder verlaengern).
         let holdingMeta = (meta > 0 && duration > 0 && duration <= meta + 1.0)
-        if duration > 0, currentTime > duration + 0.3, !holdingMeta { duration = currentTime }
+        let mayStretchDuration = (source == "navidrome" || source == "offline")
+        if mayStretchDuration, duration > 0, currentTime > duration + 0.3, !holdingMeta { duration = currentTime }
     }
 
     private func checkEndStall() {
@@ -729,6 +743,7 @@ final class PlayerController: ObservableObject {
             player.replaceCurrentItem(with: item)
             applyEQ(to: item, thenResume: autoplay)
             loading = false
+            backfillDurationIfNeeded(for: track)
             Task { await api.postHistory(track, contextName: ctxName, contextURI: ctxURI) }
             prefetchUpcoming()
             return
@@ -741,6 +756,7 @@ final class PlayerController: ObservableObject {
             player.replaceCurrentItem(with: item)
             applyEQ(to: item, thenResume: autoplay)
             loading = false
+            backfillDurationIfNeeded(for: track)
             Task { await api.postHistory(track, contextName: ctxName, contextURI: ctxURI) }
             prefetchUpcoming()
             return
