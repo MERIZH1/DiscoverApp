@@ -278,6 +278,7 @@ struct StreamURLResponse: Codable {
     let videoId: String?
     let navidromeId: String?
     let stream_cache: String?    // "file" = lokal gespeichert, "url" = Stream-URL gecacht, "none"
+    let duration: Int?           // echte Track-Dauer (Sek.) vom Server -> Fallback gegen iOS-Doppel-Dauer
     let error: String?
 }
 struct SmartCache: Codable {

@@ -155,6 +155,7 @@ final class PlayerController: ObservableObject {
     private var prebuf: [String: URL] = [:]
     private var prebufBusy: Set<String> = []
     private var timeObserver: Any?
+    private var metaDur: Double = 0   // echte Dauer aus der Stream-Antwort (Fallback gegen iOS-Doppel-Dauer)
     private var statusObs: NSKeyValueObservation?
     private var endObs: NSObjectProtocol?
     private let api: APIClient
@@ -666,7 +667,7 @@ final class PlayerController: ObservableObject {
         if autoplay { wantPlay = true }
         persistSnapshot()
         updateRemoteForContent()
-        loading = true; currentTime = 0; duration = track.durationSec; source = ""; streamCache = ""
+        loading = true; currentTime = 0; duration = track.durationSec; source = ""; streamCache = ""; metaDur = 0
         player.volume = 1                                   // aktiver Track immer voll (Einblenden nur in der Ueberblende)
         try? AVAudioSession.sharedInstance().setActive(true) // nach Stall/Track-Ende sicher reaktivieren -> kein stummer Folge-Song
         updateNowPlaying(title: track.name, artist: track.artist, album: track.album,
@@ -712,6 +713,7 @@ final class PlayerController: ObservableObject {
                 }
                 source = r.source ?? ""
                 streamCache = r.stream_cache ?? ""
+                metaDur = Double(r.duration ?? 0)
                 UserDefaults.standard.set(source, forKey: "lastSource_\(profileScope)")
                 let played = track
                 Task { await api.postHistory(played, contextName: ctxName, contextURI: ctxURI) }
@@ -795,7 +797,7 @@ final class PlayerController: ObservableObject {
                         // Player-Dauer deutlich groesser (>1.5x), der Metadaten-
                         // Laenge vertrauen. (Datei selbst ist korrekt, nur Apples
                         // Decoder verzaehlt sich an der Bild-Spur.)
-                        let meta = self.current?.durationSec ?? 0
+                        let meta = max(self.current?.durationSec ?? 0, self.metaDur)
                         self.duration = (meta > 0 && d > meta * 1.5) ? meta : d
                     }
                     if let t = self.current { self.streamRetried.remove(t.uri) }
