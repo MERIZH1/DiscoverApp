@@ -517,7 +517,7 @@ final class PlayerController: ObservableObject {
     /// Wir uebernehmen die echte Player-Dauer und ziehen, falls der Ton ueber die
     /// bekannte Dauer hinauslaeuft, die Linie nach (statt am Ende zu kleben).
     private func syncDuration() {
-        guard !isRadio else { return }
+        guard !isRadio, !loading else { return }
         let meta = knownDuration(for: current)
         if meta > 0 {
             if let item = player.currentItem {
@@ -550,7 +550,7 @@ final class PlayerController: ObservableObject {
     }
 
     private func checkEndStall() {
-        guard isPlaying, !isRadio, !crossfading, duration > 1 else { endStallTicks = 0; return }
+        guard isPlaying, !loading, !isRadio, !crossfading, duration > 1 else { endStallTicks = 0; return }
         let meta = knownDuration(for: current)
         if meta > 0, currentTime > meta + 1.0 {
             diag("play_meta_end", "\(trackDiag(current)) pos=\(Int(currentTime)) meta=\(Int(meta))")
