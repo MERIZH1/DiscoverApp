@@ -155,6 +155,7 @@ final class PlayerController: ObservableObject {
     var prebufferCount = UserDefaults.standard.integer(forKey: "prebufferCount")
     private var prebuf: [String: URL] = [:]
     private var prebufBusy: Set<String> = []
+    private var prebufTasks: [String: Task<Void, Never>] = [:]
     private var timeObserver: Any?
     private var metaDur: Double = 0   // echte Dauer aus der Stream-Antwort (Fallback gegen iOS-Doppel-Dauer)
     private var statusObs: NSKeyValueObservation?
@@ -337,24 +338,30 @@ final class PlayerController: ObservableObject {
     }
     /// Laedt die naechsten N Tracks (Offline-Buffer) als Temp-Dateien vor; raeumt
     /// nicht mehr benoetigte Eintraege weg.
+    private func cancelPrebuffers(except keep: Set<String> = []) {
+        for (uri, task) in prebufTasks where !keep.contains(uri) {
+            task.cancel()
+            prebufTasks[uri] = nil
+            prebufBusy.remove(uri)
+        }
+    }
     private func prefetchUpcoming() {
         guard prebufferCount > 0, !isRadio else { return }
         let upcoming = Array(upNext.prefix(prebufferCount)).filter { !$0.uri.isEmpty }
         var keep = Set(upcoming.map { $0.uri })
         if let cur = current?.uri { keep.insert(cur) }      // laufende Datei nicht loeschen
-        for (uri, url) in prebuf where !keep.contains(uri) {
-            try? FileManager.default.removeItem(at: url); prebuf[uri] = nil
-        }
+        cancelPrebuffers(except: keep)
         for t in upcoming where prebuf[t.uri] == nil && !prebufBusy.contains(t.uri) {
             if downloads?.localURL(for: t.uri) != nil { continue }    // schon dauerhaft offline
             prebufBusy.insert(t.uri)
-            Task { await prebufferOne(t) }
+            prebufTasks[t.uri] = Task(priority: .background) { await prebufferOne(t) }
         }
     }
     private func prebufferOne(_ t: Track) async {
-        defer { prebufBusy.remove(t.uri) }
+        defer { prebufBusy.remove(t.uri); prebufTasks[t.uri] = nil }
         guard let r = try? await api.streamURL(for: t), r.ok, let rel = r.url,
               let url = api.absoluteURL(rel) else { return }
+        guard !Task.isCancelled else { return }
         if let d = r.duration, d > 0 { streamDurations[t.uri] = Double(d) }
         var req = URLRequest(url: url)
         if let pid = api.profileId { req.setValue(pid, forHTTPHeaderField: "X-Profile-Id") }
@@ -363,6 +370,7 @@ final class PlayerController: ObservableObject {
         guard let (data, resp) = try? await URLSession.shared.data(for: req),
               let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode),
               data.count > 1000 else { return }
+        guard !Task.isCancelled else { return }
         let ext = prebufExt(mime: resp.mimeType, urlExt: resp.url?.pathExtension)
         let dest = prebufDir.appendingPathComponent(prebufKey(t.uri) + "." + ext)
         guard (try? data.write(to: dest)) != nil else { return }
@@ -422,9 +430,10 @@ final class PlayerController: ObservableObject {
         if let t = current {
             // Observer feuert beim schon-ready Crossfade-Item nicht -> Dauer explizit
             // korrekt setzen (sonst 0/doppelt -> Song spielt in die Stille weiter).
-            if let inItem = player.currentItem { applyDuration(for: inItem, serverDur: 0) }
-            else { duration = t.durationSec }
-            updateNowPlaying(title: t.name, artist: t.artist, album: t.album, dur: t.durationSec, art: t.image, live: false)
+            let dur = knownDuration(for: t)
+            if let inItem = player.currentItem { applyDuration(for: inItem, serverDur: dur) }
+            else { duration = dur }
+            updateNowPlaying(title: t.name, artist: t.artist, album: t.album, dur: dur, art: t.image, live: false)
             Task { await api.postHistory(t, contextName: ctxName, contextURI: ctxURI) }
         }
         persistSnapshot()
@@ -487,6 +496,10 @@ final class PlayerController: ObservableObject {
     private func syncDuration() {
         guard !isRadio else { return }
         let meta = knownDuration(for: current)
+        if meta > 0 {
+            if abs(duration - meta) > 0.75 { duration = meta }
+            return
+        }
         if let item = player.currentItem {
             let d = CMTimeGetSeconds(item.duration)
             // iOS-Doppel-Dauer-Bug: bei m4a mit eingebetteter Cover-Bild-Spur
@@ -507,6 +520,10 @@ final class PlayerController: ObservableObject {
 
     private func checkEndStall() {
         guard isPlaying, !isRadio, !crossfading, duration > 1 else { endStallTicks = 0; return }
+        let meta = knownDuration(for: current)
+        if meta > 0, currentTime > meta + 1.0 {
+            next(auto: true); return
+        }
         // Phantom-Stille nach Doppel-Dauer-Bug: item.duration ist DOPPELT, wir halten
         // die Leiste auf der echten (Meta-)Dauer -> der Player spielt aber stumm in
         // die zweite Haelfte weiter (currentTime laeuft ueber die echte Dauer, EOF
@@ -683,6 +700,7 @@ final class PlayerController: ObservableObject {
         try? AVAudioSession.sharedInstance().setActive(true) // nach Stall/Track-Ende sicher reaktivieren -> kein stummer Folge-Song
         updateNowPlaying(title: track.name, artist: track.artist, album: track.album,
                          dur: metaDur, art: track.image, live: false)
+        cancelPrebuffers()
         // Offline vorhanden (und diese Session nicht als fehlerhaft markiert)? -> lokal abspielen
         if let local = downloads?.localURL(for: track.uri), !failedOffline.contains(track.uri) {
             source = "offline"
@@ -713,7 +731,7 @@ final class PlayerController: ObservableObject {
         // "falsche Metadaten, aber alter Song spielt". Kurze Stille beim Laden ist ok.
         player.replaceCurrentItem(with: nil)
         let myIndex = index
-        Task {
+        Task(priority: .userInitiated) {
             do {
                 let r = try await api.streamURL(for: track)
                 guard myIndex == index, !isRadio else { return }
@@ -864,13 +882,13 @@ final class PlayerController: ObservableObject {
     /// Server-Dauer; sonst echte Audiospur-Dauer (gegen das verdoppelte Gesamt-Asset bei
     /// m4a mit Cover-/Video-Spur). Datei selbst ist korrekt, nur Apples Decoder verzaehlt sich.
     private func applyDuration(for item: AVPlayerItem, serverDur: Double) {
-        let d = CMTimeGetSeconds(item.duration)
-        guard d.isFinite, d > 0 else { return }
-        let meta = max(self.current?.durationSec ?? 0, serverDur)
+        let meta = max(knownDuration(for: current), serverDur)
         if meta > 0 {
-            self.duration = (d > meta * 1.5) ? meta : d
+            self.duration = meta
             return
         }
+        let d = CMTimeGetSeconds(item.duration)
+        guard d.isFinite, d > 0 else { return }
         self.duration = d
         Task { @MainActor in
             if let at = try? await item.asset.loadTracks(withMediaType: .audio).first,
