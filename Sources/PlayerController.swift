@@ -871,6 +871,7 @@ final class PlayerController: ObservableObject {
         statusObs = item.observe(\.status, options: [.new]) { [weak self] it, _ in
             guard let self else { return }
             Task { @MainActor in
+                guard self.player.currentItem === it else { return }
                 if it.status == .readyToPlay {
                     let raw = CMTimeGetSeconds(it.duration)
                     self.diag("play_ready", "\(self.trackDiag(self.current)) raw=\(raw.isFinite ? Int(raw) : -1) serverDur=\(Int(self.metaDur))")
@@ -912,8 +913,11 @@ final class PlayerController: ObservableObject {
         }
         if let e = endObs { NotificationCenter.default.removeObserver(e) }
         endObs = NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { [weak self] _ in
-            Task { @MainActor in self?.next(auto: true) }
+            forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { [weak self, weak item] _ in
+            Task { @MainActor in
+                guard let self, let item, self.player.currentItem === item else { return }
+                self.next(auto: true)
+            }
         }
     }
     private func addTimeObserver() {
