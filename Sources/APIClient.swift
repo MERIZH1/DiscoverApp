@@ -124,6 +124,25 @@ final class APIClient: ObservableObject {
               let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return false }
         return (obj["ok"] as? Bool) ?? false
     }
+    /// Admin: YouTube-Playlist als globale "Schlafen"-Playlist hinzufuegen/auflisten/loeschen.
+    func addSleepPlaylist(url: String, name: String) async -> AddSleepResponse {
+        guard let d = try? await data("/api/admin/sleep-playlist", method: "POST", json: ["url": url, "name": name]),
+              let r = try? JSONDecoder().decode(AddSleepResponse.self, from: d) else {
+            return AddSleepResponse(ok: false, name: nil, count: nil, error: "Netzwerk-/Serverfehler")
+        }
+        return r
+    }
+    func sleepPlaylists() async -> [SleepPlaylist] {
+        guard let d = try? await data("/api/admin/sleep-playlists"),
+              let r = try? JSONDecoder().decode(SleepPlaylistsResponse.self, from: d) else { return [] }
+        return r.playlists
+    }
+    @discardableResult
+    func deleteSleepPlaylist(lid: String) async -> Bool {
+        guard let d = try? await data("/api/admin/sleep-playlist/delete", method: "POST", json: ["lid": lid]),
+              let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return false }
+        return (obj["ok"] as? Bool) ?? false
+    }
     /// Admin: einzelne Caches gezielt leeren (playlists|pllist|home|recs).
     @discardableResult func adminClearCache(which: [String]) async -> Bool {
         guard let d = try? await data("/api/admin/clear-cache", method: "POST", json: ["which": which]),
