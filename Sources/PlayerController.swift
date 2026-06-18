@@ -413,7 +413,10 @@ final class PlayerController: ObservableObject {
         let pos = CMTimeGetSeconds(player.currentTime())
         currentTime = pos.isFinite ? pos : 0
         if let t = current {
-            duration = t.durationSec
+            // Observer feuert beim schon-ready Crossfade-Item nicht -> Dauer explizit
+            // korrekt setzen (sonst 0/doppelt -> Song spielt in die Stille weiter).
+            if let inItem = player.currentItem { applyDuration(for: inItem, serverDur: 0) }
+            else { duration = t.durationSec }
             updateNowPlaying(title: t.name, artist: t.artist, album: t.album, dur: t.durationSec, art: t.image, live: false)
             Task { await api.postHistory(t, contextName: ctxName, contextURI: ctxURI) }
         }
@@ -788,26 +791,7 @@ final class PlayerController: ObservableObject {
             guard let self else { return }
             Task { @MainActor in
                 if it.status == .readyToPlay {
-                    let d = CMTimeGetSeconds(it.duration)
-                    if d.isFinite, d > 0 {
-                        // iOS-Doppel-Dauer-Bug: bei m4a mit eingebetteter Cover-
-                        // Bild-Spur (mjpeg) meldet AVFoundation die DOPPELTE Dauer
-                        // (6:20 statt 3:10) -> Leiste falsch, Seeking springt ins
-                        // Leere. Wenn die Metadaten-Laenge bekannt ist und die
-                        // Player-Dauer deutlich groesser (>1.5x), der Metadaten-
-                        // Laenge vertrauen. (Datei selbst ist korrekt, nur Apples
-                        // Decoder verzaehlt sich an der Bild-Spur.)
-                        var meta = max(self.current?.durationSec ?? 0, self.metaDur)
-                        // Kein Metadaten-/Server-Wert (z.B. prebuffered/offline ohne duration_ms)?
-                        // -> echte Audiospur-Dauer laden. Bei m4a mit Cover-Bild-/Video-Spur
-                        // meldet das Gesamt-Asset doppelt, die Audiospur selbst aber korrekt.
-                        if meta == 0, let at = try? await it.asset.loadTracks(withMediaType: .audio).first,
-                           let tr = try? await at.load(.timeRange) {
-                            let ad = CMTimeGetSeconds(tr.duration)
-                            if ad.isFinite, ad > 0, d > ad * 1.5 { meta = ad }
-                        }
-                        self.duration = (meta > 0 && d > meta * 1.5) ? meta : d
-                    }
+                    self.applyDuration(for: it, serverDur: self.metaDur)
                     if let t = self.current { self.streamRetried.remove(t.uri) }
                     // Wiedergabe durchsetzen, falls play() vor readyToPlay kam (sonst 2x play noetig)
                     if self.wantPlay {
@@ -865,6 +849,29 @@ final class PlayerController: ObservableObject {
     }
 
     // MARK: - Lock-Screen
+    /// Setzt self.duration korrekt inkl. iOS-Doppel-Dauer-Schutz. Wird vom readyToPlay-
+    /// Observer UND vom Crossfade-Swap genutzt (dort feuert der status-Observer NICHT,
+    /// weil das eingehende Item schon `readyToPlay` ist). Reihenfolge: Track-Metadaten /
+    /// Server-Dauer; sonst echte Audiospur-Dauer (gegen das verdoppelte Gesamt-Asset bei
+    /// m4a mit Cover-/Video-Spur). Datei selbst ist korrekt, nur Apples Decoder verzaehlt sich.
+    private func applyDuration(for item: AVPlayerItem, serverDur: Double) {
+        let d = CMTimeGetSeconds(item.duration)
+        guard d.isFinite, d > 0 else { return }
+        let meta = max(self.current?.durationSec ?? 0, serverDur)
+        if meta > 0 {
+            self.duration = (d > meta * 1.5) ? meta : d
+            return
+        }
+        self.duration = d
+        Task { @MainActor in
+            if let at = try? await item.asset.loadTracks(withMediaType: .audio).first,
+               let tr = try? await at.load(.timeRange) {
+                let ad = CMTimeGetSeconds(tr.duration)
+                if ad.isFinite, ad > 0, d > ad * 1.5 { self.duration = ad }
+            }
+        }
+    }
+
     private func updateNowPlaying(title: String, artist: String, album: String?, dur: Double, art: String?, live: Bool) {
         var info: [String: Any] = [MPMediaItemPropertyTitle: title, MPMediaItemPropertyArtist: artist]
         if let al = album { info[MPMediaItemPropertyAlbumTitle] = al }
