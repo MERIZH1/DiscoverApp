@@ -486,7 +486,7 @@ final class PlayerController: ObservableObject {
     /// bekannte Dauer hinauslaeuft, die Linie nach (statt am Ende zu kleben).
     private func syncDuration() {
         guard !isRadio else { return }
-        let meta = current?.durationSec ?? 0
+        let meta = knownDuration(for: current)
         if let item = player.currentItem {
             let d = CMTimeGetSeconds(item.duration)
             // iOS-Doppel-Dauer-Bug: bei m4a mit eingebetteter Cover-Bild-Spur
@@ -495,6 +495,7 @@ final class PlayerController: ObservableObject {
             // NICHT uebernehmen — sonst springt die Leiste alle 0.5s wieder auf
             // doppelt und Seeking landet im leeren Phantom-Bereich.
             let doubled = (meta > 0 && d.isFinite && d > meta * 1.5)
+            if doubled, abs(duration - meta) > 0.75 { duration = meta }
             if d.isFinite, d > 0, !doubled, abs(d - duration) > 0.75 { duration = d }
         }
         // Nachziehen (FLAC-Header zu kurz) — aber NICHT wenn wir die Dauer
