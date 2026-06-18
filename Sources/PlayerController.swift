@@ -77,6 +77,7 @@ final class PlayerController: ObservableObject {
     private var failedOffline: Set<String> = []   // Offline-Dateien, die diese Session nicht liefen -> streamen
     private var streamRetried: Set<String> = []   // gestreamte Tracks, die nach Fehler schon 1x frisch geladen wurden
     private var streamDurations: [String: Double] = [:] // echte Dauer aus /api/stream-url, auch fuer Prebuffer
+    private var durationDiagLogged = Set<String>()
     private var wantPlay = false                   // Absicht zu spielen -> beim readyToPlay durchsetzen (gegen 2x-play)
     private var streamFailStreak = 0               // Skip-on-Error: Stream-Fehler in Folge (Cap gegen Endlos-Skip)
     private var endStallTicks = 0                  // Auto-Advance-Fallback: Ticks am Track-Ende ohne Fortschritt
@@ -173,6 +174,15 @@ final class PlayerController: ObservableObject {
 
     private var ctxName = ""
     private var ctxURI = ""
+
+    private func diag(_ ev: String, _ info: String) {
+        Task { await api.bgLog(ev, info) }
+    }
+    private func trackDiag(_ t: Track?) -> String {
+        guard let t else { return "track=nil" }
+        let uri = t.uri.split(separator: ":").last.map(String.init) ?? t.uri
+        return "idx=\(index)/\(queue.count) mode=\(repeatMode) shuffle=\(shuffle) src=\(source) uri=\(uri) name=\(t.artist) - \(t.name) trackDur=\(Int(t.durationSec)) known=\(Int(knownDuration(for: t))) metaDur=\(Int(metaDur))"
+    }
 
     // MARK: - Tracks
     func play(tracks: [Track], startAt i: Int = 0, contextName: String = "", contextURI: String = "") {
@@ -497,6 +507,13 @@ final class PlayerController: ObservableObject {
         guard !isRadio else { return }
         let meta = knownDuration(for: current)
         if meta > 0 {
+            if let item = player.currentItem {
+                let raw = CMTimeGetSeconds(item.duration)
+                if raw.isFinite, raw > meta * 1.5, let uri = current?.uri, !durationDiagLogged.contains(uri) {
+                    durationDiagLogged.insert(uri)
+                    diag("play_duration_double", "\(trackDiag(current)) raw=\(Int(raw)) shown=\(Int(duration))")
+                }
+            }
             if abs(duration - meta) > 0.75 { duration = meta }
             return
         }
@@ -522,6 +539,7 @@ final class PlayerController: ObservableObject {
         guard isPlaying, !isRadio, !crossfading, duration > 1 else { endStallTicks = 0; return }
         let meta = knownDuration(for: current)
         if meta > 0, currentTime > meta + 1.0 {
+            diag("play_meta_end", "\(trackDiag(current)) pos=\(Int(currentTime)) meta=\(Int(meta))")
             next(auto: true); return
         }
         // Phantom-Stille nach Doppel-Dauer-Bug: item.duration ist DOPPELT, wir halten
@@ -692,10 +710,12 @@ final class PlayerController: ObservableObject {
         if crossfading { abortCrossfade() }
         primedNotLoaded = false
         endStallTicks = 0; lastStallTime = -1.0      // Stall-Erkennung fuer neuen Track zuruecksetzen
+        durationDiagLogged.remove(track.uri)
         if autoplay { wantPlay = true }
         persistSnapshot()
         updateRemoteForContent()
         loading = true; currentTime = 0; duration = track.durationSec; source = ""; streamCache = ""; metaDur = knownDuration(for: track)
+        diag("play_load_start", "\(trackDiag(track)) prebuf=\(prebuf[track.uri] != nil) busy=\(prebufBusy.contains(track.uri))")
         player.volume = 1                                   // aktiver Track immer voll (Einblenden nur in der Ueberblende)
         try? AVAudioSession.sharedInstance().setActive(true) // nach Stall/Track-Ende sicher reaktivieren -> kein stummer Folge-Song
         updateNowPlaying(title: track.name, artist: track.artist, album: track.album,
@@ -733,10 +753,12 @@ final class PlayerController: ObservableObject {
         let myIndex = index
         Task(priority: .userInitiated) {
             do {
+                let started = Date()
                 let r = try await api.streamURL(for: track)
                 guard myIndex == index, !isRadio else { return }
                 guard r.ok, let rel = r.url, let url = api.absoluteURL(rel) else {
                     loading = false
+                    diag("play_stream_fail", "\(trackDiag(track)) ok=\(r.ok) err=\(r.error ?? "")")
                     skipAfterStreamFailure()
                     return
                 }
@@ -744,6 +766,8 @@ final class PlayerController: ObservableObject {
                 streamCache = r.stream_cache ?? ""
                 metaDur = Double(r.duration ?? 0)
                 if metaDur > 0 { streamDurations[track.uri] = metaDur }
+                let ms = Int(Date().timeIntervalSince(started) * 1000)
+                diag("play_stream_ok", "\(trackDiag(track)) ms=\(ms) respDur=\(r.duration ?? 0) video=\(r.videoId ?? "") cache=\(streamCache)")
                 UserDefaults.standard.set(source, forKey: "lastSource_\(profileScope)")
                 let played = track
                 Task { await api.postHistory(played, contextName: ctxName, contextURI: ctxURI) }
@@ -757,6 +781,7 @@ final class PlayerController: ObservableObject {
             } catch {
                 guard myIndex == index, !isRadio else { return }
                 loading = false
+                diag("play_stream_error", "\(trackDiag(track)) err=\(error.localizedDescription)")
                 skipAfterStreamFailure()
             }
         }
@@ -769,6 +794,7 @@ final class PlayerController: ObservableObject {
     private func skipAfterStreamFailure() {
         guard wantPlay, !isRadio, queue.count > 1 else { return }
         streamFailStreak += 1
+        diag("play_skip_after_fail", "\(trackDiag(current)) streak=\(streamFailStreak)")
         if streamFailStreak >= min(queue.count, 8) {
             streamFailStreak = 0
             pause()
@@ -818,6 +844,8 @@ final class PlayerController: ObservableObject {
             guard let self else { return }
             Task { @MainActor in
                 if it.status == .readyToPlay {
+                    let raw = CMTimeGetSeconds(it.duration)
+                    self.diag("play_ready", "\(self.trackDiag(self.current)) raw=\(raw.isFinite ? Int(raw) : -1) serverDur=\(Int(self.metaDur))")
                     self.applyDuration(for: it, serverDur: self.metaDur)
                     if let t = self.current { self.streamRetried.remove(t.uri) }
                     // Wiedergabe durchsetzen, falls play() vor readyToPlay kam (sonst 2x play noetig)

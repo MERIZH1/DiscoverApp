@@ -80,6 +80,10 @@ final class APIClient: ObservableObject {
         return try JSONDecoder().decode(T.self, from: d)
     }
 
+    func bgLog(_ ev: String, _ info: String) async {
+        _ = try? await data("/api/bglog", method: "POST", json: ["ev": ev, "info": info])
+    }
+
     // MARK: - Admin-Konsole
     func systemStatus() async -> SystemStatus? {
         try? await get("/api/status")
