@@ -811,35 +811,10 @@ final class PlayerController: ObservableObject {
                 UserDefaults.standard.set(source, forKey: "lastSource_\(profileScope)")
                 let played = track
                 Task { await api.postHistory(played, contextName: ctxName, contextURI: ctxURI) }
-                if (r.source ?? "") == "youtube" {
-                    var req = URLRequest(url: url)
-                    if let pid = api.profileId { req.setValue(pid, forHTTPHeaderField: "X-Profile-Id") }
-                    req.setValue("current", forHTTPHeaderField: "X-Discover-Playback")
-                    req.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15",
-                                 forHTTPHeaderField: "User-Agent")
-                    if let (data, resp) = try? await URLSession.shared.data(for: req),
-                       let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode),
-                       data.count > 1000 {
-                        let ext = prebufExt(mime: resp.mimeType, urlExt: resp.url?.pathExtension)
-                        let dest = prebufDir.appendingPathComponent(prebufKey(track.uri) + "." + ext)
-                        try? data.write(to: dest)
-                        prebuf[track.uri] = dest
-                        let item = AVPlayerItem(url: dest)
-                        attachItemObservers(item)
-                        player.replaceCurrentItem(with: item)
-                        applyEQ(to: item, thenResume: autoplay)
-                    } else {
-                        let item = AVPlayerItem(url: url)
-                        attachItemObservers(item)
-                        player.replaceCurrentItem(with: item)
-                        applyEQ(to: item, thenResume: autoplay)
-                    }
-                } else {
-                    let item = AVPlayerItem(url: url)
-                    attachItemObservers(item)
-                    player.replaceCurrentItem(with: item)
-                    applyEQ(to: item, thenResume: autoplay)
-                }
+                let item = AVPlayerItem(url: url)
+                attachItemObservers(item)
+                player.replaceCurrentItem(with: item)
+                applyEQ(to: item, thenResume: autoplay)
                 loading = false
                 streamFailStreak = 0
                 prefetchUpcoming()
