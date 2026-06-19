@@ -1723,7 +1723,16 @@ struct SendToUserSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var profiles: [Profile] = []
     @State private var status = ""
-    private var others: [Profile] { profiles.filter { $0.id != app.profile?.id } }
+    @State private var sendingTo: String?
+    private var mergedProfiles: [Profile] {
+        var seen = Set<String>()
+        return (profiles + app.allProfiles).filter { p in
+            guard p.id != app.profile?.id, !seen.contains(p.id) else { return false }
+            seen.insert(p.id)
+            return true
+        }
+    }
+    private var others: [Profile] { mergedProfiles }
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -1744,11 +1753,19 @@ struct SendToUserSheet: View {
                             Button { send(p) } label: {
                                 HStack(spacing: 12) {
                                     AvatarCircle(name: p.name, color: p.color, size: 40)
-                                    Text(p.name).font(.system(size: 16)).foregroundStyle(Theme.text)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(p.name).font(.system(size: 16)).foregroundStyle(Theme.text)
+                                        Text("Als naechstes oder in die Inbox")
+                                            .font(.caption).foregroundStyle(Theme.sub)
+                                    }
                                     Spacer()
-                                    Image(systemName: "paperplane").foregroundStyle(Theme.sub)
+                                    if sendingTo == p.id {
+                                        ProgressView().controlSize(.small).tint(Theme.sub)
+                                    } else {
+                                        Image(systemName: "paperplane").foregroundStyle(Theme.sub)
+                                    }
                                 }.padding(.horizontal).padding(.vertical, 8).contentShape(Rectangle())
-                            }.buttonStyle(.plain)
+                            }.buttonStyle(.plain).disabled(sendingTo != nil)
                         }
                     }.padding(.top, 4)
                 }
@@ -1765,13 +1782,22 @@ struct SendToUserSheet: View {
                 }
             }
         }
-        .task { profiles = (try? await app.api.profiles()) ?? [] }
+        .onAppear { profiles = app.allProfiles }
+        .task {
+            if let fresh = try? await app.api.profiles(), !fresh.isEmpty {
+                profiles = fresh
+                app.allProfiles = fresh
+            }
+        }
     }
     private func send(_ p: Profile) {
+        guard sendingTo == nil else { return }
+        sendingTo = p.id
         Task {
             let ok = await app.api.pushToProfile(p.id, track: track)
-            status = ok ? "An \(p.name) gesendet ✓" : "Senden fehlgeschlagen"
-            Haptics.tap()
+            status = ok ? "An \(p.name) gesendet" : "Senden fehlgeschlagen"
+            sendingTo = nil
+            Haptics.tap(ok ? .medium : .light)
             try? await Task.sleep(nanoseconds: 900_000_000)
             if ok { dismiss() } else { status = "" }
         }
@@ -3065,6 +3091,7 @@ struct NowPlayingBar: View {
     @Binding var showPlayer: Bool
     @EnvironmentObject var sync: SyncManager
     @State private var showDevices = false
+    @State private var showQueue = false
     private var remote: RemoteState? { sync.remote }
     private var showRemote: Bool { remote?.track != nil }
     private let swipeThreshold: CGFloat = 55
@@ -3077,10 +3104,23 @@ struct NowPlayingBar: View {
     }
     private var bufferLabel: String {
         switch player.source {
-        case "youtube":   return "Lädt von YouTube…"
-        case "navidrome": return "Lädt aus Bibliothek…"
-        case "offline":   return "Lädt offline…"
-        default:          return "Lädt…"
+        case "youtube":   return "Laedt von YouTube..."
+        case "navidrome": return "Laedt aus Bibliothek..."
+        case "offline":   return "Laedt offline..."
+        case "buffer":    return "Laedt aus Buffer..."
+        default:           return "Laedt..."
+        }
+    }
+    private var sourceIcon: (name: String, color: Color) {
+        if player.streamCache == "file" && (player.source == "youtube" || player.source.isEmpty) {
+            return ("externaldrive.fill", Color(hex6: 0x1DB954))
+        }
+        switch player.source {
+        case "youtube":   return ("play.rectangle.fill", Color(hex6: 0xFF3B30))
+        case "navidrome": return ("music.note.house.fill", Theme.accent)
+        case "offline":   return ("arrow.down.circle.fill", Color(hex6: 0x4A90E2))
+        case "buffer":    return ("bolt.horizontal.circle.fill", Color(hex6: 0x1DB954))
+        default:           return ("music.note", Theme.sub)
         }
     }
     var body: some View {
@@ -3099,8 +3139,11 @@ struct NowPlayingBar: View {
                             Text(bufferLabel).font(.caption).foregroundStyle(Theme.sub).lineLimit(1)
                         } else {
                             if !player.isRadio && !player.source.isEmpty {
-                                Circle().fill(player.streamCache == "file" ? Color(hex6: 0x1DB954) : (player.source == "youtube" ? Color(hex6: 0xFF3B30) : Theme.accent))
-                                    .frame(width: 6, height: 6)
+                                let icon = sourceIcon
+                                Image(systemName: icon.name)
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(icon.color)
+                                    .frame(width: 14)
                             }
                             Text(player.displayArtist).font(.caption).foregroundStyle(Theme.sub).lineLimit(1)
                         }
@@ -3135,13 +3178,23 @@ struct NowPlayingBar: View {
             .shadow(color: .black.opacity(0.5), radius: 12, y: 4)
             .contentShape(Rectangle())
             .onTapGesture { if showRemote { showDevices = true } else { showPlayer = true } }
+            .onLongPressGesture(minimumDuration: 0.35) {
+                guard !showRemote else { showDevices = true; return }
+                showQueue = true
+                Haptics.tap(.medium)
+            }
             .simultaneousGesture(
                 DragGesture(minimumDistance: 25)
                     .onEnded { value in
                         guard !showRemote else { return }
                         let dx = value.translation.width
-                        let dy = abs(value.translation.height)
-                        guard abs(dx) >= swipeThreshold, abs(dx) > dy * 1.4 else { return }
+                        let dy = value.translation.height
+                        if dy < -swipeThreshold, abs(dy) > abs(dx) * 1.25 {
+                            showPlayer = true
+                            Haptics.tap(.medium)
+                            return
+                        }
+                        guard abs(dx) >= swipeThreshold, abs(dx) > abs(dy) * 1.4 else { return }
                         if dx < 0 {
                             player.next()
                         } else {
@@ -3151,7 +3204,22 @@ struct NowPlayingBar: View {
                     }
             )
             .sheet(isPresented: $showDevices) { DevicePickerSheet().environmentObject(sync) }
+            .sheet(isPresented: $showQueue) { MiniQueueSheet().environmentObject(player) }
         }
+    }
+}
+
+struct MiniQueueSheet: View {
+    @EnvironmentObject var player: PlayerController
+    @Environment(\.dismiss) private var dismiss
+    var body: some View {
+        NavigationStack {
+            QueuePage(page: .constant(1))
+                .background(Theme.bg)
+                .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Fertig") { dismiss() }.foregroundStyle(Theme.accent) } }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 }
 
