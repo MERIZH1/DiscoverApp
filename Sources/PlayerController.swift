@@ -814,6 +814,7 @@ final class PlayerController: ObservableObject {
                 if (r.source ?? "") == "youtube" {
                     var req = URLRequest(url: url)
                     if let pid = api.profileId { req.setValue(pid, forHTTPHeaderField: "X-Profile-Id") }
+                    req.setValue("current", forHTTPHeaderField: "X-Discover-Playback")
                     req.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15",
                                  forHTTPHeaderField: "User-Agent")
                     if let (data, resp) = try? await URLSession.shared.data(for: req),
