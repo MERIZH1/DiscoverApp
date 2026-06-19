@@ -390,6 +390,26 @@ final class APIClient: ObservableObject {
         }
     }
 
+    func warmupTracks(_ tracks: [Track], current: Track? = nil) async {
+        var arr: [[String: Any]] = []
+        if let current {
+            arr.append([
+                "priority": 0, "uri": current.uri, "name": current.name, "artist": current.artist,
+                "album": current.album ?? "", "duration_ms": current.duration_ms ?? 0,
+                "image": current.image ?? "", "navidromeId": current.navidromeId ?? "",
+            ])
+        }
+        for (i, t) in tracks.prefix(8).enumerated() {
+            arr.append([
+                "priority": i + 1, "uri": t.uri, "name": t.name, "artist": t.artist,
+                "album": t.album ?? "", "duration_ms": t.duration_ms ?? 0,
+                "image": t.image ?? "", "navidromeId": t.navidromeId ?? "",
+            ])
+        }
+        guard !arr.isEmpty else { return }
+        _ = try? await data("/api/warmup", method: "POST", json: ["client": "ios", "tracks": arr])
+    }
+
     /// "Discover": Empfehlungen basierend auf einer Playlist/einem Album.
     /// skip = bereits gezeigte Track-IDs (fuer "Mehr laden").
     func recommendations(_ uri: String, n: Int = 15, skip: [String] = [], nocache: Bool = false) async throws -> [Track] {

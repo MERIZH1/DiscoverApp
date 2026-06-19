@@ -381,7 +381,14 @@ final class PlayerController: ObservableObject {
         }
     }
     private func prefetchUpcoming() {
-        guard prebufferCount > 0, !isRadio else { return }
+        guard !isRadio else { return }
+        let warmCount = max(prebufferCount, 2)
+        let upcomingForWarmup = Array(upNext.prefix(warmCount)).filter { !$0.uri.isEmpty }
+        warmupServer(upcomingForWarmup, current: current)
+        guard prebufferCount > 0 else {
+            cancelPrebuffers(except: current.map { Set([$0.uri]) } ?? [])
+            return
+        }
         let upcoming = Array(upNext.prefix(prebufferCount)).filter { !$0.uri.isEmpty }
         var keep = Set(upcoming.map { $0.uri })
         if let cur = current?.uri { keep.insert(cur) }      // laufende Datei nicht loeschen
@@ -422,6 +429,10 @@ final class PlayerController: ObservableObject {
         }
         let p = (urlExt ?? "").lowercased()
         return ["m4a", "mp3", "aac", "mp4", "flac", "aiff", "aif", "ogg", "opus", "wav"].contains(p) ? p : "m4a"
+    }
+    private func warmupServer(_ tracks: [Track], current: Track? = nil) {
+        guard !tracks.isEmpty || current != nil else { return }
+        Task(priority: .utility) { await api.warmupTracks(tracks, current: current) }
     }
 
     /// Ueberblende abschliessen: Idle-Player (eingehend) wird aktiv, Queue-Status nachziehen.
@@ -715,11 +726,14 @@ final class PlayerController: ObservableObject {
     func playNext(_ t: Track) {
         if !hasContent || isRadio { play(tracks: [t]); return }
         manualQueue.insert(t, at: 0)
+        warmupServer([t], current: current)
+        prefetchUpcoming()
     }
     /// "Zur Warteschlange" -> ans Ende der manuellen Queue.
     func addToQueue(_ t: Track) {
         if !hasContent || isRadio { play(tracks: [t]); return }
         manualQueue.append(t)
+        warmupServer(Array(upNext.prefix(max(1, prebufferCount))), current: current)
     }
     /// "Als Nächstes" (manuelle Queue + Rest der Playback-Queue) umsortieren.
     func moveUpNext(from source: IndexSet, to destination: Int) {
