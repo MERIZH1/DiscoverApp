@@ -96,7 +96,7 @@ struct MainView: View {
     @EnvironmentObject var sync: SyncManager
     @EnvironmentObject var app: AppState
     @State private var showPlayer = false
-    @State private var keyboardUp = false
+    @State private var keyboardVisible = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -109,13 +109,18 @@ struct MainView: View {
             .tint(Theme.text)
             VStack(spacing: 8) {
                 // EIN Player — zeigt lokal ODER das Remote-Geraet (kein doppelter Banner mehr)
-                if (player.hasContent || sync.remote?.track != nil) && !keyboardUp {
+                if (player.hasContent || sync.remote?.track != nil) && !keyboardVisible {
                     NowPlayingBar(showPlayer: $showPlayer)
                 }
-            }.padding(.horizontal, 8).padding(.bottom, 50)
-                .ignoresSafeArea(.keyboard, edges: .bottom)
-                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardUp = true }
-                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardUp = false }
+            }
+            .padding(.horizontal, 8)
+            .padding(.bottom, 50)
+            .ignoresSafeArea(.keyboard, edges: .bottom)
+            .animation(.easeInOut(duration: 0.18), value: keyboardVisible)
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { updateKeyboard($0) }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidChangeFrameNotification)) { updateKeyboard($0) }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardVisible = false }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { _ in keyboardVisible = false }
         }
         .overlay(alignment: .top) {
             if !sync.injectToast.isEmpty {
@@ -142,7 +147,21 @@ struct MainView: View {
         }
         .animation(.easeInOut(duration: 0.3), value: app.toast)
         .onAppear { configureAppearance(glass: app.liquidGlass) }
+        .onChange(of: showPlayer) { _, open in
+            if open { dismissKeyboard(); keyboardVisible = false }
+        }
         .sheet(isPresented: $showPlayer) { PlayerView() }
+    }
+
+    private func updateKeyboard(_ note: Notification) {
+        guard let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
+        let screen = UIScreen.main.bounds
+        let overlap = max(0, screen.maxY - frame.minY)
+        keyboardVisible = overlap > 80 && frame.minY < screen.maxY
+    }
+
+    private func dismissKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 }
 
