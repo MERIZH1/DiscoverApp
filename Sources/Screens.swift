@@ -303,7 +303,12 @@ struct TrackMenu: View {
                 app?.flash("Radio konnte nicht erstellt werden")   // z.B. lokaler/YT-Song ohne Spotify-Empfehlungen
                 return
             }
-            let tracks = r.tracks ?? ((try? await api.playlistTracks(puri))?.tracks ?? [])
+            let tracks: [Track]
+            if let direct = r.tracks, !direct.isEmpty {
+                tracks = direct
+            } else {
+                tracks = ((try? await api.playlistTracks(puri))?.tracks ?? [])
+            }
             guard !tracks.isEmpty else { app?.flash("Radio konnte nicht erstellt werden"); return }
             if player.current?.uri == track.uri {
                 player.replaceQueueKeepingCurrent(with: tracks, contextName: r.name ?? radioName, contextURI: puri)
@@ -381,7 +386,12 @@ struct PlaylistMenu: View {
         Task {
             guard let r = await app.api.startPlaylistRadio(uri: uri, name: name), r.ok,
                   let puri = r.playlist_uri else { app.flash("Radio fehlgeschlagen"); return }
-            let tracks = r.tracks ?? ((try? await app.api.playlistTracks(puri))?.tracks ?? [])
+            let tracks: [Track]
+            if let direct = r.tracks, !direct.isEmpty {
+                tracks = direct
+            } else {
+                tracks = ((try? await app.api.playlistTracks(puri))?.tracks ?? [])
+            }
             guard !tracks.isEmpty else { app.flash("Radio fehlgeschlagen"); return }
             app.player.play(tracks: tracks, contextName: r.name ?? "Radio", contextURI: puri)
             app.flash("Radio gestartet ✓")
@@ -2410,7 +2420,12 @@ struct TrackListView: View {
         Task {
             guard let r = await app.api.startPlaylistRadio(uri: uri, name: title), r.ok,
                   let puri = r.playlist_uri else { return }
-            let tracks = r.tracks ?? ((try? await app.api.playlistTracks(puri))?.tracks ?? [])
+            let tracks: [Track]
+            if let direct = r.tracks, !direct.isEmpty {
+                tracks = direct
+            } else {
+                tracks = ((try? await app.api.playlistTracks(puri))?.tracks ?? [])
+            }
             guard !tracks.isEmpty else { return }
             player.play(tracks: tracks, contextName: r.name ?? "Radio", contextURI: puri)
         }
