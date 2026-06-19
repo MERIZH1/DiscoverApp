@@ -833,6 +833,11 @@ final class PlayerController: ObservableObject {
     /// (z.B. Server komplett down) mit Pause statt einer Endlos-Skip-Schleife.
     private func skipAfterStreamFailure() {
         guard wantPlay, !isRadio, queue.count > 1 else { return }
+        if source == "youtube" {
+            loading = false
+            isPlaying = false
+            return
+        }
         streamFailStreak += 1
         diag("play_skip_after_fail", "\(trackDiag(current)) streak=\(streamFailStreak)")
         if streamFailStreak >= min(queue.count, 8) {
