@@ -2405,6 +2405,7 @@ struct TrackListView: View {
     @State private var selected: Set<String> = []
     @State private var showMultiAdd = false
     @State private var showYouTubeShare = false
+    @State private var showPlaylistActions = false
     private var selectedTracks: [Track] { (tracks + recs).filter { selected.contains($0.uri) } }
     private func toggleSel(_ uri: String) {
         if selected.contains(uri) { selected.remove(uri) } else { selected.insert(uri) }
@@ -2551,13 +2552,10 @@ struct TrackListView: View {
                             Image(systemName: all ? "checkmark.circle.fill" : "arrow.down.circle")
                                 .font(.title2).foregroundStyle(all ? Theme.accent : Theme.sub)
                         }
-                        Menu {
-                            Button { showYouTubeShare = true } label: { Label("Playlist teilen", systemImage: "square.and.arrow.up") }
-                            PlaylistMenu(uri: uri, name: title, isAlbum: isAlbum, onDeleted: { dismiss() }).equatable()
-                        } label: {
+                        Button { showPlaylistActions = true } label: {
                             Image(systemName: "ellipsis").font(.title3).foregroundStyle(Theme.sub)
                                 .frame(width: 46, height: 46).contentShape(Rectangle())
-                        }.padding(.leading, 4)
+                        }.buttonStyle(.plain).padding(.leading, 4)
                         Spacer()
                         Button { if !tracks.isEmpty { player.shuffle = true; player.play(tracks: tracks.shuffled(), contextName: title, contextURI: uri) } } label: {
                             Image(systemName: "shuffle").font(.title2).foregroundStyle(Theme.text)
@@ -2682,6 +2680,11 @@ struct TrackListView: View {
         }
         .sheet(isPresented: $showYouTubeShare) {
             YouTubePlaylistExportSheet(uri: uri, name: title).environmentObject(app)
+        }
+        .confirmationDialog(title, isPresented: $showPlaylistActions, titleVisibility: .visible) {
+            Button { showYouTubeShare = true } label: { Label("Playlist teilen", systemImage: "square.and.arrow.up") }
+            PlaylistMenu(uri: uri, name: title, isAlbum: isAlbum, onDeleted: { dismiss() }).equatable()
+            Button("Abbrechen", role: .cancel) {}
         }
         .overlay { if loading { LoadingView() } }
         .overlay(alignment: .bottom) {
@@ -3314,7 +3317,7 @@ struct NowPlayingBar: View {
     var body: some View {
         if showRemote || player.hasContent {
             HStack(spacing: 12) {
-                Artwork(url: showRemote ? remote?.track?.image : player.displayImage, size: 44, corner: 5)
+                Artwork(url: showRemote ? remote?.track?.image : player.displayImage, size: 44, corner: 9)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(showRemote ? (remote?.track?.name ?? "") : player.displayTitle)
                         .font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.text).lineLimit(1)
@@ -3353,7 +3356,7 @@ struct NowPlayingBar: View {
                 }.buttonStyle(.plain)
             }
             .padding(.horizontal, 10).padding(.vertical, 8)
-            .glassSurface(glass, shape: RoundedRectangle(cornerRadius: 8), fallback: Color(hex6: 0x282828))
+            .glassSurface(glass, shape: RoundedRectangle(cornerRadius: 18), fallback: Color(hex6: 0x282828))
             .overlay(alignment: .bottomLeading) {
                 GeometryReader { geo in
                     Capsule().fill(Color.white)
@@ -3362,9 +3365,9 @@ struct NowPlayingBar: View {
                 }
                 .allowsHitTesting(false)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: 18))
             .shadow(color: .black.opacity(0.5), radius: 12, y: 4)
-            .contentShape(Rectangle())
+            .contentShape(RoundedRectangle(cornerRadius: 18))
             .onTapGesture { if showRemote { showDevices = true } else { showPlayer = true } }
             .onLongPressGesture(minimumDuration: 0.35) {
                 guard !showRemote else { showDevices = true; return }
