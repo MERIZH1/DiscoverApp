@@ -49,8 +49,14 @@ enum Haptics {
 // MARK: - Appearance
 func configureAppearance(glass: Bool = false) {
     let nav = UINavigationBarAppearance()
-    nav.configureWithOpaqueBackground()
-    nav.backgroundColor = .black; nav.shadowColor = .clear
+    if glass {
+        nav.configureWithTransparentBackground()
+        nav.backgroundColor = .clear
+    } else {
+        nav.configureWithOpaqueBackground()
+        nav.backgroundColor = .black
+    }
+    nav.shadowColor = .clear
     nav.titleTextAttributes = [.foregroundColor: UIColor.white]
     nav.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
     // Zurueck-Button: nur Pfeil, kein Text (wie PWA)
@@ -72,6 +78,27 @@ func configureAppearance(glass: Bool = false) {
         tab.backgroundColor = .black; tab.shadowColor = .clear
         UITabBar.appearance().standardAppearance = tab
         UITabBar.appearance().scrollEdgeAppearance = tab
+    }
+}
+
+struct GlassSymbolButton: View {
+    @Environment(\.liquidGlass) private var glass
+    let systemName: String
+    var active = false
+    var size: CGFloat = 44
+    var symbolSize: CGFloat = 18
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: symbolSize, weight: .semibold))
+                .foregroundStyle(active ? Theme.accent : Theme.text)
+                .frame(width: size, height: size)
+                .glassButton(glass, shape: Circle(), fallback: Theme.input.opacity(0.92))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -113,8 +140,8 @@ struct MainView: View {
                     NowPlayingBar(showPlayer: $showPlayer)
                 }
             }
-            .padding(.horizontal, 8)
-            .padding(.bottom, 50)
+            .padding(.horizontal, app.liquidGlass ? 14 : 8)
+            .padding(.bottom, app.liquidGlass ? 58 : 50)
             .ignoresSafeArea(.keyboard, edges: .bottom)
             .animation(.easeInOut(duration: 0.18), value: keyboardVisible)
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { updateKeyboard($0) }
@@ -1097,8 +1124,8 @@ struct SettingsView: View {
                     SettingsGroup("DARSTELLUNG") {
                         Toggle(isOn: $app.liquidGlass) {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Liquid Glass").font(.system(size: 15)).foregroundStyle(Theme.text)
-                                Text("Durchscheinendes Glas-Design (iOS 26). Tab-Leiste passt sich nach Neustart an.").font(.caption2).foregroundStyle(Theme.mute)
+                                Text("iOS 26.5 Design").font(.system(size: 15)).foregroundStyle(Theme.text)
+                                Text("Liquid Glass, schwebende Controls und native Aktionsflaechen. Ausschalten = klassischer Discover-Look.").font(.caption2).foregroundStyle(Theme.mute)
                             }
                         }.tint(Theme.accent)
                         .onChange(of: app.liquidGlass) { _ in configureAppearance(glass: app.liquidGlass) }
@@ -2538,33 +2565,35 @@ struct TrackListView: View {
                         }
                     }
                     // Aktions-Reihe
-                    HStack {
-                        Button {
+                    HStack(spacing: 10) {
+                        GlassSymbolButton(
+                            systemName: (!tracks.isEmpty && tracks.allSatisfy { downloads.isDownloaded($0.uri) }) ? "checkmark.circle.fill" : "arrow.down.circle",
+                            active: !tracks.isEmpty && tracks.allSatisfy { downloads.isDownloaded($0.uri) },
+                            size: 44,
+                            symbolSize: 21
+                        ) {
                             let all = !tracks.isEmpty && tracks.allSatisfy { downloads.isDownloaded($0.uri) }
                             if all {
-                                for t in tracks { downloads.delete(t.uri) }   // alles geladen -> erneuter Druck loescht
+                                for t in tracks { downloads.delete(t.uri) }
                             } else {
                                 let coll = OfflineCollection(id: uri, name: title, image: image, kind: isAlbum ? "album" : "playlist")
                                 Task { for (i, t) in tracks.enumerated() { await downloads.download(t, collection: coll, order: i) } }
                             }
-                        } label: {
-                            let all = !tracks.isEmpty && tracks.allSatisfy { downloads.isDownloaded($0.uri) }
-                            Image(systemName: all ? "checkmark.circle.fill" : "arrow.down.circle")
-                                .font(.title2).foregroundStyle(all ? Theme.accent : Theme.sub)
                         }
-                        Button { showPlaylistActions = true } label: {
-                            Image(systemName: "ellipsis").font(.title3).foregroundStyle(Theme.sub)
-                                .frame(width: 46, height: 46).contentShape(Rectangle())
-                        }.buttonStyle(.plain).padding(.leading, 4)
+                        GlassSymbolButton(systemName: "ellipsis", size: 44, symbolSize: 20) { showPlaylistActions = true }
                         Spacer()
-                        Button { if !tracks.isEmpty { player.shuffle = true; player.play(tracks: tracks.shuffled(), contextName: title, contextURI: uri) } } label: {
-                            Image(systemName: "shuffle").font(.title2).foregroundStyle(Theme.text)
-                        }.padding(.trailing, 18)
-                        Button { if !tracks.isEmpty { player.shuffle = false; player.play(tracks: tracks, startAt: 0, contextName: title, contextURI: uri) } } label: {
-                            Image(systemName: "play.fill").font(.system(size: 22)).foregroundStyle(.black)
-                                .frame(width: 56, height: 56).background(Theme.accent).clipShape(Circle())
-                                .shadow(color: Theme.accent.opacity(0.4), radius: 10)
+                        GlassSymbolButton(systemName: "shuffle", size: 44, symbolSize: 20) {
+                            if !tracks.isEmpty {
+                                player.shuffle = true
+                                player.play(tracks: tracks.shuffled(), contextName: title, contextURI: uri)
+                            }
                         }
+                        Button { if !tracks.isEmpty { player.shuffle = false; player.play(tracks: tracks, startAt: 0, contextName: title, contextURI: uri) } } label: {
+                            Image(systemName: "play.fill").font(.system(size: 22, weight: .bold)).foregroundStyle(.black)
+                                .frame(width: 58, height: 58)
+                                .background(Theme.accent, in: Circle())
+                                .shadow(color: Theme.accent.opacity(0.34), radius: 12, y: 3)
+                        }.buttonStyle(.plain)
                     }.padding(.horizontal).padding(.top, 8)
                 }
                 .padding(.bottom, 16)
@@ -3147,6 +3176,7 @@ struct NumberedTrackRow: View {
     @State private var showAddPlaylist = false
     @State private var showSendUser = false
     @State private var showFixYT = false
+    @State private var showActions = false
     var body: some View {
         HStack(spacing: 12) {
             if selecting {
@@ -3167,17 +3197,19 @@ struct NumberedTrackRow: View {
                 if track.downloaded == true {
                     Image(systemName: "checkmark").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.accent)
                 }
-                Menu {
-                    TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }, onRemoveFromPlaylist: onRemoveFromPlaylist).equatable()
-                } label: {
+                Button { showActions = true } label: {
                     Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
                         .frame(width: 46, height: 46).contentShape(Rectangle())
-                }
+                }.buttonStyle(.plain)
             }
         }.padding(.vertical, 9).padding(.horizontal)
             .background(playing ? Theme.accent.opacity(0.08) : .clear)
             .contentShape(Rectangle())
             .onTapGesture(perform: tap)
+            .confirmationDialog(track.name, isPresented: $showActions, titleVisibility: .visible) {
+                TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }, onRemoveFromPlaylist: onRemoveFromPlaylist).equatable()
+                Button("Abbrechen", role: .cancel) {}
+            }
             .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }, onRemoveFromPlaylist: onRemoveFromPlaylist).equatable() }
             .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum, showAddPlaylist: $showAddPlaylist, showSendUser: $showSendUser, showFixYT: $showFixYT)
     }
@@ -3232,6 +3264,7 @@ struct TrackRow: View {
     @State private var showAddPlaylist = false
     @State private var showSendUser = false
     @State private var showFixYT = false
+    @State private var showActions = false
     var body: some View {
         HStack(spacing: 12) {
             if selecting {
@@ -3252,16 +3285,18 @@ struct TrackRow: View {
                 if track.downloaded == true {
                     Image(systemName: "arrow.down.circle.fill").font(.system(size: 15)).foregroundStyle(Theme.accent.opacity(0.7))
                 }
-                Menu {
-                    TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }).equatable()
-                } label: {
+                Button { showActions = true } label: {
                     Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
                         .frame(width: 46, height: 46).contentShape(Rectangle())
-                }
+                }.buttonStyle(.plain)
             }
         }.padding(.vertical, 9).padding(.horizontal)
             .contentShape(Rectangle())
             .onTapGesture(perform: tap)
+            .confirmationDialog(track.name, isPresented: $showActions, titleVisibility: .visible) {
+                TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }).equatable()
+                Button("Abbrechen", role: .cancel) {}
+            }
             .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }).equatable() }
             .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum, showAddPlaylist: $showAddPlaylist, showSendUser: $showSendUser, showFixYT: $showFixYT)
     }
@@ -3341,33 +3376,40 @@ struct NowPlayingBar: View {
                     }
                 }
                 Spacer()
-                // Connect-Icon (Geraet wechseln) — immer sichtbar
-                Button { showDevices = true } label: {
-                    Image(systemName: "hifispeaker.2.fill").font(.system(size: 15))
-                        .foregroundStyle(showRemote ? Theme.accent : Theme.sub)
-                        .frame(width: 32, height: 34).contentShape(Rectangle())
-                }.buttonStyle(.plain)
-                Button {
-                    if showRemote { sync.remotePlayPause() } else { player.toggle() }
-                } label: {
-                    Image(systemName: (showRemote ? (remote?.playing == true) : player.isPlaying) ? "pause.fill" : "play.fill")
-                        .font(.title3).foregroundStyle(.black)
-                        .frame(width: 38, height: 38).background(.white).clipShape(Circle())
-                }.buttonStyle(.plain)
+                GlassCluster(on: glass, spacing: 7) {
+                    HStack(spacing: 7) {
+                        GlassSymbolButton(systemName: "hifispeaker.2.fill", active: showRemote, size: 38, symbolSize: 15) {
+                            showDevices = true
+                        }
+                        Button {
+                            if showRemote { sync.remotePlayPause() } else { player.toggle() }
+                        } label: {
+                            Image(systemName: (showRemote ? (remote?.playing == true) : player.isPlaying) ? "pause.fill" : "play.fill")
+                                .font(.system(size: 17, weight: .bold))
+                                .foregroundStyle(glass ? Theme.text : .black)
+                                .frame(width: 42, height: 42)
+                                .glassButton(glass, shape: Circle(), fallback: .white)
+                                .contentShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             }
-            .padding(.horizontal, 10).padding(.vertical, 8)
-            .glassSurface(glass, shape: RoundedRectangle(cornerRadius: 18), fallback: Color(hex6: 0x282828))
+            .padding(.horizontal, 12).padding(.vertical, 10)
+            .glassSurface(glass, shape: RoundedRectangle(cornerRadius: 22), fallback: Color(hex6: 0x282828))
             .overlay(alignment: .bottomLeading) {
                 GeometryReader { geo in
-                    Capsule().fill(Color.white)
-                        .frame(width: geo.size.width * CGFloat(progress), height: 2)
+                    Capsule().fill(glass ? Theme.text.opacity(0.82) : Color.white)
+                        .frame(width: max(0, (geo.size.width - 28) * CGFloat(progress)), height: 2)
+                        .padding(.horizontal, 14)
+                        .padding(.bottom, 3)
                         .frame(maxHeight: .infinity, alignment: .bottom)
                 }
                 .allowsHitTesting(false)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 18))
-            .shadow(color: .black.opacity(0.5), radius: 12, y: 4)
-            .contentShape(RoundedRectangle(cornerRadius: 18))
+            .clipShape(RoundedRectangle(cornerRadius: 22))
+            .shadow(color: .black.opacity(glass ? 0.32 : 0.5), radius: glass ? 18 : 12, y: glass ? 8 : 4)
+            .contentShape(RoundedRectangle(cornerRadius: 22))
             .onTapGesture { if showRemote { showDevices = true } else { showPlayer = true } }
             .onLongPressGesture(minimumDuration: 0.35) {
                 guard !showRemote else { showDevices = true; return }
@@ -3434,6 +3476,7 @@ struct PlayerView: View {
     @State private var showFixYT = false
     @State private var showDevices = false
     @State private var showNoise = false
+    @State private var showTrackActions = false
     @ObservedObject private var noise = NoiseEngine.shared
     private var syncMgr: SyncManager? { DiscoverServices.app?.sync }
 
@@ -3492,10 +3535,10 @@ struct PlayerView: View {
                                 .font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.text)
                                 .glassIconCircle(glass)
                         }
-                        Menu { if let t = p.current { TrackMenu(track: t, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }).equatable() } } label: {
+                        Button { showTrackActions = true } label: {
                             Image(systemName: "ellipsis").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
                                 .glassIconCircle(glass)
-                        }.disabled(p.current == nil)
+                        }.buttonStyle(.plain).disabled(p.current == nil)
                       }
                     }
                 }.padding(.horizontal, 4).padding(.top, 8)
@@ -3537,45 +3580,47 @@ struct PlayerView: View {
                         }
                     }.padding(.horizontal)
                     if p.isEpisode {
-                        HStack {
-                            Button { p.skip(-10) } label: { Image(systemName: "gobackward.10").font(.title2) }
+                        GlassCluster(on: glass, spacing: 12) {
+                        HStack(spacing: 12) {
+                            GlassSymbolButton(systemName: "gobackward.10", size: 48, symbolSize: 20) { p.skip(-10) }
                             Spacer()
-                            Button { p.prev() } label: { Image(systemName: "backward.fill").font(.title2) }
+                            GlassSymbolButton(systemName: "backward.fill", size: 48, symbolSize: 20) { p.prev() }
                             Spacer()
                             Button { p.toggle() } label: {
-                                Image(systemName: p.isPlaying ? "pause.circle.fill" : "play.circle.fill").font(.system(size: 72))
+                                Image(systemName: p.isPlaying ? "pause.fill" : "play.fill")
+                                    .font(.system(size: 30, weight: .bold))
+                                    .foregroundStyle(Theme.text)
+                                    .frame(width: 78, height: 78)
+                                    .glassButton(glass, shape: Circle(), fallback: Theme.accent.opacity(0.95))
                             }
+                            .buttonStyle(.plain)
                             Spacer()
-                            Button { p.next() } label: { Image(systemName: "forward.fill").font(.title2) }
+                            GlassSymbolButton(systemName: "forward.fill", size: 48, symbolSize: 20) { p.next() }
                             Spacer()
-                            Button { p.skip(10) } label: { Image(systemName: "goforward.10").font(.title2) }
+                            GlassSymbolButton(systemName: "goforward.10", size: 48, symbolSize: 20) { p.skip(10) }
                         }.foregroundStyle(Theme.text).padding(.horizontal, 8)
+                        }
                     } else {
-                        HStack {
-                            Button { p.toggleShuffle() } label: {
-                                Image(systemName: "shuffle").font(.title3).foregroundStyle(p.shuffle ? Theme.accent : Theme.text)
-                            }
+                        GlassCluster(on: glass, spacing: 12) {
+                        HStack(spacing: 12) {
+                            GlassSymbolButton(systemName: "shuffle", active: p.shuffle, size: 48, symbolSize: 19) { p.toggleShuffle() }
                             Spacer()
-                            Button { p.prev() } label: { Image(systemName: "backward.fill").font(.title) }
+                            GlassSymbolButton(systemName: "backward.fill", size: 52, symbolSize: 24) { p.prev() }
                             Spacer()
                             Button { p.toggle() } label: {
-                                if glass {
-                                    Image(systemName: p.isPlaying ? "pause.fill" : "play.fill")
-                                        .font(.system(size: 30)).foregroundStyle(Theme.text)
-                                        .frame(width: 78, height: 78)
-                                        .glassButton(true, shape: Circle(), fallback: .clear)
-                                } else {
-                                    Image(systemName: p.isPlaying ? "pause.circle.fill" : "play.circle.fill").font(.system(size: 72))
-                                }
+                                Image(systemName: p.isPlaying ? "pause.fill" : "play.fill")
+                                    .font(.system(size: 32, weight: .bold))
+                                    .foregroundStyle(glass ? Theme.text : .black)
+                                    .frame(width: 82, height: 82)
+                                    .glassButton(glass, shape: Circle(), fallback: Theme.accent)
                             }
+                            .buttonStyle(.plain)
                             Spacer()
-                            Button { p.next() } label: { Image(systemName: "forward.fill").font(.title) }
+                            GlassSymbolButton(systemName: "forward.fill", size: 52, symbolSize: 24) { p.next() }
                             Spacer()
-                            Button { p.cycleRepeat() } label: {
-                                Image(systemName: p.repeatMode == .one ? "repeat.1" : "repeat")
-                                    .font(.title3).foregroundStyle(p.repeatMode == .off ? Theme.text : Theme.accent)
-                            }
+                            GlassSymbolButton(systemName: p.repeatMode == .one ? "repeat.1" : "repeat", active: p.repeatMode != .off, size: 48, symbolSize: 19) { p.cycleRepeat() }
                         }.foregroundStyle(Theme.text).padding(.horizontal, 8)
+                        }
                     }
                     HStack(spacing: 0) {
                         Button { scrollToLyrics = true } label: { Label("Songtext", systemImage: "quote.bubble").font(.system(size: 15, weight: .semibold)) }
@@ -3617,6 +3662,12 @@ struct PlayerView: View {
         .sheet(isPresented: $showFixYT) { if let t = player.current { YTMatchSheet(track: t) } }
         .sheet(isPresented: $showDevices) { if let s = syncMgr { DevicePickerSheet().environmentObject(s) } }
         .sheet(isPresented: $showNoise) { NoiseSheet() }
+        .confirmationDialog(player.current?.name ?? "Song", isPresented: $showTrackActions, titleVisibility: .visible) {
+            if let t = player.current {
+                TrackMenu(track: t, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }).equatable()
+            }
+            Button("Abbrechen", role: .cancel) {}
+        }
         .sheet(isPresented: $showArtist) {
             if let t = player.current, let u = t.artists?.first?.uri {
                 NavigationStack { ArtistView(uri: u, name: t.artists?.first?.name ?? t.artist, image: t.image) }
