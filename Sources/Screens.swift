@@ -3481,8 +3481,8 @@ struct PlayerView: View {
     private var syncMgr: SyncManager? { DiscoverServices.app?.sync }
     private var heroTextPanel: some View {
         RoundedRectangle(cornerRadius: 18)
-            .fill(hero.isLight ? Color.black.opacity(0.42) : Color.black.opacity(0.18))
-            .glassSurface(glass && hero.isLight, shape: RoundedRectangle(cornerRadius: 18), fallback: .clear)
+            .fill(Color.black.opacity(0.48))
+            .glassSurface(glass, shape: RoundedRectangle(cornerRadius: 18), fallback: Color.black.opacity(0.48))
     }
 
     var body: some View {
@@ -3551,12 +3551,16 @@ struct PlayerView: View {
                 Artwork(url: p.displayImage, size: 300, corner: 12).shadow(radius: 24)
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(p.displayTitle).font(.title2.bold()).foregroundStyle(Theme.text).lineLimit(1)
-                            .shadow(color: .black.opacity(hero.isLight ? 0.65 : 0.25), radius: 4, y: 1)
-                        Text(p.displayArtist)
-                            .foregroundStyle(hero.isLight ? Color.white.opacity(0.92) : Theme.sub)
+                        Text(p.displayTitle)
+                            .font(.title2.bold())
+                            .foregroundStyle(.white)
                             .lineLimit(1)
-                            .shadow(color: .black.opacity(hero.isLight ? 0.75 : 0.2), radius: 4, y: 1)
+                            .shadow(color: .black.opacity(0.85), radius: 5, y: 1)
+                        Text(p.displayArtist)
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.92))
+                            .lineLimit(1)
+                            .shadow(color: .black.opacity(0.9), radius: 5, y: 1)
                         if p.isEpisode {
                             SourceBadge(source: "podcast").padding(.top, 4)
                         } else if !p.isRadio && !p.source.isEmpty {
@@ -3576,8 +3580,8 @@ struct PlayerView: View {
                     }
                 }
                 .padding(.horizontal, 14)
-                .padding(.vertical, hero.isLight ? 12 : 0)
-                .background { if hero.isLight { heroTextPanel } }
+                .padding(.vertical, 12)
+                .background { heroTextPanel }
                 if !p.isRadio {
                     VStack(spacing: 2) {
                         Slider(value: $scrub, in: 0...max(clock.duration, 1),
