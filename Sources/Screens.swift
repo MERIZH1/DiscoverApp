@@ -3479,6 +3479,11 @@ struct PlayerView: View {
     @State private var showTrackActions = false
     @ObservedObject private var noise = NoiseEngine.shared
     private var syncMgr: SyncManager? { DiscoverServices.app?.sync }
+    private var heroTextPanel: some View {
+        RoundedRectangle(cornerRadius: 18)
+            .fill(hero.isLight ? Color.black.opacity(0.42) : Color.black.opacity(0.18))
+            .glassSurface(glass && hero.isLight, shape: RoundedRectangle(cornerRadius: 18), fallback: .clear)
+    }
 
     var body: some View {
         let p = player
@@ -3547,7 +3552,11 @@ struct PlayerView: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(p.displayTitle).font(.title2.bold()).foregroundStyle(Theme.text).lineLimit(1)
-                        Text(p.displayArtist).foregroundStyle(Theme.sub).lineLimit(1)
+                            .shadow(color: .black.opacity(hero.isLight ? 0.65 : 0.25), radius: 4, y: 1)
+                        Text(p.displayArtist)
+                            .foregroundStyle(hero.isLight ? Color.white.opacity(0.92) : Theme.sub)
+                            .lineLimit(1)
+                            .shadow(color: .black.opacity(hero.isLight ? 0.75 : 0.2), radius: 4, y: 1)
                         if p.isEpisode {
                             SourceBadge(source: "podcast").padding(.top, 4)
                         } else if !p.isRadio && !p.source.isEmpty {
@@ -3565,7 +3574,10 @@ struct PlayerView: View {
                             Image(systemName: "plus.circle").font(.system(size: 26)).foregroundStyle(Theme.text)
                         }
                     }
-                }.padding(.horizontal, 4)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, hero.isLight ? 12 : 0)
+                .background { if hero.isLight { heroTextPanel } }
                 if !p.isRadio {
                     VStack(spacing: 2) {
                         Slider(value: $scrub, in: 0...max(clock.duration, 1),
@@ -3581,11 +3593,11 @@ struct PlayerView: View {
                     }.padding(.horizontal)
                     if p.isEpisode {
                         GlassCluster(on: glass, spacing: 12) {
-                        HStack(spacing: 12) {
+                        HStack(spacing: 0) {
                             GlassSymbolButton(systemName: "gobackward.10", size: 48, symbolSize: 20) { p.skip(-10) }
-                            Spacer()
+                                .frame(maxWidth: .infinity)
                             GlassSymbolButton(systemName: "backward.fill", size: 48, symbolSize: 20) { p.prev() }
-                            Spacer()
+                                .frame(maxWidth: .infinity)
                             Button { p.toggle() } label: {
                                 Image(systemName: p.isPlaying ? "pause.fill" : "play.fill")
                                     .font(.system(size: 30, weight: .bold))
@@ -3594,19 +3606,20 @@ struct PlayerView: View {
                                     .glassButton(glass, shape: Circle(), fallback: Theme.accent.opacity(0.95))
                             }
                             .buttonStyle(.plain)
-                            Spacer()
+                            .frame(maxWidth: .infinity)
                             GlassSymbolButton(systemName: "forward.fill", size: 48, symbolSize: 20) { p.next() }
-                            Spacer()
+                                .frame(maxWidth: .infinity)
                             GlassSymbolButton(systemName: "goforward.10", size: 48, symbolSize: 20) { p.skip(10) }
-                        }.foregroundStyle(Theme.text).padding(.horizontal, 8)
+                                .frame(maxWidth: .infinity)
+                        }.foregroundStyle(Theme.text).padding(.horizontal, 2)
                         }
                     } else {
                         GlassCluster(on: glass, spacing: 12) {
-                        HStack(spacing: 12) {
+                        HStack(spacing: 0) {
                             GlassSymbolButton(systemName: "shuffle", active: p.shuffle, size: 48, symbolSize: 19) { p.toggleShuffle() }
-                            Spacer()
+                                .frame(maxWidth: .infinity)
                             GlassSymbolButton(systemName: "backward.fill", size: 52, symbolSize: 24) { p.prev() }
-                            Spacer()
+                                .frame(maxWidth: .infinity)
                             Button { p.toggle() } label: {
                                 Image(systemName: p.isPlaying ? "pause.fill" : "play.fill")
                                     .font(.system(size: 32, weight: .bold))
@@ -3615,11 +3628,12 @@ struct PlayerView: View {
                                     .glassButton(glass, shape: Circle(), fallback: Theme.accent)
                             }
                             .buttonStyle(.plain)
-                            Spacer()
+                            .frame(maxWidth: .infinity)
                             GlassSymbolButton(systemName: "forward.fill", size: 52, symbolSize: 24) { p.next() }
-                            Spacer()
+                                .frame(maxWidth: .infinity)
                             GlassSymbolButton(systemName: p.repeatMode == .one ? "repeat.1" : "repeat", active: p.repeatMode != .off, size: 48, symbolSize: 19) { p.cycleRepeat() }
-                        }.foregroundStyle(Theme.text).padding(.horizontal, 8)
+                                .frame(maxWidth: .infinity)
+                        }.foregroundStyle(Theme.text).padding(.horizontal, 2)
                         }
                     }
                     HStack(spacing: 0) {
