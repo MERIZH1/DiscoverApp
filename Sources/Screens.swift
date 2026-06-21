@@ -2416,6 +2416,7 @@ struct TrackListView: View {
     @EnvironmentObject var app: AppState
     @EnvironmentObject var player: PlayerController
     @EnvironmentObject var downloads: DownloadManager
+    @Environment(\.liquidGlass) private var glass
     @Environment(\.dismiss) private var dismiss
     let uri: String; let title: String; let image: String?; let isAlbum: Bool
     @State private var tracks: [Track] = []
@@ -2432,7 +2433,6 @@ struct TrackListView: View {
     @State private var selected: Set<String> = []
     @State private var showMultiAdd = false
     @State private var showYouTubeShare = false
-    @State private var showPlaylistActions = false
     private var selectedTracks: [Track] { (tracks + recs).filter { selected.contains($0.uri) } }
     private func toggleSel(_ uri: String) {
         if selected.contains(uri) { selected.remove(uri) } else { selected.insert(uri) }
@@ -2580,7 +2580,19 @@ struct TrackListView: View {
                                 Task { for (i, t) in tracks.enumerated() { await downloads.download(t, collection: coll, order: i) } }
                             }
                         }
-                        GlassSymbolButton(systemName: "ellipsis", size: 44, symbolSize: 20) { showPlaylistActions = true }
+                        Menu {
+                            Button { showYouTubeShare = true } label: {
+                                Label("Playlist teilen", systemImage: "square.and.arrow.up")
+                            }
+                            PlaylistMenu(uri: uri, name: title, isAlbum: isAlbum, onDeleted: { dismiss() }).equatable()
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(Theme.text)
+                                .frame(width: 44, height: 44)
+                                .glassButton(glass, shape: Circle(), fallback: Theme.input.opacity(0.92))
+                                .contentShape(Circle())
+                        }.buttonStyle(.plain)
                         Spacer()
                         GlassSymbolButton(systemName: "shuffle", size: 44, symbolSize: 20) {
                             if !tracks.isEmpty {
@@ -2709,11 +2721,6 @@ struct TrackListView: View {
         }
         .sheet(isPresented: $showYouTubeShare) {
             YouTubePlaylistExportSheet(uri: uri, name: title).environmentObject(app)
-        }
-        .confirmationDialog(title, isPresented: $showPlaylistActions, titleVisibility: .visible) {
-            Button { showYouTubeShare = true } label: { Label("Playlist teilen", systemImage: "square.and.arrow.up") }
-            PlaylistMenu(uri: uri, name: title, isAlbum: isAlbum, onDeleted: { dismiss() }).equatable()
-            Button("Abbrechen", role: .cancel) {}
         }
         .overlay { if loading { LoadingView() } }
         .overlay(alignment: .bottom) {
@@ -3176,7 +3183,6 @@ struct NumberedTrackRow: View {
     @State private var showAddPlaylist = false
     @State private var showSendUser = false
     @State private var showFixYT = false
-    @State private var showActions = false
     var body: some View {
         HStack(spacing: 12) {
             if selecting {
@@ -3197,7 +3203,9 @@ struct NumberedTrackRow: View {
                 if track.downloaded == true {
                     Image(systemName: "checkmark").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.accent)
                 }
-                Button { showActions = true } label: {
+                Menu {
+                    TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }, onRemoveFromPlaylist: onRemoveFromPlaylist).equatable()
+                } label: {
                     Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
                         .frame(width: 46, height: 46).contentShape(Rectangle())
                 }.buttonStyle(.plain)
@@ -3206,10 +3214,6 @@ struct NumberedTrackRow: View {
             .background(playing ? Theme.accent.opacity(0.08) : .clear)
             .contentShape(Rectangle())
             .onTapGesture(perform: tap)
-            .confirmationDialog(track.name, isPresented: $showActions, titleVisibility: .visible) {
-                TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }, onRemoveFromPlaylist: onRemoveFromPlaylist).equatable()
-                Button("Abbrechen", role: .cancel) {}
-            }
             .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }, onRemoveFromPlaylist: onRemoveFromPlaylist).equatable() }
             .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum, showAddPlaylist: $showAddPlaylist, showSendUser: $showSendUser, showFixYT: $showFixYT)
     }
@@ -3264,7 +3268,6 @@ struct TrackRow: View {
     @State private var showAddPlaylist = false
     @State private var showSendUser = false
     @State private var showFixYT = false
-    @State private var showActions = false
     var body: some View {
         HStack(spacing: 12) {
             if selecting {
@@ -3285,7 +3288,9 @@ struct TrackRow: View {
                 if track.downloaded == true {
                     Image(systemName: "arrow.down.circle.fill").font(.system(size: 15)).foregroundStyle(Theme.accent.opacity(0.7))
                 }
-                Button { showActions = true } label: {
+                Menu {
+                    TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }).equatable()
+                } label: {
                     Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
                         .frame(width: 46, height: 46).contentShape(Rectangle())
                 }.buttonStyle(.plain)
@@ -3293,10 +3298,6 @@ struct TrackRow: View {
         }.padding(.vertical, 9).padding(.horizontal)
             .contentShape(Rectangle())
             .onTapGesture(perform: tap)
-            .confirmationDialog(track.name, isPresented: $showActions, titleVisibility: .visible) {
-                TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }).equatable()
-                Button("Abbrechen", role: .cancel) {}
-            }
             .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }).equatable() }
             .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum, showAddPlaylist: $showAddPlaylist, showSendUser: $showSendUser, showFixYT: $showFixYT)
     }
@@ -3476,7 +3477,6 @@ struct PlayerView: View {
     @State private var showFixYT = false
     @State private var showDevices = false
     @State private var showNoise = false
-    @State private var showTrackActions = false
     @ObservedObject private var noise = NoiseEngine.shared
     private var syncMgr: SyncManager? { DiscoverServices.app?.sync }
     private var heroTextPanel: some View {
@@ -3540,7 +3540,11 @@ struct PlayerView: View {
                                 .font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.text)
                                 .glassIconCircle(glass)
                         }
-                        Button { showTrackActions = true } label: {
+                        Menu {
+                            if let t = p.current {
+                                TrackMenu(track: t, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }).equatable()
+                            }
+                        } label: {
                             Image(systemName: "ellipsis").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
                                 .glassIconCircle(glass)
                         }.buttonStyle(.plain).disabled(p.current == nil)
@@ -3680,12 +3684,6 @@ struct PlayerView: View {
         .sheet(isPresented: $showFixYT) { if let t = player.current { YTMatchSheet(track: t) } }
         .sheet(isPresented: $showDevices) { if let s = syncMgr { DevicePickerSheet().environmentObject(s) } }
         .sheet(isPresented: $showNoise) { NoiseSheet() }
-        .confirmationDialog(player.current?.name ?? "Song", isPresented: $showTrackActions, titleVisibility: .visible) {
-            if let t = player.current {
-                TrackMenu(track: t, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }).equatable()
-            }
-            Button("Abbrechen", role: .cancel) {}
-        }
         .sheet(isPresented: $showArtist) {
             if let t = player.current, let u = t.artists?.first?.uri {
                 NavigationStack { ArtistView(uri: u, name: t.artists?.first?.name ?? t.artist, image: t.image) }
