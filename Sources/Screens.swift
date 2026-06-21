@@ -208,7 +208,7 @@ struct LoadingView: View {
 }
 
 // MARK: - Track-Kontextmenue (Long-Press + "…")
-struct TrackMenu: View {
+struct TrackMenu: View, Equatable {
     let track: Track
     var onShowArtist: (() -> Void)? = nil
     var onShowAlbum: (() -> Void)? = nil
@@ -216,6 +216,18 @@ struct TrackMenu: View {
     var onSendToUser: (() -> Void)? = nil
     var onFixYTMatch: (() -> Void)? = nil
     var onRemoveFromPlaylist: (() -> Void)? = nil
+    static func == (lhs: TrackMenu, rhs: TrackMenu) -> Bool {
+        lhs.track.uri == rhs.track.uri &&
+        lhs.track.name == rhs.track.name &&
+        lhs.track.artist == rhs.track.artist &&
+        lhs.track.downloaded == rhs.track.downloaded &&
+        (lhs.onShowArtist != nil) == (rhs.onShowArtist != nil) &&
+        (lhs.onShowAlbum != nil) == (rhs.onShowAlbum != nil) &&
+        (lhs.onAddToPlaylist != nil) == (rhs.onAddToPlaylist != nil) &&
+        (lhs.onSendToUser != nil) == (rhs.onSendToUser != nil) &&
+        (lhs.onFixYTMatch != nil) == (rhs.onFixYTMatch != nil) &&
+        (lhs.onRemoveFromPlaylist != nil) == (rhs.onRemoveFromPlaylist != nil)
+    }
     // WICHTIG: NICHT beobachten (kein @EnvironmentObject), sonst zeichnet das
     // offene Menue bei jedem Player-Tick neu (Flackern). Referenz nur lesen.
     private var app: AppState? { DiscoverServices.app }
@@ -364,12 +376,19 @@ struct TrackMenu: View {
 }
 
 // MARK: - Playlist-Kontextmenue (Long-Press + "…", geteilt)
-struct PlaylistMenu: View {
+struct PlaylistMenu: View, Equatable {
     let uri: String
     let name: String
     var isAlbum: Bool = false
     var onOpen: (() -> Void)? = nil
     var onDeleted: (() -> Void)? = nil
+    static func == (lhs: PlaylistMenu, rhs: PlaylistMenu) -> Bool {
+        lhs.uri == rhs.uri &&
+        lhs.name == rhs.name &&
+        lhs.isAlbum == rhs.isAlbum &&
+        (lhs.onOpen != nil) == (rhs.onOpen != nil) &&
+        (lhs.onDeleted != nil) == (rhs.onDeleted != nil)
+    }
     private var app: AppState? { DiscoverServices.app }
     private var isRadio: Bool { uri.hasPrefix("radio-name:") || uri.hasPrefix("radio-id:") || uri.hasPrefix("radio:") }
     private var isSpotifyPlaylist: Bool { uri.hasPrefix("spotify:playlist:") }
@@ -1985,7 +2004,7 @@ struct LibraryView: View {
                             NavigationLink(value: pl) {
                                 LibraryRow(pl: pl, subscribed: false, sync: nil)
                             }.buttonStyle(.plain)
-                            .contextMenu { PlaylistMenu(uri: pl.uri, name: pl.name, onDeleted: { Task { await load() } }) }
+                            .contextMenu { PlaylistMenu(uri: pl.uri, name: pl.name, onDeleted: { Task { await load() } }).equatable() }
                         }
                     } else if tab == "offline" {
                         if downloads.tracks.isEmpty {
@@ -2026,7 +2045,7 @@ struct LibraryView: View {
                             NavigationLink(value: pl) {
                                 LibraryRow(pl: pl, subscribed: subs.contains(pl.uri), sync: subSync[pl.uri])
                             }.buttonStyle(.plain)
-                            .contextMenu { PlaylistMenu(uri: pl.uri, name: pl.name) }
+                            .contextMenu { PlaylistMenu(uri: pl.uri, name: pl.name).equatable() }
                         }
                     }
                 }.padding(.top, 10).padding(.bottom, 130)
@@ -2534,7 +2553,7 @@ struct TrackListView: View {
                         }
                         Menu {
                             Button { showYouTubeShare = true } label: { Label("Playlist teilen", systemImage: "square.and.arrow.up") }
-                            PlaylistMenu(uri: uri, name: title, isAlbum: isAlbum, onDeleted: { dismiss() })
+                            PlaylistMenu(uri: uri, name: title, isAlbum: isAlbum, onDeleted: { dismiss() }).equatable()
                         } label: {
                             Image(systemName: "ellipsis").font(.title3).foregroundStyle(Theme.sub)
                                 .frame(width: 46, height: 46).contentShape(Rectangle())
@@ -3146,7 +3165,7 @@ struct NumberedTrackRow: View {
                     Image(systemName: "checkmark").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.accent)
                 }
                 Menu {
-                    TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }, onRemoveFromPlaylist: onRemoveFromPlaylist)
+                    TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }, onRemoveFromPlaylist: onRemoveFromPlaylist).equatable()
                 } label: {
                     Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
                         .frame(width: 46, height: 46).contentShape(Rectangle())
@@ -3156,7 +3175,7 @@ struct NumberedTrackRow: View {
             .background(playing ? Theme.accent.opacity(0.08) : .clear)
             .contentShape(Rectangle())
             .onTapGesture(perform: tap)
-            .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }, onRemoveFromPlaylist: onRemoveFromPlaylist) }
+            .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }, onRemoveFromPlaylist: onRemoveFromPlaylist).equatable() }
             .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum, showAddPlaylist: $showAddPlaylist, showSendUser: $showSendUser, showFixYT: $showFixYT)
     }
 }
@@ -3231,7 +3250,7 @@ struct TrackRow: View {
                     Image(systemName: "arrow.down.circle.fill").font(.system(size: 15)).foregroundStyle(Theme.accent.opacity(0.7))
                 }
                 Menu {
-                    TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true })
+                    TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }).equatable()
                 } label: {
                     Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
                         .frame(width: 46, height: 46).contentShape(Rectangle())
@@ -3240,7 +3259,7 @@ struct TrackRow: View {
         }.padding(.vertical, 9).padding(.horizontal)
             .contentShape(Rectangle())
             .onTapGesture(perform: tap)
-            .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }) }
+            .contextMenu { TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }).equatable() }
             .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum, showAddPlaylist: $showAddPlaylist, showSendUser: $showSendUser, showFixYT: $showFixYT)
     }
 }
@@ -3470,7 +3489,7 @@ struct PlayerView: View {
                                 .font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.text)
                                 .glassIconCircle(glass)
                         }
-                        Menu { if let t = p.current { TrackMenu(track: t, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }) } } label: {
+                        Menu { if let t = p.current { TrackMenu(track: t, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }).equatable() } } label: {
                             Image(systemName: "ellipsis").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
                                 .glassIconCircle(glass)
                         }.disabled(p.current == nil)
