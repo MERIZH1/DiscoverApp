@@ -2533,9 +2533,7 @@ struct TrackListView: View {
                                 .font(.title2).foregroundStyle(all ? Theme.accent : Theme.sub)
                         }
                         Menu {
-                            if !isAlbum {
-                                Button { showYouTubeShare = true } label: { Label("Playlist teilen", systemImage: "square.and.arrow.up") }
-                            }
+                            Button { showYouTubeShare = true } label: { Label("Playlist teilen", systemImage: "square.and.arrow.up") }
                             PlaylistMenu(uri: uri, name: title, isAlbum: isAlbum, onDeleted: { dismiss() })
                         } label: {
                             Image(systemName: "ellipsis").font(.title3).foregroundStyle(Theme.sub)
