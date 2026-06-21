@@ -2385,6 +2385,7 @@ struct TrackListView: View {
     @State private var selecting = false
     @State private var selected: Set<String> = []
     @State private var showMultiAdd = false
+    @State private var showYouTubeShare = false
     private var selectedTracks: [Track] { (tracks + recs).filter { selected.contains($0.uri) } }
     private func toggleSel(_ uri: String) {
         if selected.contains(uri) { selected.remove(uri) } else { selected.insert(uri) }
@@ -2532,6 +2533,9 @@ struct TrackListView: View {
                                 .font(.title2).foregroundStyle(all ? Theme.accent : Theme.sub)
                         }
                         Menu {
+                            if !isAlbum {
+                                Button { showYouTubeShare = true } label: { Label("Playlist teilen", systemImage: "square.and.arrow.up") }
+                            }
                             PlaylistMenu(uri: uri, name: title, isAlbum: isAlbum, onDeleted: { dismiss() })
                         } label: {
                             Image(systemName: "ellipsis").font(.title3).foregroundStyle(Theme.sub)
@@ -2659,6 +2663,9 @@ struct TrackListView: View {
         .sheet(isPresented: $showMultiAdd, onDismiss: { selecting = false; selected = [] }) {
             AddToPlaylistSheet(tracks: selectedTracks).environmentObject(app)
         }
+        .sheet(isPresented: $showYouTubeShare) {
+            YouTubePlaylistExportSheet(uri: uri, name: title).environmentObject(app)
+        }
         .overlay { if loading { LoadingView() } }
         .overlay(alignment: .bottom) {
             if !copyMsg.isEmpty {
@@ -2704,6 +2711,151 @@ struct TrackListView: View {
         }
         if let fresh = try? await app.api.recommendations(uri, nocache: true), !fresh.isEmpty {
             await MainActor.run { recs = fresh; app.cacheSet("recs_\(uri)", fresh) }
+        }
+    }
+}
+
+
+struct YouTubePlaylistExportSheet: View {
+    let uri: String
+    let name: String
+    @EnvironmentObject var app: AppState
+    @Environment(\.dismiss) private var dismiss
+    @State private var checking = true
+    @State private var connected = false
+    @State private var configured = true
+    @State private var authURL = ""
+    @State private var publicList = false
+    @State private var busy = false
+    @State private var message = ""
+    @State private var resultURL = ""
+    @State private var exported = 0
+    @State private var total = 0
+    @State private var missing = 0
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(spacing: 12) {
+                    Image(systemName: "play.rectangle.fill")
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundStyle(Color(hex6: 0xFF3B30))
+                        .frame(width: 44, height: 44)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Playlist teilen").font(.system(size: 20, weight: .bold)).foregroundStyle(Theme.text)
+                        Text(name).font(.system(size: 13)).foregroundStyle(Theme.sub).lineLimit(1)
+                    }
+                    Spacer()
+                }
+
+                Text("Erstellt eine nicht gelistete YouTube-Playlist mit gleicher Reihenfolge wie in Discover. Jeder mit Link kann sie oeffnen.")
+                    .font(.system(size: 14)).foregroundStyle(Theme.sub)
+
+                Toggle("Oeffentlich statt nicht gelistet", isOn: $publicList)
+                    .tint(Theme.accent)
+                    .disabled(busy)
+
+                if checking {
+                    HStack { ProgressView().tint(Theme.accent); Text("Pruefe YouTube-Verbindung...").foregroundStyle(Theme.sub) }
+                } else if !configured {
+                    Text("YouTube OAuth ist am Server noch nicht konfiguriert.")
+                        .font(.system(size: 14, weight: .semibold)).foregroundStyle(Color(hex6: 0xFF6B6B))
+                } else if !connected {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("YouTube muss einmal verbunden werden.")
+                            .font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.text)
+                        Button { openAuth() } label: {
+                            Label("Google-Login oeffnen", systemImage: "link")
+                                .font(.system(size: 16, weight: .semibold)).foregroundStyle(.black)
+                                .frame(maxWidth: .infinity).padding(.vertical, 13)
+                                .background(Theme.accent).clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        Button { copyAuth() } label: {
+                            Label("Login-Link kopieren", systemImage: "doc.on.doc")
+                                .font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.text)
+                                .frame(maxWidth: .infinity).padding(.vertical, 11)
+                                .background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
+                } else {
+                    Button { exportNow() } label: {
+                        HStack {
+                            if busy { ProgressView().tint(.black) }
+                            Text(busy ? "Erstelle Playlist..." : "YouTube-Playlist erstellen")
+                        }
+                        .font(.system(size: 16, weight: .semibold)).foregroundStyle(.black)
+                        .frame(maxWidth: .infinity).padding(.vertical, 13)
+                        .background(Theme.accent).clipShape(RoundedRectangle(cornerRadius: 8))
+                    }.disabled(busy)
+                }
+
+                if !resultURL.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Link kopiert").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.text)
+                        Text("\(exported)/\(total) Songs exportiert" + (missing > 0 ? ", \(missing) ohne Treffer" : ""))
+                            .font(.system(size: 13)).foregroundStyle(Theme.sub)
+                        Button { UIPasteboard.general.string = resultURL; app.flash("Link kopiert") } label: {
+                            Label("Nochmal kopieren", systemImage: "doc.on.doc")
+                        }.foregroundStyle(Theme.accent)
+                    }
+                }
+
+                if !message.isEmpty {
+                    Text(message).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.sub)
+                }
+                Spacer()
+            }
+            .padding()
+            .background(Theme.bg)
+            .navigationTitle("YouTube Export").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Fertig") { dismiss() }.foregroundStyle(Theme.accent) } }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .task { await loadStatus() }
+    }
+
+    private func loadStatus() async {
+        checking = true
+        let st = await app.api.youtubeOAuthStatus()
+        configured = st?.configured ?? false
+        connected = st?.connected ?? false
+        authURL = st?.auth_url ?? ""
+        checking = false
+    }
+    private func openAuth() {
+        guard let url = URL(string: authURL), !authURL.isEmpty else { return }
+        UIApplication.shared.open(url)
+    }
+    private func copyAuth() {
+        UIPasteboard.general.string = authURL
+        app.flash("Login-Link kopiert")
+    }
+    private func exportNow() {
+        busy = true; message = ""; resultURL = ""
+        Task {
+            guard let r = await app.api.exportPlaylistToYouTube(uri: uri, name: name, publicList: publicList) else {
+                busy = false; message = "Export fehlgeschlagen"; return
+            }
+            if r.needs_auth == true {
+                authURL = r.auth_url ?? authURL
+                connected = false
+                busy = false
+                message = "Bitte YouTube zuerst verbinden."
+                return
+            }
+            guard r.ok, let url = r.url else {
+                busy = false
+                message = r.error ?? "Export fehlgeschlagen"
+                return
+            }
+            resultURL = url
+            exported = r.exported ?? 0
+            total = r.total ?? 0
+            missing = r.missing?.count ?? 0
+            UIPasteboard.general.string = url
+            app.flash("YouTube-Link kopiert")
+            busy = false
         }
     }
 }

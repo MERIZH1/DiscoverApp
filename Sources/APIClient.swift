@@ -453,6 +453,21 @@ final class APIClient: ObservableObject {
         return (obj["ok"] as? Bool) ?? false
     }
 
+
+    func youtubeOAuthStatus() async -> YouTubeOAuthStatus? {
+        try? await get("/api/youtube/oauth/status")
+    }
+    func youtubeOAuthStart() async -> String? {
+        guard let d = try? await data("/api/youtube/oauth/start"),
+              let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return nil }
+        return obj["auth_url"] as? String
+    }
+    func exportPlaylistToYouTube(uri: String, name: String, publicList: Bool = false) async -> YouTubePlaylistExportResponse? {
+        let body: [String: Any] = ["uri": uri, "name": name, "public": publicList]
+        guard let d = try? await data("/api/playlist/export-youtube", method: "POST", json: body) else { return nil }
+        return try? JSONDecoder().decode(YouTubePlaylistExportResponse.self, from: d)
+    }
+
     /// Neue (leere) Spotify-Playlist anlegen -> uri.
     func createPlaylist(name: String) async -> String? {
         guard let d = try? await data("/api/playlist/create", method: "POST", json: ["name": name]),

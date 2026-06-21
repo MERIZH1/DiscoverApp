@@ -176,6 +176,27 @@ struct PlaylistTracksResponse: Codable {
     let tracks: [Track]
 }
 
+
+// MARK: - YouTube Playlist Export
+struct YouTubeOAuthStatus: Codable {
+    let connected: Bool?
+    let configured: Bool?
+    let auth_url: String?
+}
+struct YouTubePlaylistExportResponse: Codable {
+    let ok: Bool
+    let url: String?
+    let playlist_id: String?
+    let privacy: String?
+    let exported: Int?
+    let total: Int?
+    let missing: [String]?
+    let needs_auth: Bool?
+    let auth_url: String?
+    let configured: Bool?
+    let error: String?
+}
+
 // MARK: - Suche
 struct TopHit: Codable, Hashable {
     let type: String?
