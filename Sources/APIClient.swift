@@ -97,6 +97,12 @@ final class APIClient: ObservableObject {
         let path = slot.isEmpty ? "/api/app/versions" : "/api/app/versions?slot=\(slot)"
         return try await get(path)
     }
+    /// Pollt das OTA-Install-Signal: hat der iOS-Install-Daemon die IPA gezogen
+    /// (= "Installieren" getippt)? Genutzt, um die App danach per suspend() in den
+    /// Hintergrund (Homescreen) zu schicken.
+    func installSignal() async -> InstallSignal? {
+        try? await get("/api/app/install-started")
+    }
     /// Server-Ausfaelle (id = down-Zeitstempel) nach `since` -> fuer "war offline von X bis Y".
     func outages(since: Int) async -> [Outage] {
         let r: OutagesResponse? = try? await get("/api/outages?since=\(since)")
