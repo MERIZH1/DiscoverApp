@@ -5,6 +5,8 @@ struct ContentView: View {
     @StateObject private var updater = AppUpdater()
     @State private var booting = true
     @State private var showTailscaleWarning = false
+    @State private var tailscaleWarningDismissedThisActivation = false
+    @State private var tailscaleCheckTask: Task<Void, Never>?
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -19,8 +21,9 @@ struct ContentView: View {
                     MainView()
                 }
             }
-            if showTailscaleWarning, app.connected, !booting {
+            if showTailscaleWarning, !booting {
                 TailscaleWarningBanner {
+                    tailscaleWarningDismissedThisActivation = true
                     withAnimation(.snappy(duration: 0.18)) { showTailscaleWarning = false }
                 }
                 .padding(.horizontal, 12)
@@ -45,9 +48,7 @@ struct ContentView: View {
             }
             try? await Task.sleep(nanoseconds: 500_000_000)   // kurze Mindestanzeige
             withAnimation(.easeOut(duration: 0.4)) { booting = false }
-            if app.connected {
-                withAnimation(.snappy(duration: 0.22)) { showTailscaleWarning = true }
-            }
+            await checkGallienReachability()
             // Nach dem Start pruefen, ob eine neuere signierte Version bereitsteht.
             if app.connected { await updater.check(api: app.api) }
         }
@@ -55,12 +56,34 @@ struct ContentView: View {
             // Bei jedem Entsperren / Zurueck-in-den-Vordergrund erneut pruefen.
             // check() oeffnet bei einem neuen Build direkt Apples Installations-
             // Dialog (kein eigener Zwischen-Dialog mehr), pro Build nur einmal.
-            if phase == .active, app.connected, !booting {
-                withAnimation(.snappy(duration: 0.22)) { showTailscaleWarning = true }
-                Task { await updater.check(api: app.api) }
+            if phase == .active, !booting {
+                tailscaleWarningDismissedThisActivation = false
+                Task { await checkGallienReachability() }
+                if app.connected { Task { await updater.check(api: app.api) } }
+            } else if phase != .active {
+                tailscaleCheckTask?.cancel()
+                tailscaleCheckTask = nil
+                tailscaleWarningDismissedThisActivation = false
+                withAnimation(.snappy(duration: 0.16)) { showTailscaleWarning = false }
             }
         }
         .preferredColorScheme(.dark)
+    }
+
+    private func checkGallienReachability() async {
+        tailscaleCheckTask?.cancel()
+        let task = Task { @MainActor in
+            guard !booting, !tailscaleWarningDismissedThisActivation else { return }
+            let reachable = await app.api.ping()
+            guard !Task.isCancelled else { return }
+            if reachable {
+                withAnimation(.snappy(duration: 0.18)) { showTailscaleWarning = false }
+            } else if !tailscaleWarningDismissedThisActivation {
+                withAnimation(.snappy(duration: 0.22)) { showTailscaleWarning = true }
+            }
+        }
+        tailscaleCheckTask = task
+        await task.value
     }
 }
 
@@ -76,7 +99,7 @@ struct TailscaleWarningBanner: View {
                 .frame(width: 28, height: 28)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Tailscale prüfen")
+                Text("Gallien nicht erreichbar")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white)
                 Text("Wenn du nicht im Heim-WLAN bist, Tailscale einschalten.")
