@@ -101,7 +101,8 @@ final class APIClient: ObservableObject {
     /// (= "Installieren" getippt)? Genutzt, um die App danach per suspend() in den
     /// Hintergrund (Homescreen) zu schicken.
     func installSignal() async -> InstallSignal? {
-        try? await get("/api/app/install-started")
+        let r: InstallSignal? = try? await get("/api/app/install-started")
+        return r
     }
     /// Server-Ausfaelle (id = down-Zeitstempel) nach `since` -> fuer "war offline von X bis Y".
     func outages(since: Int) async -> [Outage] {

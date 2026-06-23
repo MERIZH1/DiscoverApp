@@ -90,7 +90,7 @@ final class AppUpdater: ObservableObject {
         // Install-Fortschritt am Homescreen-Icon. Bei "Abbrechen" kommt kein Download
         // -> kein suspend (Timeout nach 2 Min).
         Task { @MainActor in
-            guard let api = api else { UIApplication.shared.open(url); return }
+            guard let api = self.api else { UIApplication.shared.open(url); return }
             let baseTs = (await api.installSignal())?.ts ?? 0
             UIApplication.shared.open(url)
             let mySlot = (Bundle.main.object(forInfoDictionaryKey: "DiscoverOTASlot") as? String) ?? "1"
