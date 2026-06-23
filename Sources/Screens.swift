@@ -3355,9 +3355,6 @@ struct NowPlayingBar: View {
         }
     }
     private var sourceIcon: (name: String, color: Color) {
-        if player.streamCache == "file" && (player.source == "youtube" || player.source.isEmpty) {
-            return ("externaldrive.fill", Color(hex6: 0x1DB954))
-        }
         switch player.source {
         case "youtube":   return ("play.rectangle.fill", Color(hex6: 0xFF3B30))
         case "navidrome": return ("music.note.house.fill", Theme.accent)
@@ -3927,23 +3924,30 @@ struct SourceBadge: View {
     let source: String
     var cache: String = ""
     var body: some View {
+        // Quelle = Label + Punktfarbe. Nur Navidrome ist gruen; YouTube ist immer rot,
+        // auch wenn lokal gecacht — der Cache-Zustand steckt im "C" rechts daneben.
         let label: String
         let color: Color
-        if cache == "file" && (source == "youtube" || source.isEmpty) {
-            // Spielt gerade aus der lokal gespeicherten Datei -> Quelle = Server
-            label = "Gespeichert"; color = Color(hex6: 0x1DB954)
-        } else {
-            switch source {
-            case "youtube":   label = "YouTube";    color = Color(hex6: 0xFF3B30)
-            case "navidrome": label = "Bibliothek"; color = Theme.accent
-            case "podcast":   label = "Podcast";    color = Theme.sub
-            case "offline":   label = "Offline";    color = Color(hex6: 0x4A90E2)
-            default:          label = source.capitalized; color = Theme.sub
-            }
+        switch source {
+        case "youtube":   label = "YouTube";    color = Color(hex6: 0xFF3B30)
+        case "navidrome": label = "Bibliothek"; color = Theme.accent
+        case "podcast":   label = "Podcast";    color = Theme.sub
+        case "offline":   label = "Offline";    color = Color(hex6: 0x4A90E2)
+        default:          label = source.capitalized; color = Theme.sub
         }
+        // C-Indikator wie im Web: gruen = Navidrome (Mediathek), orange = YouTube
+        // temporaer gecacht (Link oder File), rot = live gestreamt (nichts gecacht).
+        let isStream = (source == "youtube" || source == "navidrome")
+        let cColor: Color
+        if source == "navidrome" { cColor = Theme.accent }
+        else if cache == "file" || cache == "url" { cColor = Color(hex6: 0xFF9F28) }
+        else { cColor = Color(hex6: 0xFF3B30) }
         return HStack(spacing: 6) {
             Circle().fill(color).frame(width: 7, height: 7)
             Text(label).font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.sub)
+            if isStream {
+                Text("C").font(.system(size: 10, weight: .heavy)).foregroundStyle(cColor)
+            }
         }
         .padding(.horizontal, 10).padding(.vertical, 5)
         .background(Theme.input).clipShape(Capsule())
