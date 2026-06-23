@@ -13,3 +13,7 @@ DerivedData/
 Payload/
 build/
 *.xcarchive
+
+# Codex-/Editor-Backups (nicht committen)
+_codex_backup_*/
+*.bak
