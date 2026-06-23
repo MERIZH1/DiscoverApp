@@ -947,6 +947,13 @@ final class PlayerController: ObservableObject {
             forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { [weak self, weak item] _ in
             Task { @MainActor in
                 guard let self, let item, self.player.currentItem === item else { return }
+                if self.isRadio {
+                    self.player.seek(to: .zero)
+                    self.player.play()
+                    self.isPlaying = true
+                    self.updateRate()
+                    return
+                }
                 self.next(auto: true)
             }
         }

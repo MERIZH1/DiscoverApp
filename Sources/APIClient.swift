@@ -536,12 +536,22 @@ final class APIClient: ObservableObject {
               let r = try? JSONDecoder().decode(YTCandidatesResponse.self, from: d) else { return [] }
         return r.candidates ?? []
     }
-    func ytSearch(_ query: String, uri: String?) async -> [YTCandidate] {
+    func ytSearch(_ query: String, uri: String?, manual: Bool = false) async -> [YTCandidate] {
         var path = "/api/yt/search?q=" + enc(query)
+        if manual { path += "&manual=1" }
         if let uri, !uri.isEmpty { path += "&spotify_uri=" + enc(uri) }
         guard let d = try? await data(path),
               let r = try? JSONDecoder().decode(YTSearchResponse.self, from: d) else { return [] }
         return r.results ?? []
+    }
+    @discardableResult
+    func ytAutoFix(_ t: Track) async -> Bool {
+        let body: [String: Any] = ["spotify_uri": t.uri, "name": t.name,
+                                   "artist": t.artist, "album": t.album ?? "",
+                                   "duration": Int(t.durationSec)]
+        guard let d = try? await data("/api/yt/autofix", method: "POST", json: body),
+              let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return false }
+        return (obj["ok"] as? Bool) ?? false
     }
     @discardableResult
     func ytOverride(uri: String, videoId: String) async -> Bool {

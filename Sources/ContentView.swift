@@ -4,10 +4,11 @@ struct ContentView: View {
     @StateObject private var app = AppState()
     @StateObject private var updater = AppUpdater()
     @State private var booting = true
+    @State private var showTailscaleWarning = false
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             Color.black.ignoresSafeArea()
             Group {
                 if !app.connected {
@@ -17,6 +18,15 @@ struct ContentView: View {
                 } else {
                     MainView()
                 }
+            }
+            if showTailscaleWarning, app.connected, !booting {
+                TailscaleWarningBanner {
+                    withAnimation(.snappy(duration: 0.18)) { showTailscaleWarning = false }
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .zIndex(8)
             }
             if booting { SplashView().transition(.opacity).zIndex(10) }
         }
@@ -35,6 +45,9 @@ struct ContentView: View {
             }
             try? await Task.sleep(nanoseconds: 500_000_000)   // kurze Mindestanzeige
             withAnimation(.easeOut(duration: 0.4)) { booting = false }
+            if app.connected {
+                withAnimation(.snappy(duration: 0.22)) { showTailscaleWarning = true }
+            }
             // Nach dem Start pruefen, ob eine neuere signierte Version bereitsteht.
             if app.connected { await updater.check(api: app.api) }
         }
@@ -43,10 +56,53 @@ struct ContentView: View {
             // check() oeffnet bei einem neuen Build direkt Apples Installations-
             // Dialog (kein eigener Zwischen-Dialog mehr), pro Build nur einmal.
             if phase == .active, app.connected, !booting {
+                withAnimation(.snappy(duration: 0.22)) { showTailscaleWarning = true }
                 Task { await updater.check(api: app.api) }
             }
         }
         .preferredColorScheme(.dark)
+    }
+}
+
+
+struct TailscaleWarningBanner: View {
+    let close: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "network.badge.shield.half.filled")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.green)
+                .frame(width: 28, height: 28)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Tailscale prüfen")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                Text("Wenn du nicht im Heim-WLAN bist, Tailscale einschalten.")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.72))
+                    .lineLimit(2)
+            }
+            Spacer(minLength: 8)
+            Button(action: close) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.82))
+                    .frame(width: 30, height: 30)
+                    .background(.white.opacity(0.10), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Tailscale Warnung schließen")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(.white.opacity(0.12), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.28), radius: 16, y: 8)
     }
 }
 

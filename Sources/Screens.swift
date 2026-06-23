@@ -267,6 +267,19 @@ struct TrackMenu: View, Equatable {
         Haptics.tap()
         Task { _ = await api.pushToProfile(p.id, track: track); app?.flash("Gesendet an \(p.name) ✓") }
     }
+    private func autoFixYTMatch() {
+        guard let app else { return }
+        Haptics.tap()
+        Task {
+            let ok = await app.api.ytAutoFix(track)
+            if ok {
+                if app.player.current?.uri == track.uri { app.player.reloadCurrent() }
+                app.flash("Match geändert ✓")
+            } else {
+                app.flash("Automatischer Fix fehlgeschlagen")
+            }
+        }
+    }
 
     var body: some View {
         // Quick-Actions als Icon-Reihe oben — alle drei sind Controls (ShareLink + Buttons)
@@ -314,7 +327,10 @@ struct TrackMenu: View, Equatable {
             } label: { Label("Gehe zu", systemImage: "arrow.forward.circle") }
         }
         if let onFix = onFixYTMatch {
-            Button { onFix() } label: { Label("YouTube-Match fixen", systemImage: "arrow.triangle.2.circlepath") }
+            Menu {
+                Button { autoFixYTMatch() } label: { Label("Automatisch fixen", systemImage: "wand.and.stars") }
+                Button { onFix() } label: { Label("Manuell fixen", systemImage: "magnifyingglass") }
+            } label: { Label("Match fixen", systemImage: "arrow.triangle.2.circlepath") }
         }
         Button { startRadio() } label: { Label("Song-Radio starten", systemImage: "dot.radiowaves.left.and.right") }
         if !track.isLocal, track.uri.hasPrefix("spotify:") {
@@ -635,7 +651,7 @@ struct YTMatchSheet: View {
         searchTask = Task {
             try? await Task.sleep(nanoseconds: 350_000_000)
             if Task.isCancelled { return }
-            let res = await app.api.ytSearch(q, uri: track.uri)
+            let res = await app.api.ytSearch(q, uri: track.uri, manual: true)
             if Task.isCancelled { return }
             cands = res; loading = false
         }
