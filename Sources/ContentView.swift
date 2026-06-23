@@ -93,39 +93,36 @@ struct TailscaleWarningBanner: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "network.badge.shield.half.filled")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.green)
-                .frame(width: 28, height: 28)
+            Image(systemName: "wifi.exclamationmark")
+                .font(.system(size: 19, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 26, height: 26)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Gallien nicht erreichbar")
-                    .font(.subheadline.weight(.semibold))
+                Text("Server nicht erreichbar")
+                    .font(.subheadline.weight(.bold))
                     .foregroundStyle(.white)
-                Text("Wenn du nicht im Heim-WLAN bist, Tailscale einschalten.")
+                Text("Discover erreicht den Server gerade nicht. Wenn du unterwegs bist, Tailscale einschalten.")
                     .font(.caption)
-                    .foregroundStyle(.white.opacity(0.72))
-                    .lineLimit(2)
+                    .foregroundStyle(.white.opacity(0.92))
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
             Button(action: close) {
                 Image(systemName: "xmark")
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.82))
+                    .foregroundStyle(.white)
                     .frame(width: 30, height: 30)
-                    .background(.white.opacity(0.10), in: Circle())
+                    .background(.white.opacity(0.20), in: Circle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Tailscale Warnung schließen")
+            .accessibilityLabel("Hinweis schliessen")
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(.white.opacity(0.12), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.28), radius: 16, y: 8)
+        .padding(.vertical, 11)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(hex6: 0xD32F2F))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 
