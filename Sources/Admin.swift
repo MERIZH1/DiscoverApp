@@ -174,6 +174,8 @@ struct AdminConsoleView: View {
     @AppStorage("alertYouTube") private var alertYouTube = true
     @State private var smartCache = SmartCacheConfig(min_listened_sec: 45, min_listened_pct: 0, min_play_count: 4, enabled: true)
     @State private var smartCacheLoaded = false
+    @State private var deezerEnabled = true
+    @State private var deezerLoaded = false
     @State private var serverConfig: ServerConfig?
     @State private var profiles: [Profile] = []
     @StateObject private var updater = AppUpdater()
@@ -391,6 +393,19 @@ struct AdminConsoleView: View {
                         }
                     }
 
+                    if deezerLoaded {
+                        SettingsGroup("DEEZER (DOWNLOADS)") {
+                            Toggle(isOn: Binding(get: { deezerEnabled }, set: { v in
+                                deezerEnabled = v
+                                Task { await app.api.setDeezerEnabled(v) }
+                            })) {
+                                Text("Deezer/Deemix aktiv").font(.system(size: 15)).foregroundStyle(Theme.text)
+                            }.tint(Theme.accent)
+                            Text("Aus = keine Deezer-Downloads/Fallbacks und keine \"ARL abgelaufen\"-Alerts. Songs laufen weiter ueber YouTube.")
+                                .font(.caption2).foregroundStyle(Theme.mute)
+                        }
+                    }
+
                     if let sc = serverConfig {
                         SettingsGroup("SERVER-KONFIG (Info)") {
                             cfgRow("Navidrome", sc.navidrome_url)
@@ -485,6 +500,7 @@ struct AdminConsoleView: View {
         tokens = await app.api.adminTokens()
         disks = await app.api.adminDisk()
         if let sc = await app.api.smartCacheConfig() { smartCache = sc; smartCacheLoaded = true }
+        if let dz = await app.api.deezerEnabled() { deezerEnabled = dz; deezerLoaded = true }
         serverConfig = await app.api.serverConfig()
         profiles = (try? await app.api.profiles()) ?? []
         await updater.check(api: app.api, prompt: false)

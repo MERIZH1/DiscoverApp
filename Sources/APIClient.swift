@@ -104,6 +104,16 @@ final class APIClient: ObservableObject {
         let r: InstallSignal? = try? await get("/api/app/install-started")
         return r
     }
+    /// Admin: Deezer/Deemix global an/aus (Server-Toggle).
+    func deezerEnabled() async -> Bool? {
+        struct R: Codable { let enabled: Bool }
+        let r: R? = try? await get("/api/admin/deezer-enabled")
+        return r?.enabled
+    }
+    @discardableResult
+    func setDeezerEnabled(_ on: Bool) async -> Bool {
+        (try? await data("/api/admin/deezer-enabled", method: "POST", json: ["enabled": on])) != nil
+    }
     /// Server-Ausfaelle (id = down-Zeitstempel) nach `since` -> fuer "war offline von X bis Y".
     func outages(since: Int) async -> [Outage] {
         let r: OutagesResponse? = try? await get("/api/outages?since=\(since)")
