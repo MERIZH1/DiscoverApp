@@ -176,6 +176,7 @@ struct AdminConsoleView: View {
     @State private var smartCacheLoaded = false
     @State private var deezerEnabled = true
     @State private var deezerLoaded = false
+    @State private var deezerSkips: [DeezerSkip] = []
     @State private var serverConfig: ServerConfig?
     @State private var profiles: [Profile] = []
     @StateObject private var updater = AppUpdater()
@@ -404,6 +405,22 @@ struct AdminConsoleView: View {
                             Text("Aus = keine Deezer-Downloads/Fallbacks und keine \"ARL abgelaufen\"-Alerts. Songs laufen weiter ueber YouTube.")
                                 .font(.caption2).foregroundStyle(Theme.mute)
                         }
+                        SettingsGroup("DEEZER-BEDARF (LOG)") {
+                            if deezerSkips.isEmpty {
+                                Text("Noch nichts — Deezer wurde seit dem Abschalten nicht gebraucht.")
+                                    .font(.caption).foregroundStyle(Theme.mute)
+                            } else {
+                                Text("\(deezerSkips.count)x waere Deezer gebraucht worden (neueste zuerst):")
+                                    .font(.caption2).foregroundStyle(Theme.mute)
+                                ForEach(deezerSkips.prefix(50)) { e in
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(e.songLine).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text)
+                                        Text(e.metaLine).font(.caption2).foregroundStyle(Theme.mute)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                            }
+                        }
                     }
 
                     if let sc = serverConfig {
@@ -501,6 +518,7 @@ struct AdminConsoleView: View {
         disks = await app.api.adminDisk()
         if let sc = await app.api.smartCacheConfig() { smartCache = sc; smartCacheLoaded = true }
         if let dz = await app.api.deezerEnabled() { deezerEnabled = dz; deezerLoaded = true }
+        deezerSkips = await app.api.deezerSkipLog()
         serverConfig = await app.api.serverConfig()
         profiles = (try? await app.api.profiles()) ?? []
         await updater.check(api: app.api, prompt: false)

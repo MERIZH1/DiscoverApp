@@ -114,6 +114,11 @@ final class APIClient: ObservableObject {
     func setDeezerEnabled(_ on: Bool) async -> Bool {
         (try? await data("/api/admin/deezer-enabled", method: "POST", json: ["enabled": on])) != nil
     }
+    /// Admin: Log wann Deezer gebraucht worden waere (obwohl aus).
+    func deezerSkipLog() async -> [DeezerSkip] {
+        let r: DeezerSkipResponse? = try? await get("/api/admin/deezer-skiplog")
+        return r?.entries ?? []
+    }
     /// Server-Ausfaelle (id = down-Zeitstempel) nach `since` -> fuer "war offline von X bis Y".
     func outages(since: Int) async -> [Outage] {
         let r: OutagesResponse? = try? await get("/api/outages?since=\(since)")

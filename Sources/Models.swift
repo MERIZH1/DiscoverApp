@@ -314,3 +314,18 @@ struct UserSettings: Codable {
     var prebuffer_count: Int?
     var smart_cache: SmartCache?
 }
+
+// MARK: - Deezer-Bedarfs-Log (wann waere Deezer gebraucht worden, obwohl aus)
+struct DeezerSkip: Codable, Identifiable {
+    let ts: Int
+    let name: String
+    let artist: String
+    let who: String
+    var id: String { "\(ts)-\(name)-\(who)" }
+    var songLine: String { artist.isEmpty ? name : "\(artist) - \(name)" }
+    var metaLine: String {
+        let f = DateFormatter(); f.dateFormat = "dd.MM. HH:mm"
+        return "\(f.string(from: Date(timeIntervalSince1970: TimeInterval(ts)))) · \(who)"
+    }
+}
+struct DeezerSkipResponse: Codable { let entries: [DeezerSkip] }
