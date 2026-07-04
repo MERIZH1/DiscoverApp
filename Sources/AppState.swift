@@ -24,6 +24,7 @@ final class AppState: ObservableObject {
     @Published var profile: Profile?
     @Published var connected = false
     @Published var allProfiles: [Profile] = []   // fuer "An Nutzer senden"
+    @Published var playlists: [Playlist] = []     // zentraler Cache -> Add-to-Playlist-Sheet ist nie leer
 
     /// Globaler Toast (Erfolg/Fehler von Aktionen) -> kein stilles Scheitern mehr.
     @Published var toast = ""
@@ -103,6 +104,15 @@ final class AppState: ObservableObject {
         cacheSet("lastProfile", p)   // fuer Offline-Start
         player.restoreLast()   // letzten Song in den Mini-Player laden
         sync.start()   // Cross-Device-Sync starten
+        Task { await self.loadPlaylists() }   // Playlists vorladen -> Add-to-Playlist-Sheet ist nie leer
+    }
+
+    /// Playlists zentral holen + cachen. Ueberschreibt den Cache nur bei ERFOLG
+    /// (nicht-leer), damit ein fehlgeschlagener/leerer Abruf die Liste nicht platt macht.
+    func loadPlaylists() async {
+        if let pls = try? await api.playlists(), !pls.isEmpty {
+            playlists = pls
+        }
     }
 
     /// Profil im laufenden Betrieb wechseln (Account-Menue).

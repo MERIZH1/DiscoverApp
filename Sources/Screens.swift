@@ -1893,13 +1893,12 @@ struct AddToPlaylistSheet: View {
     private var first: Track { tracks.first ?? Track(uri: "", name: "", artist: "", image: nil) }
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
-    @State private var playlists: [Playlist] = []
     @State private var filter = ""
     @State private var newName = ""
     @State private var showNew = false
     @State private var status = ""
     private var shown: [Playlist] {
-        let base = playlists.filter { $0.uri.hasPrefix("spotify:playlist:") }
+        let base = app.playlists.filter { $0.uri.hasPrefix("spotify:playlist:") }
         return filter.isEmpty ? base : base.filter { $0.name.localizedCaseInsensitiveContains(filter) }
     }
     var body: some View {
@@ -1959,7 +1958,7 @@ struct AddToPlaylistSheet: View {
                 }
             }
         }
-        .task { playlists = (try? await app.api.playlists()) ?? [] }
+        .task { await app.loadPlaylists() }
     }
     private func doAdd(_ uri: String, _ name: String) async {
         let ok: Bool
