@@ -1005,6 +1005,10 @@ final class PlayerController: ObservableObject {
         info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? playbackRate : 0.0
         info[MPNowPlayingInfoPropertyIsLiveStream] = live
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+        // Ohne expliziten playbackState bleibt der Zustand auf .unknown -> iOS
+        // wertet die App als "spielt nicht mehr" und raeumt die Now-Playing-Kachel
+        // (Lock-Screen/Control-Center) beim Pausieren viel zu frueh weg.
+        MPNowPlayingInfoCenter.default().playbackState = isPlaying ? .playing : .paused
         // Relative Server-Bild-URLs aufloesen (sonst kein Cover am Lock-Screen)
         if let a = art, !a.isEmpty,
            let u = URL(string: a.hasPrefix("http") ? a : ImageBase.url + (a.hasPrefix("/") ? a : "/" + a)) {
@@ -1030,6 +1034,8 @@ final class PlayerController: ObservableObject {
         var i = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
         i[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? playbackRate : 0.0
         MPNowPlayingInfoCenter.default().nowPlayingInfo = i
+        // Zustand mitfuehren -> Kachel bleibt bei Pause erhalten (siehe updateNowPlaying).
+        MPNowPlayingInfoCenter.default().playbackState = isPlaying ? .playing : .paused
     }
     private func setupRemoteCommands() {
         let c = MPRemoteCommandCenter.shared()
