@@ -3,7 +3,19 @@ import SwiftUI
 import UIKit
 import WebKit
 
-final class HubWebViewModel: NSObject, ObservableObject, WKNavigationDelegate, WKUIDelegate {
+private final class WeakScriptMessageHandler: NSObject, WKScriptMessageHandler {
+    weak var delegate: WKScriptMessageHandler?
+
+    init(delegate: WKScriptMessageHandler) {
+        self.delegate = delegate
+    }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        delegate?.userContentController(userContentController, didReceive: message)
+    }
+}
+
+final class HubWebViewModel: NSObject, ObservableObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
     @Published private(set) var isLoading = false
     @Published private(set) var canGoBack = false
     @Published private(set) var isOutsideHub = false
@@ -13,6 +25,8 @@ final class HubWebViewModel: NSObject, ObservableObject, WKNavigationDelegate, W
     var authenticationHandler: (() -> Void)?
     private(set) var baseURL = HubEndpoint.tailscale.baseURL
     private var hasLoaded = false
+    private var notificationBridge: WeakScriptMessageHandler?
+    private var shouldOpenControl = false
 
     override init() {
         let configuration = WKWebViewConfiguration()
@@ -23,6 +37,9 @@ final class HubWebViewModel: NSObject, ObservableObject, WKNavigationDelegate, W
 
         webView = WKWebView(frame: .zero, configuration: configuration)
         super.init()
+        let notificationBridge = WeakScriptMessageHandler(delegate: self)
+        self.notificationBridge = notificationBridge
+        webView.configuration.userContentController.add(notificationBridge, name: "gallienNotifications")
         webView.navigationDelegate = self
         webView.uiDelegate = self
         webView.allowsBackForwardNavigationGestures = true
@@ -71,6 +88,17 @@ final class HubWebViewModel: NSObject, ObservableObject, WKNavigationDelegate, W
         }
     }
 
+    func openControlCenter() {
+        shouldOpenControl = true
+        guard let current = webView.url,
+              current.host == baseURL.host,
+              current.port == baseURL.port else {
+            goHome()
+            return
+        }
+        presentPendingControlCenter()
+    }
+
     private func load(url: URL) {
         hasLoaded = true
         errorMessage = nil
@@ -106,6 +134,30 @@ final class HubWebViewModel: NSObject, ObservableObject, WKNavigationDelegate, W
         return "Die Seite konnte nicht geladen werden."
     }
 
+    private func presentPendingControlCenter() {
+        guard shouldOpenControl else { return }
+        let script = """
+        (() => {
+          if (!window.GallienHub) return false;
+          window.GallienHub.setView('control');
+          return true;
+        })()
+        """
+        webView.evaluateJavaScript(script) { [weak self] result, error in
+            if error == nil, result as? Bool == true {
+                self?.shouldOpenControl = false
+            }
+        }
+    }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        let expectedPort = baseURL.port ?? (baseURL.scheme == "https" ? 443 : 80)
+        guard message.name == "gallienNotifications",
+              message.frameInfo.securityOrigin.host == baseURL.host,
+              message.frameInfo.securityOrigin.port == expectedPort else { return }
+        HubNotificationCoordinator.shared.acceptBridgeMessage(message.body)
+    }
+
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         isLoading = true
         errorMessage = nil
@@ -115,6 +167,7 @@ final class HubWebViewModel: NSObject, ObservableObject, WKNavigationDelegate, W
         isLoading = false
         webView.scrollView.refreshControl?.endRefreshing()
         updateNavigationState(webView)
+        presentPendingControlCenter()
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {

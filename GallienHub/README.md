@@ -4,7 +4,13 @@ Native SwiftUI-Hülle für das Gallien Hub. Die App verwendet eine normale `WKWe
 
 ## Anmeldung
 
-Der zentrale Login wird in Apples sicherem System-Anmeldedialog geöffnet. Authentik kann dort Passkeys/Face ID und seine vorhandene SSO-Sitzung verwenden. Nach erfolgreicher Anmeldung erhält die App nur ein kurzlebiges Einmal-Ticket; das Passwort und der Passkey sind für die App niemals sichtbar.
+Der zentrale Login wird in Apples sicherem System-Anmeldedialog geöffnet. Dort werden Benutzername und Passwort eingegeben. Nach erfolgreicher Anmeldung erhält die App nur ein kurzlebiges Einmal-Ticket; das Passwort ist für die App niemals sichtbar. Die `WKWebView` verwendet einen dauerhaften Datenspeicher, damit Hub- und App-Sitzungen auch nach einem Neustart der App erhalten bleiben.
+
+## Lockscreen-Mitteilungen
+
+Die App meldet neue kritische Hinweise und Warnungen lokal auf dem Sperrbildschirm. Die Aktion „Im Kontrollzentrum öffnen“ springt direkt zur passenden Hub-Ansicht. Im Vordergrund übernimmt die Web-App die aktuellen Ereignisse; im Hintergrund bittet die App iOS regelmäßig um ein kurzes Aktualisierungsfenster. iOS bestimmt den genauen Zeitpunkt dieser Hintergrundprüfungen, daher sind sie nicht sekundengenau.
+
+Die Lösung benötigt keine Push-, Widget- oder Live-Activity-Erweiterung und bleibt dadurch mit einer sideloaded Signulous-App kompatibel. Beim ersten Start müssen Mitteilungen erlaubt werden.
 
 ## Adressen
 

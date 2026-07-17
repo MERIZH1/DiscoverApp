@@ -2,9 +2,11 @@ import AuthenticationServices
 import SwiftUI
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("gallienHub.endpoint") private var endpointValue = HubEndpoint.tailscale.rawValue
     @StateObject private var web = HubWebViewModel()
     @StateObject private var authentication = AuthenticationCoordinator()
+    @ObservedObject private var notifications = HubNotificationCoordinator.shared
     @State private var authenticationError: String?
 
     private var endpoint: HubEndpoint {
@@ -65,7 +67,27 @@ struct ContentView: View {
         }
         .onAppear {
             web.authenticationHandler = startAuthentication
+            let webModel = web
+            notifications.openControlHandler = { [weak webModel] in
+                webModel?.openControlCenter()
+            }
+            notifications.requestAuthorizationIfNeeded()
+            notifications.scheduleBackgroundRefresh()
             web.loadIfNeeded(endpoint)
+        }
+        .onDisappear {
+            notifications.openControlHandler = nil
+        }
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .active:
+                Task { await notifications.refreshFromServer() }
+            case .background:
+                notifications.scheduleBackgroundRefresh()
+                Task { await notifications.refreshFromServer() }
+            default:
+                break
+            }
         }
     }
 
