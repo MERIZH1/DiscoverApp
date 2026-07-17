@@ -1,0 +1,92 @@
+name: Gallien Hub IPA bauen
+
+on:
+  push:
+    branches: [ codex/gallien-hub-app ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    working-directory: GallienHub
+
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - name: Quellcode laden
+        uses: actions/checkout@v4
+
+      - name: Xcode auswählen
+        run: |
+          LATEST=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$LATEST" ]; then sudo xcode-select -s "$LATEST/Contents/Developer"; fi
+          xcodebuild -version
+
+      - name: Build-Werkzeuge installieren
+        run: brew install xcodegen librsvg
+
+      - name: App-Icon erzeugen
+        run: |
+          rsvg-convert \
+            --width 1024 \
+            --height 1024 \
+            Artwork/icon.svg \
+            --output Sources/Assets.xcassets/AppIcon.appiconset/icon-1024.png
+
+      - name: Projekt erzeugen
+        run: xcodegen generate
+
+      - name: Version setzen
+        run: |
+          VERSION="1.0.${{ github.run_number }}"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" Sources/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" Sources/Info.plist
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: App ohne Signatur archivieren
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project GallienHub.xcodeproj \
+            -scheme GallienHub \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$PWD/build/GallienHub.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            archive
+
+      - name: IPA verpacken
+        run: |
+          set -euo pipefail
+          APP="build/GallienHub.xcarchive/Products/Applications/GallienHub.app"
+          test -d "$APP"
+          rm -rf Payload GallienHub.ipa
+          mkdir Payload
+          cp -R "$APP" Payload/
+          zip -r -y GallienHub.ipa Payload >/dev/null
+          shasum -a 256 GallienHub.ipa > GallienHub.ipa.sha256
+          ls -lh GallienHub.ipa
+
+      - name: Build-Artefakt hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: GallienHub-IPA
+          path: |
+            GallienHub/GallienHub.ipa
+            GallienHub/GallienHub.ipa.sha256
+
+      - name: Separate Gallien-Hub-Release bereitstellen
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: gallien-hub-latest
+          name: Gallien Hub ${{ env.VERSION }}
+          prerelease: true
+          files: |
+            GallienHub/GallienHub.ipa
+            GallienHub/GallienHub.ipa.sha256
+
