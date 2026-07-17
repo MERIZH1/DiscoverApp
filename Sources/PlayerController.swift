@@ -50,6 +50,25 @@ final class ICYMetadataReader: NSObject, AVPlayerItemMetadataOutputPushDelegate 
 
 /// Nativer Player: Queue + AVPlayer + Lock-Screen. Spielt Tracks (ueber das
 /// Backend aufgeloest) und Live-Radio (direkte Stream-URL). Komplett nativ.
+/// Robuste Audio-Session-Aktivierung: Kategorie .playback + aktiv, mit einmaligem
+/// Retry. Direkt nach dem Resume aus langer Hintergrund-Suspendierung verweigert
+/// iOS die Aktivierung manchmal (eine andere App haelt noch die Session) -> ohne
+/// Retry laeuft die Timeline dann STUMM weiter ("kein Ton, Balken laeuft").
+enum AudioSessionManager {
+    static func activate() {
+        let s = AVAudioSession.sharedInstance()
+        do {
+            try s.setCategory(.playback, mode: .default, options: [])
+            try s.setActive(true)
+        } catch {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                try? s.setCategory(.playback, mode: .default, options: [])
+                try? s.setActive(true)
+            }
+        }
+    }
+}
+
 @MainActor
 final class PlayerController: ObservableObject {
     @Published private(set) var queue: [Track] = []          // physische Playback-Queue (ggf. geshuffelt)
@@ -165,9 +184,7 @@ final class PlayerController: ObservableObject {
 
     init(api: APIClient) {
         self.api = api
-        let s = AVAudioSession.sharedInstance()
-        try? s.setCategory(.playback, mode: .default)
-        try? s.setActive(true)
+        AudioSessionManager.activate()
         setupRemoteCommands()
         addTimeObserver()
     }
@@ -769,7 +786,7 @@ final class PlayerController: ObservableObject {
         loading = true; currentTime = 0; duration = track.durationSec; source = ""; streamCache = ""; metaDur = knownDuration(for: track)
         diag("play_load_start", "\(trackDiag(track)) prebuf=\(prebuf[track.uri] != nil) busy=\(prebufBusy.contains(track.uri))")
         player.volume = 1                                   // aktiver Track immer voll (Einblenden nur in der Ueberblende)
-        try? AVAudioSession.sharedInstance().setActive(true) // nach Stall/Track-Ende sicher reaktivieren -> kein stummer Folge-Song
+        AudioSessionManager.activate()                       // Kategorie+aktiv (mit Retry) -> auch nach Stunden Idle kein stummer Song
         updateNowPlaying(title: track.name, artist: track.artist, album: track.album,
                          dur: metaDur, art: track.image, live: false)
         cancelPrebuffers()

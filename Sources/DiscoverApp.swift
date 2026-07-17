@@ -34,9 +34,7 @@ struct DiscoverApp: App {
     init() {
         // Audio-Session SOFORT als .playback aktivieren -> echtes Background-
         // Audio + Lock-Screen-Wiedergabe (das, was der PWA fehlt).
-        let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playback, mode: .default, options: [])
-        try? session.setActive(true)
+        AudioSessionManager.activate()
     }
 
     var body: some Scene {
@@ -45,7 +43,7 @@ struct DiscoverApp: App {
         }
         .onChange(of: scenePhase) { phase in
             switch phase {
-            case .active:     HealthMonitor.shared.startForeground()
+            case .active:     AudioSessionManager.activate(); HealthMonitor.shared.startForeground()
             case .background: HealthMonitor.shared.stopForeground(); HealthMonitor.shared.scheduleBG()
             default:          break
             }
