@@ -190,7 +190,7 @@ final class PlayerController: ObservableObject {
     }
 
     private var ctxName = ""
-    private var ctxURI = ""
+    private(set) var ctxURI = ""   // aktuell laufender Playlist-/Album-Kontext (fuer "Zu Playlist"-Sortierung lesbar)
 
     private func diag(_ ev: String, _ info: String) {
         Task { await api.bgLog(ev, info) }

@@ -1899,7 +1899,15 @@ struct AddToPlaylistSheet: View {
     @State private var status = ""
     private var shown: [Playlist] {
         let base = app.playlists.filter { $0.uri.hasPrefix("spotify:playlist:") }
-        return filter.isEmpty ? base : base.filter { $0.name.localizedCaseInsensitiveContains(filter) }
+        let filtered = filter.isEmpty ? base : base.filter { $0.name.localizedCaseInsensitiveContains(filter) }
+        // Aktuell laufende Playlist ganz nach oben.
+        let cur = app.player.ctxURI
+        if !cur.isEmpty, let i = filtered.firstIndex(where: { $0.uri == cur }), i > 0 {
+            var r = filtered
+            r.insert(r.remove(at: i), at: 0)
+            return r
+        }
+        return filtered
     }
     var body: some View {
         NavigationStack {
@@ -1935,6 +1943,9 @@ struct AddToPlaylistSheet: View {
                                 HStack(spacing: 12) {
                                     Artwork(url: pl.image, size: 44, corner: 4)
                                     Text(pl.name).font(.system(size: 16)).foregroundStyle(Theme.text).lineLimit(1)
+                                    if pl.uri == app.player.ctxURI {
+                                        Text("· läuft").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.accent)
+                                    }
                                     Spacer()
                                 }.padding(.horizontal).padding(.vertical, 6).contentShape(Rectangle())
                             }.buttonStyle(.plain)
