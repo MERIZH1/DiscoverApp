@@ -19,6 +19,8 @@ Die Lösung benötigt keine Push-, Widget- oder Live-Activity-Erweiterung und bl
 
 Tailscale ist der Standard. Falls es nicht erreichbar ist, bietet die Fehleransicht den Heimnetz-Zugang an.
 
+Beim Start und bei jeder Rückkehr in den Vordergrund prüft die App über die Tailscale-HTTPS-Adresse, ob ein neuer signierter Build bereitsteht. Neue Builds öffnen einmalig direkt den iOS-Installationsdialog. Nach der Bestätigung erkennt der Server den IPA-Abruf und schickt die alte App auf den Homescreen, damit der Installationsfortschritt sichtbar ist.
+
 ## Build
 
 GitHub Actions erzeugt eine unsignierte `GallienHub.ipa`. Diese wird anschließend mit dem vorhandenen Signulous-Zertifikat und einem Profil für die Bundle-ID `com.gallien.hub` signiert.

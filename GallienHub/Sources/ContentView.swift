@@ -6,6 +6,7 @@ struct ContentView: View {
     @AppStorage("gallienHub.endpoint") private var endpointValue = HubEndpoint.tailscale.rawValue
     @StateObject private var web = HubWebViewModel()
     @StateObject private var authentication = AuthenticationCoordinator()
+    @StateObject private var updater = HubAppUpdater()
     @ObservedObject private var notifications = HubNotificationCoordinator.shared
     @State private var authenticationError: String?
 
@@ -74,6 +75,7 @@ struct ContentView: View {
             notifications.requestAuthorizationIfNeeded()
             notifications.scheduleBackgroundRefresh()
             web.loadIfNeeded(endpoint)
+            Task { await updater.checkForUpdate() }
         }
         .onDisappear {
             notifications.openControlHandler = nil
@@ -82,6 +84,7 @@ struct ContentView: View {
             switch phase {
             case .active:
                 Task { await notifications.refreshFromServer() }
+                Task { await updater.checkForUpdate() }
             case .background:
                 notifications.scheduleBackgroundRefresh()
                 Task { await notifications.refreshFromServer() }

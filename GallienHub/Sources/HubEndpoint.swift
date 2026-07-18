@@ -33,6 +33,14 @@ enum HubEndpoint: String, CaseIterable, Identifiable {
         URL(string: "https://gallien.tail24f6af.ts.net:8443/auth/mobile/start")!
     }
 
+    static var updateVersionURL: URL {
+        URL(string: "https://gallien.tail24f6af.ts.net:8443/download/version.json")!
+    }
+
+    static var installSignalURL: URL {
+        URL(string: "https://gallien.tail24f6af.ts.net:8443/download/install-started.json")!
+    }
+
     static func exchangeURL(for code: String) -> URL? {
         var parts = URLComponents(
             url: URL(string: "https://gallien.tail24f6af.ts.net:8443/auth/mobile/exchange")!,
