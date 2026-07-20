@@ -3,9 +3,9 @@ import SwiftUI
 struct ContentView: View {
     @ObservedObject var store: WhenBuffStore
     @ObservedObject private var notifications = WhenBuffNotificationCoordinator.shared
-    @State private var selectedDate = Date()
+    @State private var selectedDate = Calendar.current.startOfDay(for: Date())
 
-    static let dateFormatter: DateFormatter = {
+    static let dateTimeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "de_DE")
         formatter.dateFormat = "EEE, dd.MM.yyyy · HH:mm"
@@ -16,10 +16,27 @@ struct ContentView: View {
         NavigationStack {
             List {
                 Section {
-                    CalendarHeader(selectedDate: $selectedDate, lastUpdated: store.lastUpdated)
+                    WebsiteCalendar(
+                        selectedDate: $selectedDate,
+                        selectedFaction: Binding(
+                            get: { store.selectedFaction },
+                            set: { store.selectFaction($0) }
+                        ),
+                        buffs: factionBuffs
+                    )
+                }
+                .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                .listRowBackground(Color.clear)
+
+                Section {
+                    Label(notificationText, systemImage: notificationIcon)
+                        .foregroundStyle(notificationColor)
+                    Text("Gemeldet werden nur neue Buffs für den ausgewählten Server und die ausgewählte Fraktion.")
+                        .font(.caption)
+                        .foregroundStyle(WhenBuffPalette.muted)
                 } header: {
-                    Text("Kalender")
-                        .foregroundStyle(WhenBuffPalette.calendar)
+                    Text("Benachrichtigungen")
+                        .foregroundStyle(WhenBuffPalette.notification)
                 }
 
                 Section {
@@ -51,41 +68,13 @@ struct ContentView: View {
                     }
 
                     if let lastUpdated = store.lastUpdated {
-                        Text("Stand: \(Self.dateFormatter.string(from: lastUpdated))")
+                        Text("Letzte Serverabfrage: \(Self.dateTimeFormatter.string(from: lastUpdated))")
                             .font(.caption)
                             .foregroundStyle(WhenBuffPalette.muted)
                     }
                 } header: {
                     Text("Live-Server")
                         .foregroundStyle(WhenBuffPalette.server)
-                }
-
-                Section {
-                    if store.buffs.isEmpty {
-                        ContentUnavailableView(
-                            "Keine kommenden Buffs",
-                            systemImage: "bell.slash",
-                            description: Text("Neue Einträge erscheinen automatisch.")
-                        )
-                    } else {
-                        ForEach(store.buffs) { buff in
-                            BuffRow(buff: buff)
-                        }
-                    }
-                } header: {
-                    Text("Kommende Buffs")
-                        .foregroundStyle(WhenBuffPalette.buff)
-                }
-
-                Section {
-                    Label(notificationText, systemImage: notificationIcon)
-                        .foregroundStyle(notificationColor)
-                    Text("Der Server prüft whenbuff.com alle 5 Sekunden. Im Hintergrund bestimmt iOS, wann die App kurz aktualisieren darf.")
-                        .font(.caption)
-                        .foregroundStyle(WhenBuffPalette.muted)
-                } header: {
-                    Text("Benachrichtigungen")
-                        .foregroundStyle(WhenBuffPalette.notification)
                 }
             }
             .navigationTitle("WhenBuff")
@@ -95,6 +84,13 @@ struct ContentView: View {
             .background(WhenBuffPalette.background)
             .tint(WhenBuffPalette.calendar)
             .refreshable { await store.refresh() }
+        }
+    }
+
+    private var factionBuffs: [WhenBuffRecord] {
+        store.buffs.filter { buff in
+            let faction = buff.faction.lowercased()
+            return faction == store.selectedFaction || faction == "all" || faction == "both" || faction.isEmpty
         }
     }
 
@@ -115,48 +111,87 @@ struct ContentView: View {
     }
 }
 
-private struct CalendarHeader: View {
+private struct WebsiteCalendar: View {
     @Binding var selectedDate: Date
-    let lastUpdated: Date?
+    @Binding var selectedFaction: String
+    let buffs: [WhenBuffRecord]
+
+    private var selectedBuffs: [WhenBuffRecord] {
+        buffs.filter {
+            Calendar.current.isDate(
+                Date(timeIntervalSince1970: TimeInterval($0.scheduledAt)),
+                inSameDayAs: selectedDate
+            )
+        }
+        .sorted { $0.scheduledAt < $1.scheduledAt }
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                Image(systemName: "calendar.badge.clock")
-                    .font(.title2.weight(.bold))
-                    .foregroundStyle(WhenBuffPalette.calendar)
-                    .frame(width: 34, height: 34)
-                    .background(WhenBuffPalette.calendar.opacity(0.16), in: RoundedRectangle(cornerRadius: 10))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Buff-Kalender")
+        VStack(spacing: 12) {
+            NextBuffBanner(buffs: buffs)
+
+            Picker("Fraktion", selection: $selectedFaction) {
+                Label("Allianz", systemImage: "shield.fill").tag("alliance")
+                Label("Horde", systemImage: "flame.fill").tag("horde")
+            }
+            .pickerStyle(.segmented)
+            .accessibilityLabel("Fraktion auswählen")
+
+            HStack(spacing: 12) {
+                Button {
+                    moveDay(-1)
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .frame(width: 38, height: 38)
+                }
+                .buttonStyle(.bordered)
+
+                VStack(spacing: 2) {
+                    Text(Self.dateFormatter.string(from: selectedDate))
                         .font(.headline)
                         .foregroundStyle(.white)
-                    Text("Neue Einträge werden automatisch übernommen")
+                    Text(Self.weekdayFormatter.string(from: selectedDate))
                         .font(.caption)
                         .foregroundStyle(WhenBuffPalette.muted)
                 }
-                Spacer()
+                .frame(maxWidth: .infinity)
+
+                Button {
+                    moveDay(1)
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .frame(width: 38, height: 38)
+                }
+                .buttonStyle(.bordered)
             }
 
-            DatePicker(
-                "Datum auswählen",
-                selection: $selectedDate,
-                displayedComponents: .date
-            )
-            .datePickerStyle(.graphical)
-            .labelsHidden()
-            .tint(WhenBuffPalette.calendar)
-            .accessibilityLabel("Buff-Datum auswählen")
-
             HStack {
-                Label(Self.dateFormatter.string(from: selectedDate), systemImage: "calendar")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(WhenBuffPalette.date)
+                Label("Kalender", systemImage: "calendar")
+                    .font(.caption.bold())
+                    .foregroundStyle(WhenBuffPalette.calendar)
                 Spacer()
-                if let lastUpdated {
-                    Text("Stand \(ContentView.dateFormatter.string(from: lastUpdated))")
-                        .font(.caption2)
-                        .foregroundStyle(WhenBuffPalette.muted)
+                Label("24 Stunden", systemImage: "clock")
+                    .font(.caption)
+                    .foregroundStyle(WhenBuffPalette.muted)
+            }
+
+            VStack(spacing: 8) {
+                if selectedBuffs.isEmpty {
+                    VStack(spacing: 8) {
+                        Image(systemName: "calendar.badge.minus")
+                            .font(.title2)
+                            .foregroundStyle(WhenBuffPalette.muted)
+                        Text("Keine Buffs an diesem Tag")
+                            .font(.subheadline)
+                            .foregroundStyle(WhenBuffPalette.muted)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 24)
+                    .background(WhenBuffPalette.emptyCard, in: RoundedRectangle(cornerRadius: 10))
+                } else {
+                    ForEach(selectedBuffs) { buff in
+                        BuffCalendarCard(buff: buff)
+                    }
                 }
             }
         }
@@ -164,90 +199,140 @@ private struct CalendarHeader: View {
         .background(WhenBuffPalette.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(WhenBuffPalette.calendar.opacity(0.32), lineWidth: 1)
+                .stroke(WhenBuffPalette.calendar.opacity(0.28), lineWidth: 1)
         )
-        .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 8, trailing: 0))
-        .listRowBackground(Color.clear)
+    }
+
+    private func moveDay(_ amount: Int) {
+        if let date = Calendar.current.date(byAdding: .day, value: amount, to: selectedDate) {
+            selectedDate = date
+        }
     }
 
     private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "de_DE")
-        formatter.dateFormat = "EEEE, dd.MM.yyyy"
+        formatter.dateFormat = "dd. MMMM yyyy"
+        return formatter
+    }()
+
+    private static let weekdayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "de_DE")
+        formatter.dateFormat = "EEEE"
         return formatter
     }()
 }
 
-private struct BuffRow: View {
+private struct NextBuffBanner: View {
+    let buffs: [WhenBuffRecord]
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let nextBuff = buffs
+                .filter { $0.scheduledAt >= Int(context.date.timeIntervalSince1970) }
+                .min { $0.scheduledAt < $1.scheduledAt }
+
+            HStack(spacing: 12) {
+                Image(systemName: "bolt.fill")
+                    .font(.title2)
+                    .foregroundStyle(nextBuff.map { WhenBuffPalette.buffColor(for: $0.type) } ?? WhenBuffPalette.muted)
+                VStack(alignment: .leading, spacing: 2) {
+                    if let nextBuff {
+                        Text("Nächster Buff: \(nextBuff.type.whenBuffDisplayName)")
+                            .font(.subheadline.bold())
+                            .foregroundStyle(.white)
+                        Text("in \(Self.countdown(to: nextBuff.scheduledAt, now: context.date))")
+                            .font(.title3.monospacedDigit().bold())
+                            .foregroundStyle(WhenBuffPalette.buffColor(for: nextBuff.type))
+                    } else {
+                        Text("Kein kommender Buff bekannt")
+                            .font(.subheadline.bold())
+                            .foregroundStyle(WhenBuffPalette.muted)
+                    }
+                }
+                Spacer()
+            }
+            .padding(12)
+            .background(WhenBuffPalette.banner, in: RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
+    private static func countdown(to timestamp: Int, now: Date) -> String {
+        let remaining = max(0, timestamp - Int(now.timeIntervalSince1970))
+        let hours = remaining / 3600
+        let minutes = (remaining % 3600) / 60
+        let seconds = remaining % 60
+        return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+    }
+}
+
+private struct BuffCalendarCard: View {
     let buff: WhenBuffRecord
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Image(systemName: "bell.fill")
-                    .foregroundStyle(WhenBuffPalette.buff)
-                Text(buff.type.whenBuffDisplayName)
-                    .font(.headline)
-                    .foregroundStyle(WhenBuffPalette.buff)
-                Spacer()
-                Text(factionText)
-                    .font(.caption.bold())
-                    .foregroundStyle(factionColor)
+        HStack(spacing: 12) {
+            Image(systemName: buff.type.lowercased().contains("ony") ? "flame.fill" : "leaf.fill")
+                .font(.title3.bold())
+                .frame(width: 28)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(Self.timeFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(buff.scheduledAt))))
+                        .font(.headline.monospacedDigit())
+                    Text("–")
+                    Text(buff.type.whenBuffDisplayName)
+                        .font(.headline)
+                }
+                if !buff.guild.isEmpty {
+                    Label(buff.guild, systemImage: "person.3.fill")
+                        .font(.caption)
+                        .lineLimit(1)
+                }
+                if !buff.notes.isEmpty {
+                    Text(buff.notes)
+                        .font(.caption2)
+                        .lineLimit(2)
+                }
             }
-            Label(
-                ContentView.dateFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(buff.scheduledAt))),
-                systemImage: "clock.fill"
-            )
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(WhenBuffPalette.date)
-            if !buff.guild.isEmpty {
-                Label(buff.guild, systemImage: "person.3.fill")
-                    .font(.caption)
-                    .foregroundStyle(WhenBuffPalette.guild)
-            }
-            if !buff.notes.isEmpty {
-                Text(buff.notes)
-                    .font(.caption)
-                    .foregroundStyle(WhenBuffPalette.notes)
-            }
+            Spacer()
         }
-        .padding(.vertical, 4)
-        .listRowBackground(WhenBuffPalette.card)
+        .foregroundStyle(.white)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(WhenBuffPalette.buffColor(for: buff.type), in: RoundedRectangle(cornerRadius: 8))
+        .shadow(color: WhenBuffPalette.buffColor(for: buff.type).opacity(0.24), radius: 4, y: 2)
     }
 
-    private var factionText: String {
-        switch buff.faction.lowercased() {
-        case "alliance": return "Allianz"
-        case "horde": return "Horde"
-        default: return "Beide"
-        }
-    }
-
-    private var factionColor: Color {
-        switch buff.faction.lowercased() {
-        case "alliance": return WhenBuffPalette.alliance
-        case "horde": return WhenBuffPalette.horde
-        default: return WhenBuffPalette.both
-        }
-    }
+    private static let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "de_DE")
+        formatter.dateFormat = "HH:mm"
+        return formatter
+    }()
 }
 
 private enum WhenBuffPalette {
     static let background = Color(hex6: 0x0B1220)
     static let card = Color(hex6: 0x17253A)
+    static let banner = Color(hex6: 0x101C2E)
+    static let emptyCard = Color(hex6: 0x101C2E)
     static let muted = Color(hex6: 0xA8B6CC)
     static let calendar = Color(hex6: 0x5EEAD4)
     static let server = Color(hex6: 0x60A5FA)
     static let live = Color(hex6: 0x86EFAC)
     static let warning = Color(hex6: 0xFDBA74)
-    static let buff = Color(hex6: 0xFDE047)
-    static let date = Color(hex6: 0x67E8F9)
-    static let guild = Color(hex6: 0xF0ABFC)
-    static let notes = Color(hex6: 0xA7F3D0)
     static let notification = Color(hex6: 0xC4B5FD)
-    static let alliance = Color(hex6: 0x60A5FA)
-    static let horde = Color(hex6: 0xFB7185)
-    static let both = Color(hex6: 0xC084FC)
+    static let zg = Color(hex6: 0x32A866)
+    static let onyxia = Color(hex6: 0xD94A4A)
+    static let rend = Color(hex6: 0x9370DB)
+
+    static func buffColor(for type: String) -> Color {
+        let value = type.lowercased()
+        if value.contains("ony") { return onyxia }
+        if value.contains("zul") || value == "zg" { return zg }
+        if value.contains("rend") { return rend }
+        return calendar
+    }
 }
 
 extension Color {

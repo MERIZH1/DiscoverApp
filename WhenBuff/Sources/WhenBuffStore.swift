@@ -6,6 +6,7 @@ final class WhenBuffStore: ObservableObject {
     @Published private(set) var servers: [WhenBuffServer] = []
     @Published private(set) var buffs: [WhenBuffRecord] = []
     @Published private(set) var selectedServer: String
+    @Published private(set) var selectedFaction: String
     @Published private(set) var lastUpdated: Date?
     @Published private(set) var statusText = "Verbinde …"
     @Published private(set) var isRefreshing = false
@@ -14,6 +15,8 @@ final class WhenBuffStore: ObservableObject {
 
     init() {
         selectedServer = UserDefaults.standard.string(forKey: "whenBuff.selectedServer") ?? "SoulSeeker"
+        selectedFaction = UserDefaults.standard.string(forKey: "whenBuff.selectedFaction") ?? "alliance"
+        UserDefaults.standard.set(selectedFaction, forKey: "whenBuff.selectedFaction")
     }
 
     func activate() {
@@ -39,6 +42,13 @@ final class WhenBuffStore: ObservableObject {
         buffs = []
         statusText = "Server wird geladen …"
         Task { await refresh() }
+    }
+
+    func selectFaction(_ faction: String) {
+        guard faction == "alliance" || faction == "horde",
+              faction != selectedFaction else { return }
+        selectedFaction = faction
+        UserDefaults.standard.set(faction, forKey: "whenBuff.selectedFaction")
     }
 
     func refresh() async {

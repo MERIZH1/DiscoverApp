@@ -59,6 +59,7 @@ final class WhenBuffNotificationCoordinator: NSObject, ObservableObject, UNUserN
     func refreshSelectedServer() async -> Bool {
         let defaults = UserDefaults.standard
         let server = defaults.string(forKey: "whenBuff.selectedServer") ?? "SoulSeeker"
+        let selectedFaction = defaults.string(forKey: "whenBuff.selectedFaction") ?? "alliance"
         let cursorKey = "whenBuff.eventCursor.\(server)"
 
         do {
@@ -74,7 +75,7 @@ final class WhenBuffNotificationCoordinator: NSObject, ObservableObject, UNUserN
             let mayNotify = settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
 
             for event in envelope.events.sorted(by: { $0.scheduledAt < $1.scheduledAt }) {
-                if mayNotify {
+                if mayNotify, Self.matches(event.faction, selectedFaction: selectedFaction) {
                     await publish(event)
                 }
                 defaults.set(event.id, forKey: cursorKey)
@@ -86,6 +87,11 @@ final class WhenBuffNotificationCoordinator: NSObject, ObservableObject, UNUserN
         } catch {
             return false
         }
+    }
+
+    private static func matches(_ eventFaction: String, selectedFaction: String) -> Bool {
+        let value = eventFaction.lowercased()
+        return value == selectedFaction || value == "all" || value == "both" || value.isEmpty
     }
 
     private func publish(_ event: WhenBuffEvent) async {
