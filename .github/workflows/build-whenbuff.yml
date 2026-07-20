@@ -31,12 +31,8 @@ jobs:
       - name: App-Icon erzeugen
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --location \
-            https://cdn.wowclassicdb.com/icons/inv_misc_head_dragon_01.jpg \
-            --output /tmp/whenbuff-onyxia-icon.jpg
-          sips --setProperty format png --resampleHeightWidth 1024 1024 \
-            /tmp/whenbuff-onyxia-icon.jpg \
-            --out Sources/Assets.xcassets/WhenBuffIcon.appiconset/icon-1024.png
+          cp Artwork/onyxia-upscaled.png \
+            Sources/Assets.xcassets/WhenBuffIcon.appiconset/icon-1024.png
           test -s Sources/Assets.xcassets/WhenBuffIcon.appiconset/icon-1024.png
 
       - name: Originale WoW-Buff-Icons laden
