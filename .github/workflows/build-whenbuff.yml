@@ -1,0 +1,88 @@
+name: WhenBuff-IPAs bauen
+
+on:
+  push:
+    branches: [ codex/whenbuff-app ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    working-directory: WhenBuff
+
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - name: Quellcode laden
+        uses: actions/checkout@v4
+
+      - name: Xcode auswählen
+        run: |
+          LATEST=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$LATEST" ]; then sudo xcode-select -s "$LATEST/Contents/Developer"; fi
+          xcodebuild -version
+
+      - name: Build-Werkzeuge installieren
+        run: brew install xcodegen librsvg
+
+      - name: App-Icon erzeugen
+        run: |
+          rsvg-convert --width 1024 --height 1024 Artwork/icon.svg \
+            --output Sources/Assets.xcassets/AppIcon.appiconset/icon-1024.png
+
+      - name: Projekt erzeugen
+        run: xcodegen generate
+
+      - name: Version setzen
+        run: |
+          VERSION="1.0.${{ github.run_number }}"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" Sources/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" Sources/Info.plist
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: App ohne Signatur archivieren
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project WhenBuff.xcodeproj \
+            -scheme WhenBuff \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$PWD/build/WhenBuff.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            archive
+
+      - name: IPA verpacken
+        run: |
+          set -euo pipefail
+          APP="build/WhenBuff.xcarchive/Products/Applications/WhenBuff.app"
+          test -d "$APP"
+          rm -rf Payload WhenBuff.ipa
+          mkdir Payload
+          cp -R "$APP" Payload/
+          zip -r -y WhenBuff.ipa Payload >/dev/null
+          shasum -a 256 WhenBuff.ipa > WhenBuff.ipa.sha256
+          ls -lh WhenBuff.ipa
+
+      - name: Build-Artefakt hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: WhenBuff-IPA
+          path: |
+            WhenBuff/WhenBuff.ipa
+            WhenBuff/WhenBuff.ipa.sha256
+
+      - name: WhenBuff-Release bereitstellen
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: whenbuff-latest
+          name: WhenBuff ${{ env.VERSION }}
+          prerelease: true
+          files: |
+            WhenBuff/WhenBuff.ipa
+            WhenBuff/WhenBuff.ipa.sha256
