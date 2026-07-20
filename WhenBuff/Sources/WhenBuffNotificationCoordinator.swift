@@ -75,7 +75,8 @@ final class WhenBuffNotificationCoordinator: NSObject, ObservableObject, UNUserN
             let mayNotify = settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
 
             for event in envelope.events.sorted(by: { $0.scheduledAt < $1.scheduledAt }) {
-                if mayNotify, Self.matches(event.faction, selectedFaction: selectedFaction) {
+                let eventFaction = event.type.whenBuffFaction(reportedFaction: event.faction)
+                if mayNotify, Self.matches(eventFaction, selectedFaction: selectedFaction) {
                     await publish(event)
                 }
                 defaults.set(event.id, forKey: cursorKey)

@@ -23,6 +23,10 @@ struct WhenBuffRecord: Codable, Identifiable {
     let notes: String
 
     var id: String { key }
+
+    var whenBuffFaction: String {
+        type.whenBuffFaction(reportedFaction: faction)
+    }
 }
 
 struct WhenBuffBootstrap: Decodable {
@@ -56,5 +60,19 @@ extension String {
         case "rend": return "Rend-Buff"
         default: return self
         }
+    }
+
+    var whenBuffIconName: String {
+        let value = lowercased()
+        if value.contains("ony") { return "BuffOnyxia" }
+        if value.contains("rend") { return "BuffRend" }
+        return "BuffZulgurub"
+    }
+
+    func whenBuffFaction(reportedFaction: String) -> String {
+        if lowercased().contains("rend") {
+            return "horde"
+        }
+        return reportedFaction.lowercased()
     }
 }

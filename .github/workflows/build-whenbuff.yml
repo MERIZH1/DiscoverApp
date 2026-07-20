@@ -31,7 +31,20 @@ jobs:
       - name: App-Icon erzeugen
         run: |
           rsvg-convert --width 1024 --height 1024 Artwork/onyxia-icon.svg \
-            --output Sources/Assets.xcassets/AppIcon.appiconset/icon-1024.png
+            --output Sources/Assets.xcassets/WhenBuffIcon.appiconset/icon-1024.png
+
+      - name: Originale WoW-Buff-Icons laden
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            https://cdn.wowclassicdb.com/icons/inv_misc_head_dragon_01.jpg \
+            --output Sources/Assets.xcassets/BuffOnyxia.imageset/onyxia.jpg
+          curl --fail --silent --show-error --location \
+            https://cdn.wowclassicdb.com/icons/ability_creature_poison_05.jpg \
+            --output Sources/Assets.xcassets/BuffZulgurub.imageset/zulgurub.jpg
+          curl --fail --silent --show-error --location \
+            https://cdn.wowclassicdb.com/icons/spell_arcane_teleportorgrimmar.jpg \
+            --output Sources/Assets.xcassets/BuffRend.imageset/rend.jpg
 
       - name: Projekt erzeugen
         run: xcodegen generate

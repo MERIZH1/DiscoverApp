@@ -89,7 +89,7 @@ struct ContentView: View {
 
     private var factionBuffs: [WhenBuffRecord] {
         store.buffs.filter { buff in
-            let faction = buff.faction.lowercased()
+            let faction = buff.whenBuffFaction
             return faction == store.selectedFaction || faction == "all" || faction == "both" || faction.isEmpty
         }
     }
@@ -130,12 +130,7 @@ private struct WebsiteCalendar: View {
         VStack(spacing: 12) {
             NextBuffBanner(buffs: buffs)
 
-            Picker("Fraktion", selection: $selectedFaction) {
-                Label("Allianz", systemImage: "shield.fill").tag("alliance")
-                Label("Horde", systemImage: "flame.fill").tag("horde")
-            }
-            .pickerStyle(.segmented)
-            .accessibilityLabel("Fraktion auswählen")
+            FactionSelector(selectedFaction: $selectedFaction)
 
             HStack(spacing: 12) {
                 Button {
@@ -224,6 +219,57 @@ private struct WebsiteCalendar: View {
     }()
 }
 
+private struct FactionSelector: View {
+    @Binding var selectedFaction: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            factionButton(
+                value: "alliance",
+                title: "Allianz",
+                symbol: "shield.fill",
+                color: WhenBuffPalette.alliance
+            )
+            factionButton(
+                value: "horde",
+                title: "Horde",
+                symbol: "flame.fill",
+                color: WhenBuffPalette.horde
+            )
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Fraktion auswählen")
+    }
+
+    private func factionButton(
+        value: String,
+        title: String,
+        symbol: String,
+        color: Color
+    ) -> some View {
+        let isSelected = selectedFaction == value
+        return Button {
+            selectedFaction = value
+        } label: {
+            Label(title, systemImage: symbol)
+                .font(.subheadline.bold())
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .foregroundStyle(isSelected ? Color.white : WhenBuffPalette.muted)
+                .background(
+                    isSelected ? color : WhenBuffPalette.emptyCard,
+                    in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .stroke(isSelected ? color : WhenBuffPalette.muted.opacity(0.35), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
 private struct NextBuffBanner: View {
     let buffs: [WhenBuffRecord]
 
@@ -234,9 +280,14 @@ private struct NextBuffBanner: View {
                 .min { $0.scheduledAt < $1.scheduledAt }
 
             HStack(spacing: 12) {
-                Image(systemName: "bolt.fill")
-                    .font(.title2)
-                    .foregroundStyle(nextBuff.map { WhenBuffPalette.buffColor(for: $0.type) } ?? WhenBuffPalette.muted)
+                if let nextBuff {
+                    BuffIcon(type: nextBuff.type, size: 36)
+                } else {
+                    Image(systemName: "bolt.fill")
+                        .font(.title2)
+                        .foregroundStyle(WhenBuffPalette.muted)
+                        .frame(width: 36, height: 36)
+                }
                 VStack(alignment: .leading, spacing: 2) {
                     if let nextBuff {
                         Text("Nächster Buff: \(nextBuff.type.whenBuffDisplayName)")
@@ -272,9 +323,7 @@ private struct BuffCalendarCard: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: buff.type.lowercased().contains("ony") ? "flame.fill" : "leaf.fill")
-                .font(.title3.bold())
-                .frame(width: 28)
+            BuffIcon(type: buff.type, size: 38)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(Self.timeFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(buff.scheduledAt))))
@@ -311,6 +360,26 @@ private struct BuffCalendarCard: View {
     }()
 }
 
+private struct BuffIcon: View {
+    let type: String
+    let size: CGFloat
+
+    var body: some View {
+        Image(type.whenBuffIconName)
+            .resizable()
+            .interpolation(.none)
+            .scaledToFill()
+            .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: max(5, size * 0.16), style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: max(5, size * 0.16), style: .continuous)
+                    .stroke(Color.white.opacity(0.58), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.32), radius: 2, y: 1)
+            .accessibilityHidden(true)
+    }
+}
+
 private enum WhenBuffPalette {
     static let background = Color(hex6: 0x0B1220)
     static let card = Color(hex6: 0x17253A)
@@ -322,6 +391,8 @@ private enum WhenBuffPalette {
     static let live = Color(hex6: 0x86EFAC)
     static let warning = Color(hex6: 0xFDBA74)
     static let notification = Color(hex6: 0xC4B5FD)
+    static let alliance = Color(hex6: 0x2563EB)
+    static let horde = Color(hex6: 0xB91C1C)
     static let zg = Color(hex6: 0x32A866)
     static let onyxia = Color(hex6: 0xD94A4A)
     static let rend = Color(hex6: 0x9370DB)
