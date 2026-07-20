@@ -14,6 +14,7 @@ enum WhenBuffAPIError: LocalizedError {
 
 enum WhenBuffAPI {
     private static let baseURLs = [
+        URL(string: "https://gallien.tail24f6af.ts.net:8443/whenbuff")!,
         URL(string: "http://192.168.2.14:1112")!,
         URL(string: "http://100.112.51.72:1112")!,
     ]

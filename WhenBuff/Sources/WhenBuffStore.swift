@@ -15,7 +15,9 @@ final class WhenBuffStore: ObservableObject {
 
     init() {
         selectedServer = UserDefaults.standard.string(forKey: "whenBuff.selectedServer") ?? "SoulSeeker"
-        selectedFaction = UserDefaults.standard.string(forKey: "whenBuff.selectedFaction") ?? "alliance"
+        selectedFaction = UserDefaults.standard.string(forKey: "whenBuff.selectedFaction") == "horde"
+            ? "horde"
+            : "alliance"
         UserDefaults.standard.set(selectedFaction, forKey: "whenBuff.selectedFaction")
     }
 
