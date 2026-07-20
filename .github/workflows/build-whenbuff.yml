@@ -31,9 +31,20 @@ jobs:
       - name: App-Icon erzeugen
         run: |
           set -euo pipefail
+          ICON_DIR="Sources/Assets.xcassets/WhenBuffIcon.appiconset"
+          sips --resampleHeightWidth 120 120 Artwork/onyxia-upscaled.png \
+            --out "$ICON_DIR/icon-120.png"
+          sips --resampleHeightWidth 180 180 Artwork/onyxia-upscaled.png \
+            --out "$ICON_DIR/icon-180.png"
+          sips --resampleHeightWidth 76 76 Artwork/onyxia-upscaled.png \
+            --out "$ICON_DIR/icon-76.png"
+          sips --resampleHeightWidth 152 152 Artwork/onyxia-upscaled.png \
+            --out "$ICON_DIR/icon-152.png"
+          sips --resampleHeightWidth 167 167 Artwork/onyxia-upscaled.png \
+            --out "$ICON_DIR/icon-167.png"
           sips --resampleHeightWidth 1024 1024 Artwork/onyxia-upscaled.png \
-            --out Sources/Assets.xcassets/WhenBuffIcon.appiconset/icon-1024.png
-          test -s Sources/Assets.xcassets/WhenBuffIcon.appiconset/icon-1024.png
+            --out "$ICON_DIR/icon-1024.png"
+          for icon in "$ICON_DIR"/*.png; do test -s "$icon"; done
 
       - name: Originale WoW-Buff-Icons laden
         run: |
