@@ -30,7 +30,7 @@ jobs:
 
       - name: App-Icon erzeugen
         run: |
-          rsvg-convert --width 1024 --height 1024 Artwork/icon.svg \
+          rsvg-convert --width 1024 --height 1024 Artwork/onyxia-icon.svg \
             --output Sources/Assets.xcassets/AppIcon.appiconset/icon-1024.png
 
       - name: Projekt erzeugen
