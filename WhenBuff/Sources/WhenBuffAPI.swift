@@ -40,9 +40,36 @@ enum WhenBuffAPI {
         )
     }
 
+    static func notificationProfile(channel: String) async throws -> WhenBuffNotificationProfile {
+        try await fetch(
+            "api/v1/notification-profile",
+            query: [URLQueryItem(name: "channel", value: channel)]
+        )
+    }
+
+    static func updateNotificationProfile(
+        channel: String,
+        server: String,
+        faction: String
+    ) async throws -> WhenBuffNotificationProfile {
+        let body = try JSONSerialization.data(withJSONObject: [
+            "channel": channel,
+            "server": server,
+            "faction": faction,
+        ])
+        return try await fetch(
+            "api/v1/notification-profile",
+            query: [],
+            method: "PUT",
+            body: body
+        )
+    }
+
     private static func fetch<T: Decodable>(
         _ path: String,
-        query: [URLQueryItem]
+        query: [URLQueryItem],
+        method: String = "GET",
+        body: Data? = nil
     ) async throws -> T {
         var reachedServer = false
         for baseURL in baseURLs {
@@ -60,6 +87,11 @@ enum WhenBuffAPI {
             )
             request.setValue("application/json", forHTTPHeaderField: "Accept")
             request.setValue("WhenBuff-iOS/1.0", forHTTPHeaderField: "User-Agent")
+            request.httpMethod = method
+            request.httpBody = body
+            if body != nil {
+                request.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
+            }
 
             do {
                 let (data, response) = try await URLSession.shared.data(for: request)

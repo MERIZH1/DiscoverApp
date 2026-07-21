@@ -9,6 +9,8 @@ final class WhenBuffStore: ObservableObject {
     @Published private(set) var selectedFaction: String
     @Published private(set) var lastUpdated: Date?
     @Published private(set) var statusText = "Verbinde …"
+    @Published private(set) var notificationProfile: WhenBuffNotificationProfile?
+    @Published private(set) var notificationStatusText = "ntfy-Profil wird geladen …"
     @Published private(set) var isRefreshing = false
 
     private var pollingTask: Task<Void, Never>?
@@ -34,7 +36,6 @@ final class WhenBuffStore: ObservableObject {
     func deactivate() {
         pollingTask?.cancel()
         pollingTask = nil
-        WhenBuffNotificationCoordinator.shared.scheduleBackgroundRefresh()
     }
 
     func selectServer(_ server: String) {
@@ -51,6 +52,7 @@ final class WhenBuffStore: ObservableObject {
               faction != selectedFaction else { return }
         selectedFaction = faction
         UserDefaults.standard.set(faction, forKey: "whenBuff.selectedFaction")
+        Task { await syncNotificationProfile(force: true) }
     }
 
     func refresh() async {
@@ -69,13 +71,37 @@ final class WhenBuffStore: ObservableObject {
                 }
             }
 
-            _ = await WhenBuffNotificationCoordinator.shared.refreshSelectedServer()
+            await syncNotificationProfile()
             let bootstrap = try await WhenBuffAPI.bootstrap(server: selectedServer)
             buffs = bootstrap.buffs.sorted { $0.scheduledAt < $1.scheduledAt }
             lastUpdated = Date(timeIntervalSince1970: TimeInterval(bootstrap.generatedAt))
             statusText = "Live · Prüfung alle 5 Sekunden"
         } catch {
             statusText = error.localizedDescription
+        }
+    }
+
+    private func syncNotificationProfile(force: Bool = false) async {
+        do {
+            if notificationProfile == nil {
+                notificationProfile = try await WhenBuffAPI.notificationProfile(
+                    channel: WhenBuffInstallation.channel
+                )
+            }
+            guard force
+                    || notificationProfile?.server != selectedServer
+                    || notificationProfile?.faction != selectedFaction else {
+                notificationStatusText = "ntfy-Profil ist synchronisiert"
+                return
+            }
+            notificationProfile = try await WhenBuffAPI.updateNotificationProfile(
+                channel: WhenBuffInstallation.channel,
+                server: selectedServer,
+                faction: selectedFaction
+            )
+            notificationStatusText = "ntfy-Profil ist synchronisiert"
+        } catch {
+            notificationStatusText = "ntfy-Profil konnte nicht synchronisiert werden"
         }
     }
 }

@@ -1,9 +1,10 @@
 import SwiftUI
+import UIKit
 
 struct ContentView: View {
     @ObservedObject var store: WhenBuffStore
-    @ObservedObject private var notifications = WhenBuffNotificationCoordinator.shared
     @State private var selectedDate = Calendar.current.startOfDay(for: Date())
+    @State private var copiedNtfySetup = false
 
     static let dateTimeFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -29,13 +30,52 @@ struct ContentView: View {
                 .listRowBackground(Color.clear)
 
                 Section {
-                    Label(notificationText, systemImage: notificationIcon)
-                        .foregroundStyle(notificationColor)
-                    Text("Gemeldet werden nur neue Buffs für den ausgewählten Server und die ausgewählte Fraktion.")
+                    Label("Push-Nachrichten werden ausschließlich von ntfy gesendet.", systemImage: "paperplane.fill")
+                        .foregroundStyle(WhenBuffPalette.notification)
+
+                    if let profile = store.notificationProfile {
+                        LabeledContent("Profil", value: profile.displayName)
+                        LabeledContent("Auswahl", value: "\(profile.server) · \(factionName(profile.faction))")
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("ntfy-Server")
+                                .font(.caption)
+                                .foregroundStyle(WhenBuffPalette.muted)
+                            Text(profile.ntfyBaseURL)
+                                .font(.caption.monospaced())
+                                .textSelection(.enabled)
+                            Text("Persönliches Thema")
+                                .font(.caption)
+                                .foregroundStyle(WhenBuffPalette.muted)
+                                .padding(.top, 4)
+                            Text(profile.topic)
+                                .font(.caption.monospaced())
+                                .textSelection(.enabled)
+                        }
+
+                        Button {
+                            UIPasteboard.general.string = "Server: \(profile.ntfyBaseURL)\nThema: \(profile.topic)"
+                            copiedNtfySetup = true
+                        } label: {
+                            Label(
+                                copiedNtfySetup ? "ntfy-Daten kopiert" : "ntfy-Daten kopieren",
+                                systemImage: copiedNtfySetup ? "checkmark.circle.fill" : "doc.on.doc"
+                            )
+                        }
+                    }
+
+                    Text(store.notificationStatusText)
+                        .font(.caption)
+                        .foregroundStyle(
+                            store.notificationStatusText.contains("nicht")
+                                ? WhenBuffPalette.warning
+                                : WhenBuffPalette.live
+                        )
+                    Text("Gemeldet werden nur neu eingetragene Buffs für die oben ausgewählte Kombination aus Server und Fraktion.")
                         .font(.caption)
                         .foregroundStyle(WhenBuffPalette.muted)
                 } header: {
-                    Text("Benachrichtigungen")
+                    Text("ntfy-Benachrichtigungen")
                         .foregroundStyle(WhenBuffPalette.notification)
                 }
 
@@ -94,20 +134,8 @@ struct ContentView: View {
         }
     }
 
-    private var notificationText: String {
-        switch notifications.authorizationStatus {
-        case .authorized, .provisional: return "Benachrichtigungen sind aktiv"
-        case .denied: return "Benachrichtigungen sind in iOS deaktiviert"
-        default: return "Benachrichtigungen werden eingerichtet"
-        }
-    }
-
-    private var notificationIcon: String {
-        notifications.authorizationStatus == .denied ? "bell.slash.fill" : "bell.badge.fill"
-    }
-
-    private var notificationColor: Color {
-        notifications.authorizationStatus == .denied ? WhenBuffPalette.warning : WhenBuffPalette.notification
+    private func factionName(_ faction: String) -> String {
+        faction == "horde" ? "Horde" : "Allianz"
     }
 }
 

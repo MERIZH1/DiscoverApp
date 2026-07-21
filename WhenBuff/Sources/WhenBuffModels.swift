@@ -52,6 +52,24 @@ struct WhenBuffEventEnvelope: Decodable {
     let latestEventId: Int
 }
 
+struct WhenBuffNotificationProfile: Decodable {
+    let channel: String
+    let displayName: String
+    let topic: String
+    let server: String
+    let faction: String
+    let ntfyBaseURL: String
+    let subscriptionURL: String
+    let updatedAt: Int
+}
+
+enum WhenBuffInstallation {
+    static var channel: String {
+        let value = (Bundle.main.infoDictionary?["WhenBuffChannel"] as? String ?? "max").lowercased()
+        return value == "julia" ? "julia" : "max"
+    }
+}
+
 extension String {
     var whenBuffDisplayName: String {
         switch lowercased() {
