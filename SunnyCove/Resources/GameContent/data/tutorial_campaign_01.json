@@ -1,0 +1,132 @@
+{
+  "schemaVersion": "1.0.0",
+  "generated": "2026-07-21",
+  "id": "tutorial_campaign_01",
+  "resumable": true,
+  "interruptible": true,
+  "resumeField": "tutorial.currentStep",
+  "note": "Vollständig geführtes Onboarding. Während das Tutorial aktiv ist, sind nur die je Schritt in 'allowedActions' genannten Aktionen zulässig; alle anderen UI-Elemente sind gesperrt. Fortschritt (currentStep + completedSteps) liegt im Spielstand und ist nach App-Neustart fortsetzbar; jeder Schritt ist idempotent und über seine completion-Bedingung erneut prüfbar.",
+  "steps": [
+    {
+      "id": "tut_01",
+      "trigger": "campaign_start",
+      "precondition": null,
+      "character": "gull",
+      "portrait": "characters/char_gull_happy.svg",
+      "text": "Na endlich zurück, Marina! Der Sturm hat Omas Strandbar ganz schön zugerichtet. Keine Sorge – zusammen kriegen wir das wieder hin. Lass mich dir zeigen, wie.",
+      "highlightUI": { "type": "none" },
+      "allowedActions": ["tap_continue"],
+      "completion": { "type": "dialog_dismissed" }
+    },
+    {
+      "id": "tut_02",
+      "trigger": "after:tut_01",
+      "precondition": "tutorial.currentStep == 'tut_02'",
+      "character": "kai",
+      "portrait": "characters/char_kai_pointing.svg",
+      "text": "Alles beginnt am Strand. Tipp die angeschwemmte Strandkiste an – sie spuckt Fundstücke aus.",
+      "highlightUI": { "type": "generator", "ref": "gen1_beach_crate" },
+      "allowedActions": ["tap_generator:gen1_beach_crate"],
+      "completion": { "type": "item_produced", "generator": "gen1_beach_crate" }
+    },
+    {
+      "id": "tut_03",
+      "trigger": "after:tut_02",
+      "precondition": "tutorial.currentStep == 'tut_03'",
+      "character": "marina",
+      "portrait": "characters/char_marina_friendly.svg",
+      "text": "Zwei gleiche Fundstücke ergeben ein besseres. Schieb zwei Muschelsplitter aufeinander!",
+      "highlightUI": { "type": "board_items", "chain": "chain_beach", "stage": 1 },
+      "allowedActions": ["drag_merge"],
+      "completion": { "type": "merge_completed", "chain": "chain_beach", "toStage": 2 }
+    },
+    {
+      "id": "tut_04",
+      "trigger": "after:tut_03",
+      "precondition": "tutorial.currentStep == 'tut_04'",
+      "character": "gull",
+      "portrait": "characters/char_gull_neutral.svg",
+      "text": "Jeder Kisten-Tipp kostet ein bisschen Energie – oben in der Leiste. Energie füllt sich mit der Zeit von selbst wieder auf. Also immer schön dosieren!",
+      "highlightUI": { "type": "topbar_region", "ref": "energy" },
+      "allowedActions": ["tap_continue"],
+      "completion": { "type": "dialog_dismissed" }
+    },
+    {
+      "id": "tut_05",
+      "trigger": "after:tut_04",
+      "precondition": "tutorial.currentStep == 'tut_05'",
+      "character": "kai",
+      "portrait": "characters/char_kai_friendly.svg",
+      "text": "Für den ersten Auftrag brauchen wir zwei kleine Muscheln. Tipp die Kiste weiter an und merge, bis du zwei hast.",
+      "highlightUI": { "type": "generator", "ref": "gen1_beach_crate" },
+      "allowedActions": ["tap_generator:gen1_beach_crate", "drag_merge"],
+      "completion": { "type": "inventory_at_least", "item": "chain1_beach_2_small_shell", "count": 2 }
+    },
+    {
+      "id": "tut_06",
+      "trigger": "after:tut_05",
+      "precondition": "tutorial.currentStep == 'tut_06'",
+      "character": "marina",
+      "portrait": "characters/char_marina_pointing.svg",
+      "text": "Perfekt! Öffne die Auftragskarte und gib die zwei Muscheln ab.",
+      "highlightUI": { "type": "ui_asset", "ref": "order_card_small" },
+      "allowedActions": ["open_order", "give_order:order_01"],
+      "completion": { "type": "order_completed", "order": "order_01" }
+    },
+    {
+      "id": "tut_07",
+      "trigger": "after:tut_06",
+      "precondition": "tutorial.currentStep == 'tut_07'",
+      "character": "gull",
+      "portrait": "characters/char_gull_happy.svg",
+      "text": "Und schon klingelt die Kasse! Sammel deine Belohnung ein.",
+      "highlightUI": { "type": "ui_asset", "ref": "popup_reward" },
+      "allowedActions": ["tap_collect"],
+      "completion": { "type": "reward_collected", "order": "order_01" }
+    },
+    {
+      "id": "tut_08",
+      "trigger": "after:tut_07",
+      "precondition": "tutorial.currentStep == 'tut_08'",
+      "character": "marina",
+      "portrait": "characters/char_marina_excited.svg",
+      "text": "Jede Abgabe bringt die Bar ein Stück zurück. Wirf einen Blick in die Restaurierungsansicht!",
+      "highlightUI": { "type": "button", "ref": "restoration" },
+      "allowedActions": ["open_restoration"],
+      "completion": { "type": "restoration_opened" }
+    },
+    {
+      "id": "tut_09",
+      "trigger": "after:tut_08",
+      "precondition": "tutorial.currentStep == 'tut_09'",
+      "character": "kai",
+      "portrait": "characters/char_kai_thoughtful.svg",
+      "text": "Wird das Board mal eng, verkauf einfach ein Item für Münzen. Probier es kurz aus.",
+      "highlightUI": { "type": "board_action", "ref": "sale_marker" },
+      "allowedActions": ["sell_item"],
+      "completion": { "type": "item_sold" }
+    },
+    {
+      "id": "tut_10",
+      "trigger": "after:tut_09",
+      "precondition": "tutorial.currentStep == 'tut_10'",
+      "character": "gull",
+      "portrait": "characters/char_gull_neutral.svg",
+      "text": "Die verhangenen Felder unten sind noch gesperrt – die schaltest du frei, wenn du im Level aufsteigst. Und jetzt: ran an den Wiederaufbau von Sunny Cove!",
+      "highlightUI": { "type": "board_cell_state", "ref": "locked" },
+      "allowedActions": ["tap_continue"],
+      "completion": { "type": "dialog_dismissed" }
+    },
+    {
+      "id": "tut_done",
+      "trigger": "after:tut_10",
+      "precondition": "tutorial.currentStep == 'tut_done'",
+      "character": "marina",
+      "portrait": "characters/char_marina_excited.svg",
+      "text": "Du hast den Dreh raus! Ab hier führen dich die Aufträge weiter.",
+      "highlightUI": { "type": "none" },
+      "allowedActions": ["tap_continue"],
+      "completion": { "type": "tutorial_finished" }
+    }
+  ]
+}

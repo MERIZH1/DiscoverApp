@@ -1,0 +1,383 @@
+{
+  "meta": {
+    "locale": "en",
+    "version": "1.0.0",
+    "placeholders": "{count},{max},{amount},{name} werden von der App gefüllt",
+    "note": "Stabile Schlüssel; Zahlen als Platzhalter; Pluralformen unter 'plural.*'"
+  },
+  "common": {
+    "play": "Play",
+    "continue": "Continue",
+    "collect": "Collect",
+    "give": "Deliver",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "settings": "Settings",
+    "shop": "Shop",
+    "back": "Back",
+    "sell": "Sell",
+    "restoration": "Restoration",
+    "retry": "Retry",
+    "welcomeBack": "Welcome back!",
+    "boardFull": "Board full",
+    "levelUp": "Level up!",
+    "orderComplete": "Order complete!",
+    "notEnough": "Not enough yet"
+  },
+  "plural": {
+    "coins": {
+      "one": "{count} coin",
+      "other": "{count} coins"
+    },
+    "gems": {
+      "one": "{count} gem",
+      "other": "{count} gems"
+    },
+    "stars": {
+      "one": "{count} star",
+      "other": "{count} stars"
+    },
+    "days": {
+      "one": "{count} day",
+      "other": "{count} days"
+    },
+    "energy": {
+      "other": "{count} energy"
+    },
+    "xp": {
+      "other": "{count} XP"
+    },
+    "level": {
+      "other": "Level {count}"
+    },
+    "itemsLeft": {
+      "one": "{count} left",
+      "other": "{count} left"
+    }
+  },
+  "hud": {
+    "level": "Level {count}",
+    "energy": "{count}/{max}",
+    "gain": "+{amount}"
+  },
+  "item": {
+    "chain1_beach_1_shell_shard": {
+      "name": "Shell Shard"
+    },
+    "chain1_beach_2_small_shell": {
+      "name": "Small Shell"
+    },
+    "chain1_beach_3_shell_trio": {
+      "name": "Colorful Shells"
+    },
+    "chain1_beach_4_shell_collection": {
+      "name": "Shell Collection"
+    },
+    "chain1_beach_5_pearl_shell": {
+      "name": "Pearl Shell"
+    },
+    "chain1_beach_6_pearl_necklace": {
+      "name": "Pearl Necklace"
+    },
+    "chain1_beach_7_jewelry_box": {
+      "name": "Jewelry Box"
+    },
+    "chain1_beach_8_treasure_crown": {
+      "name": "Sea Treasure Crown"
+    },
+    "chain2_bar_1_lime_slice": {
+      "name": "Lime Slice"
+    },
+    "chain2_bar_2_limes": {
+      "name": "Limes"
+    },
+    "chain2_bar_3_juice_glass": {
+      "name": "Juice Glass"
+    },
+    "chain2_bar_4_lemonade": {
+      "name": "Lemonade"
+    },
+    "chain2_bar_5_coconut_drink": {
+      "name": "Coconut Drink"
+    },
+    "chain2_bar_6_tropical_cocktail": {
+      "name": "Tropical Cocktail"
+    },
+    "chain2_bar_7_cocktail_tray": {
+      "name": "Cocktail Tray"
+    },
+    "chain2_bar_8_luxury_bar_set": {
+      "name": "Beach Bar Spread"
+    },
+    "chain3_surf_1_wax": {
+      "name": "Surf Wax"
+    },
+    "chain3_surf_2_wax_comb": {
+      "name": "Wax & Comb"
+    },
+    "chain3_surf_3_fin": {
+      "name": "Fin"
+    },
+    "chain3_surf_4_bodyboard": {
+      "name": "Bodyboard"
+    },
+    "chain3_surf_5_simple_board": {
+      "name": "Simple Surfboard"
+    },
+    "chain3_surf_6_pro_board": {
+      "name": "Pro Surfboard"
+    },
+    "chain3_surf_7_surf_gear": {
+      "name": "Surf Gear"
+    },
+    "chain3_surf_8_legendary_set": {
+      "name": "Legendary Sunny Cove Set"
+    },
+    "chain4_tool_1_screw": {
+      "name": "Screw"
+    },
+    "chain4_tool_2_screw_pack": {
+      "name": "Screw Pack"
+    },
+    "chain4_tool_3_screwdriver": {
+      "name": "Screwdriver"
+    },
+    "chain4_tool_4_hammer": {
+      "name": "Hammer"
+    },
+    "chain4_tool_5_tool_bag": {
+      "name": "Tool Bag"
+    },
+    "chain4_tool_6_toolbox": {
+      "name": "Toolbox"
+    },
+    "chain4_tool_7_workbench": {
+      "name": "Workbench"
+    },
+    "chain4_tool_8_island_workshop": {
+      "name": "Island Workshop"
+    },
+    "chain5_garden_1_seed": {
+      "name": "Seed"
+    },
+    "chain5_garden_2_sprout": {
+      "name": "Sprout"
+    },
+    "chain5_garden_3_small_plant": {
+      "name": "Small Plant"
+    },
+    "chain5_garden_4_hibiscus_pot": {
+      "name": "Hibiscus"
+    },
+    "chain5_garden_5_bouquet": {
+      "name": "Bouquet"
+    },
+    "chain5_garden_6_tropical_planter": {
+      "name": "Tropical Planter"
+    },
+    "chain5_garden_7_palm_pot": {
+      "name": "Decorative Palm"
+    },
+    "chain5_garden_8_garden_arch": {
+      "name": "Tropical Garden Arch"
+    }
+  },
+  "generator": {
+    "gen1_beach_crate": {
+      "name": "Washed-up Beach Crate"
+    },
+    "gen2_bar_cart": {
+      "name": "Beach Bar Cart"
+    },
+    "gen3_surf_locker": {
+      "name": "Surf Locker"
+    },
+    "gen4_tool_chest": {
+      "name": "Old Tool Chest"
+    },
+    "gen5_garden_basket": {
+      "name": "Garden Basket"
+    }
+  },
+  "restorationElement": {
+    "elem_counter": {
+      "name": "Counter"
+    },
+    "elem_roof": {
+      "name": "Roof"
+    },
+    "elem_sign": {
+      "name": "Sign"
+    },
+    "elem_chair_a": {
+      "name": "Bar Stool (blue)"
+    },
+    "elem_chair_b": {
+      "name": "Bar Stool (pink)"
+    },
+    "elem_string_lights": {
+      "name": "String Lights"
+    },
+    "elem_flowers": {
+      "name": "Flowers"
+    },
+    "elem_surfboard_deco": {
+      "name": "Surfboard Deco"
+    },
+    "elem_palm": {
+      "name": "Palm"
+    }
+  },
+  "restorationState": {
+    "damaged": {
+      "name": "Damaged"
+    },
+    "partial": {
+      "name": "Partly Restored"
+    },
+    "restored": {
+      "name": "Restored"
+    }
+  },
+  "character": {
+    "marina": {
+      "name": "Marina"
+    },
+    "kai": {
+      "name": "Kai"
+    },
+    "shelly": {
+      "name": "Shelly"
+    },
+    "gull": {
+      "name": "Gull"
+    }
+  },
+  "order": {
+    "order_01": {
+      "dialog": "Welcome back to Sunny Cove, Marina! That storm was nasty. Gather me a few shells and we will get started."
+    },
+    "order_02": {
+      "dialog": "First, let us tidy up. Bring me a couple more shells from the beach."
+    },
+    "order_03": {
+      "dialog": "Hey! I am Kai. For the bar we need limes - tap the drinks crate."
+    },
+    "order_04": {
+      "dialog": "We will not get far without tools. Show me you can dig up a screw."
+    },
+    "order_05": {
+      "dialog": "A fresh juice helps me think. Mix me one?"
+    },
+    "order_06": {
+      "dialog": "The old counter can be saved! Bring a screwdriver and I will fit it."
+    },
+    "order_07": {
+      "dialog": "Hi, I am Shelly. For my garden - do you have a seed?"
+    },
+    "order_08": {
+      "dialog": "Guests are coming soon. Some colorful shells for decoration would be lovely."
+    },
+    "order_09": {
+      "dialog": "Time for the roof! With a hammer we can raise the frame."
+    },
+    "order_10": {
+      "dialog": "Looking better already! A cool coconut drink to celebrate?"
+    },
+    "order_11": {
+      "dialog": "Please gather a small shell collection - I will hang it up."
+    },
+    "order_12": {
+      "dialog": "The sign needs to go back up so people can find us!"
+    },
+    "order_13": {
+      "dialog": "My first plant is growing! Bring me a small plant to compare."
+    },
+    "order_14": {
+      "dialog": "The surfers are asking. Got any surf wax for them?"
+    },
+    "order_15": {
+      "dialog": "Have a seat - once you have brought over this bar stool."
+    },
+    "order_16": {
+      "dialog": "A proper cocktail lifts the whole bar. Give it a try!"
+    },
+    "order_17": {
+      "dialog": "One more stool and two guests can toast together."
+    },
+    "order_18": {
+      "dialog": "Oh! A hibiscus in a pot - exactly what my garden needs."
+    },
+    "order_19": {
+      "dialog": "For the evenings we need light. I will trade a simple surfboard for the string lights."
+    },
+    "order_20": {
+      "dialog": "Let us hang the string lights! Bring tools and a drink for Kai."
+    },
+    "order_21": {
+      "dialog": "Guests love flowers. A bouquet from Shelly's beds?"
+    },
+    "order_22": {
+      "dialog": "My planter is all planted - take a look and bring me more shells."
+    },
+    "order_23": {
+      "dialog": "Fresh flowers on the counter! Then the bar really shines."
+    },
+    "order_24": {
+      "dialog": "A pro surfboard as decor - that pulls the surfers in."
+    },
+    "order_25": {
+      "dialog": "For the grand opening: a cocktail tray full of drinks."
+    },
+    "order_26": {
+      "dialog": "Hang the surfboard as decor - bring the board and tools!"
+    },
+    "order_27": {
+      "dialog": "Almost there! My decorative palm is waiting for its spot."
+    },
+    "order_28": {
+      "dialog": "Time for the last palm - then Marina's Beach Bar is back!"
+    },
+    "order_29": {
+      "dialog": "Grand opening! A legendary surf set as the eye-catcher."
+    },
+    "order_30": {
+      "dialog": "Sunny Cove shines again. Crown the day with a beach bar spread - to Marina!"
+    }
+  },
+  "tutorial": {
+    "tut_01": {
+      "text": "Back at last, Marina! The storm really hit Grandma's beach bar. Do not worry - together we will fix it. Let me show you how."
+    },
+    "tut_02": {
+      "text": "It all starts on the beach. Tap the washed-up beach crate - it spits out finds."
+    },
+    "tut_03": {
+      "text": "Two matching finds make a better one. Slide two shell shards together!"
+    },
+    "tut_04": {
+      "text": "Each crate tap costs a little energy - up in the bar. Energy refills over time, so pace yourself!"
+    },
+    "tut_05": {
+      "text": "For the first order we need two small shells. Keep tapping the crate and merge until you have two."
+    },
+    "tut_06": {
+      "text": "Perfect! Open the order card and hand over the two shells."
+    },
+    "tut_07": {
+      "text": "And the register rings! Collect your reward."
+    },
+    "tut_08": {
+      "text": "Every delivery brings the bar back a little. Take a look at the restoration view!"
+    },
+    "tut_09": {
+      "text": "When the board gets tight, just sell an item for coins. Give it a quick try."
+    },
+    "tut_10": {
+      "text": "The covered fields at the bottom are still locked - you will unlock them as you level up. Now: on to rebuilding Sunny Cove!"
+    },
+    "tut_done": {
+      "text": "You have got the hang of it! From here the orders will guide you."
+    }
+  }
+}

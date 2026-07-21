@@ -1,0 +1,36 @@
+name: Build Sunny Cove Beta
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["codex/sunny-cove-beta"]
+    paths:
+      - "SunnyCove/**"
+      - ".github/workflows/build-sunny-cove.yml"
+
+jobs:
+  build:
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: SunnyCove
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project
+        run: xcodegen generate
+      - name: Run unit tests
+        run: xcodebuild test -project SunnyCove.xcodeproj -scheme SunnyCove -destination 'platform=iOS Simulator,name=iPhone 16 Pro' CODE_SIGNING_ALLOWED=NO
+      - name: Archive unsigned app
+        run: xcodebuild archive -project SunnyCove.xcodeproj -scheme SunnyCove -archivePath build/SunnyCove.xcarchive -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
+      - name: Package IPA
+        run: |
+          mkdir -p build/Payload
+          cp -R build/SunnyCove.xcarchive/Products/Applications/SunnyCove.app build/Payload/
+          cd build
+          zip -qry Sunny_Cove-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Sunny-Cove-unsigned-ipa
+          path: SunnyCove/build/Sunny_Cove-unsigned.ipa

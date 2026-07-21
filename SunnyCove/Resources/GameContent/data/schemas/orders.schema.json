@@ -1,0 +1,124 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Orders",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string"
+    },
+    "generated": {
+      "type": "string"
+    },
+    "campaign": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string"
+    },
+    "orders": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sequence": {
+            "type": "integer"
+          },
+          "character": {
+            "enum": [
+              "marina",
+              "kai",
+              "shelly",
+              "gull"
+            ]
+          },
+          "portrait": {
+            "type": "string"
+          },
+          "portraitPose": {
+            "type": "string"
+          },
+          "dialog": {
+            "type": "string"
+          },
+          "requiredItems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "item": {
+                  "type": "string"
+                },
+                "asset": {
+                  "type": "string"
+                },
+                "displayName": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "required": [
+                "item",
+                "count"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "rewards": {
+            "type": "object",
+            "properties": {
+              "coins": {
+                "type": "integer"
+              },
+              "gems": {
+                "type": "integer"
+              },
+              "energy": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "coins"
+            ],
+            "additionalProperties": true
+          },
+          "xp": {
+            "type": "integer"
+          },
+          "restorationActions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "sequence",
+          "character",
+          "portrait",
+          "dialog",
+          "requiredItems",
+          "rewards",
+          "xp",
+          "restorationActions"
+        ],
+        "additionalProperties": true
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "campaign",
+    "orders"
+  ],
+  "additionalProperties": true
+}

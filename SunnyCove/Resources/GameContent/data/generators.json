@@ -1,0 +1,282 @@
+{
+  "schemaVersion": "1.0.0",
+  "generated": "2026-07-21",
+  "note": "dropTable-Gewichte summieren zu 1.0. 'upgraded' ist der dauerhaft aufgewertete Zustand (mehr Ladungen, kürzere Aufladezeit, höhere Item-Stufen).",
+  "generators": [
+    {
+      "id": "gen1_beach_crate",
+      "displayName": "Angeschwemmte Strandkiste",
+      "producesChain": "chain_beach",
+      "states": {
+        "ready": "generators/gen1_beach_crate_ready.svg",
+        "producing": "generators/gen1_beach_crate_producing.svg",
+        "cooldown": "generators/gen1_beach_crate_cooldown.svg",
+        "upgraded": "generators/gen1_beach_crate_upgraded.svg"
+      },
+      "base": {
+        "energyCostPerTap": 1,
+        "maxCharges": 8,
+        "rechargeSeconds": 120,
+        "productionAnimationMs": 400,
+        "dropTable": [
+          {
+            "stage": 1,
+            "weight": 0.55
+          },
+          {
+            "stage": 2,
+            "weight": 0.32
+          },
+          {
+            "stage": 3,
+            "weight": 0.13
+          }
+        ]
+      },
+      "upgraded": {
+        "energyCostPerTap": 1,
+        "maxCharges": 12,
+        "rechargeSeconds": 90,
+        "productionAnimationMs": 400,
+        "dropTable": [
+          {
+            "stage": 1,
+            "weight": 0.4
+          },
+          {
+            "stage": 2,
+            "weight": 0.35
+          },
+          {
+            "stage": 3,
+            "weight": 0.2
+          },
+          {
+            "stage": 4,
+            "weight": 0.05
+          }
+        ]
+      }
+    },
+    {
+      "id": "gen2_bar_cart",
+      "displayName": "Strandbar-Wagen",
+      "producesChain": "chain_bar",
+      "states": {
+        "ready": "generators/gen2_bar_cart_ready.svg",
+        "producing": "generators/gen2_bar_cart_producing.svg",
+        "cooldown": "generators/gen2_bar_cart_cooldown.svg",
+        "upgraded": "generators/gen2_bar_cart_upgraded.svg"
+      },
+      "base": {
+        "energyCostPerTap": 1,
+        "maxCharges": 8,
+        "rechargeSeconds": 120,
+        "productionAnimationMs": 400,
+        "dropTable": [
+          {
+            "stage": 1,
+            "weight": 0.55
+          },
+          {
+            "stage": 2,
+            "weight": 0.32
+          },
+          {
+            "stage": 3,
+            "weight": 0.13
+          }
+        ]
+      },
+      "upgraded": {
+        "energyCostPerTap": 1,
+        "maxCharges": 12,
+        "rechargeSeconds": 90,
+        "productionAnimationMs": 400,
+        "dropTable": [
+          {
+            "stage": 1,
+            "weight": 0.4
+          },
+          {
+            "stage": 2,
+            "weight": 0.35
+          },
+          {
+            "stage": 3,
+            "weight": 0.2
+          },
+          {
+            "stage": 4,
+            "weight": 0.05
+          }
+        ]
+      }
+    },
+    {
+      "id": "gen3_surf_locker",
+      "displayName": "Surf-Spind",
+      "producesChain": "chain_surf",
+      "states": {
+        "ready": "generators/gen3_surf_locker_ready.svg",
+        "producing": "generators/gen3_surf_locker_producing.svg",
+        "cooldown": "generators/gen3_surf_locker_cooldown.svg",
+        "upgraded": "generators/gen3_surf_locker_upgraded.svg"
+      },
+      "base": {
+        "energyCostPerTap": 1,
+        "maxCharges": 8,
+        "rechargeSeconds": 120,
+        "productionAnimationMs": 400,
+        "dropTable": [
+          {
+            "stage": 1,
+            "weight": 0.55
+          },
+          {
+            "stage": 2,
+            "weight": 0.32
+          },
+          {
+            "stage": 3,
+            "weight": 0.13
+          }
+        ]
+      },
+      "upgraded": {
+        "energyCostPerTap": 1,
+        "maxCharges": 12,
+        "rechargeSeconds": 90,
+        "productionAnimationMs": 400,
+        "dropTable": [
+          {
+            "stage": 1,
+            "weight": 0.4
+          },
+          {
+            "stage": 2,
+            "weight": 0.35
+          },
+          {
+            "stage": 3,
+            "weight": 0.2
+          },
+          {
+            "stage": 4,
+            "weight": 0.05
+          }
+        ]
+      }
+    },
+    {
+      "id": "gen4_tool_chest",
+      "displayName": "Alte Werkzeugkiste",
+      "producesChain": "chain_tool",
+      "states": {
+        "ready": "generators/gen4_tool_chest_ready.svg",
+        "producing": "generators/gen4_tool_chest_producing.svg",
+        "cooldown": "generators/gen4_tool_chest_cooldown.svg",
+        "upgraded": "generators/gen4_tool_chest_upgraded.svg"
+      },
+      "base": {
+        "energyCostPerTap": 1,
+        "maxCharges": 8,
+        "rechargeSeconds": 120,
+        "productionAnimationMs": 400,
+        "dropTable": [
+          {
+            "stage": 1,
+            "weight": 0.55
+          },
+          {
+            "stage": 2,
+            "weight": 0.32
+          },
+          {
+            "stage": 3,
+            "weight": 0.13
+          }
+        ]
+      },
+      "upgraded": {
+        "energyCostPerTap": 1,
+        "maxCharges": 12,
+        "rechargeSeconds": 90,
+        "productionAnimationMs": 400,
+        "dropTable": [
+          {
+            "stage": 1,
+            "weight": 0.4
+          },
+          {
+            "stage": 2,
+            "weight": 0.35
+          },
+          {
+            "stage": 3,
+            "weight": 0.2
+          },
+          {
+            "stage": 4,
+            "weight": 0.05
+          }
+        ]
+      }
+    },
+    {
+      "id": "gen5_garden_basket",
+      "displayName": "Gartenkorb",
+      "producesChain": "chain_garden",
+      "states": {
+        "ready": "generators/gen5_garden_basket_ready.svg",
+        "producing": "generators/gen5_garden_basket_producing.svg",
+        "cooldown": "generators/gen5_garden_basket_cooldown.svg",
+        "upgraded": "generators/gen5_garden_basket_upgraded.svg"
+      },
+      "base": {
+        "energyCostPerTap": 1,
+        "maxCharges": 8,
+        "rechargeSeconds": 120,
+        "productionAnimationMs": 400,
+        "dropTable": [
+          {
+            "stage": 1,
+            "weight": 0.55
+          },
+          {
+            "stage": 2,
+            "weight": 0.32
+          },
+          {
+            "stage": 3,
+            "weight": 0.13
+          }
+        ]
+      },
+      "upgraded": {
+        "energyCostPerTap": 1,
+        "maxCharges": 12,
+        "rechargeSeconds": 90,
+        "productionAnimationMs": 400,
+        "dropTable": [
+          {
+            "stage": 1,
+            "weight": 0.4
+          },
+          {
+            "stage": 2,
+            "weight": 0.35
+          },
+          {
+            "stage": 3,
+            "weight": 0.2
+          },
+          {
+            "stage": 4,
+            "weight": 0.05
+          }
+        ]
+      }
+    }
+  ]
+}

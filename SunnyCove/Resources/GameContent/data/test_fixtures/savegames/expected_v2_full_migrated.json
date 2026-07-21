@@ -1,0 +1,454 @@
+{
+  "schemaVersion": "1.0.0",
+  "saveVersion": 3,
+  "_fixtureNote": "Vollstaendiges 63-Felder-Savegame (v2) fuer den End-to-End-Ladetest + Migration",
+  "player": {
+    "level": 7,
+    "xp": 900,
+    "energy": 80,
+    "energyMax": 120,
+    "coins": 1840,
+    "gems": 24
+  },
+  "board": {
+    "cols": 7,
+    "rows": 9,
+    "cells": [
+      {
+        "row": 0,
+        "col": 0,
+        "state": "generator",
+        "generator": "gen1_beach_crate"
+      },
+      {
+        "row": 0,
+        "col": 1,
+        "state": "empty"
+      },
+      {
+        "row": 0,
+        "col": 2,
+        "state": "empty"
+      },
+      {
+        "row": 0,
+        "col": 3,
+        "state": "generator",
+        "generator": "gen2_bar_cart"
+      },
+      {
+        "row": 0,
+        "col": 4,
+        "state": "empty"
+      },
+      {
+        "row": 0,
+        "col": 5,
+        "state": "empty"
+      },
+      {
+        "row": 0,
+        "col": 6,
+        "state": "generator",
+        "generator": "gen3_surf_locker"
+      },
+      {
+        "row": 1,
+        "col": 0,
+        "state": "empty"
+      },
+      {
+        "row": 1,
+        "col": 1,
+        "state": "item",
+        "item": "chain1_beach_4_shell_collection",
+        "bubble": false
+      },
+      {
+        "row": 1,
+        "col": 2,
+        "state": "item",
+        "item": "chain1_beach_2_small_shell",
+        "bubble": false
+      },
+      {
+        "row": 1,
+        "col": 3,
+        "state": "empty"
+      },
+      {
+        "row": 1,
+        "col": 4,
+        "state": "item",
+        "item": "chain1_beach_1_shell_shard",
+        "bubble": true
+      },
+      {
+        "row": 1,
+        "col": 5,
+        "state": "item",
+        "item": "chain2_bar_5_coconut_drink",
+        "bubble": false
+      },
+      {
+        "row": 1,
+        "col": 6,
+        "state": "empty"
+      },
+      {
+        "row": 2,
+        "col": 0,
+        "state": "generator",
+        "generator": "gen4_tool_chest"
+      },
+      {
+        "row": 2,
+        "col": 1,
+        "state": "empty"
+      },
+      {
+        "row": 2,
+        "col": 2,
+        "state": "empty"
+      },
+      {
+        "row": 2,
+        "col": 3,
+        "state": "empty"
+      },
+      {
+        "row": 2,
+        "col": 4,
+        "state": "empty"
+      },
+      {
+        "row": 2,
+        "col": 5,
+        "state": "generator",
+        "generator": "gen5_garden_basket"
+      },
+      {
+        "row": 2,
+        "col": 6,
+        "state": "empty"
+      },
+      {
+        "row": 3,
+        "col": 0,
+        "state": "empty"
+      },
+      {
+        "row": 3,
+        "col": 1,
+        "state": "empty"
+      },
+      {
+        "row": 3,
+        "col": 2,
+        "state": "empty"
+      },
+      {
+        "row": 3,
+        "col": 3,
+        "state": "item",
+        "item": "chain3_surf_4_bodyboard",
+        "bubble": false
+      },
+      {
+        "row": 3,
+        "col": 4,
+        "state": "item",
+        "item": "chain4_tool_3_screwdriver",
+        "bubble": false
+      },
+      {
+        "row": 3,
+        "col": 5,
+        "state": "empty"
+      },
+      {
+        "row": 3,
+        "col": 6,
+        "state": "empty"
+      },
+      {
+        "row": 4,
+        "col": 0,
+        "state": "item",
+        "item": "chain5_garden_4_hibiscus_pot",
+        "bubble": false
+      },
+      {
+        "row": 4,
+        "col": 1,
+        "state": "empty"
+      },
+      {
+        "row": 4,
+        "col": 2,
+        "state": "empty"
+      },
+      {
+        "row": 4,
+        "col": 3,
+        "state": "empty"
+      },
+      {
+        "row": 4,
+        "col": 4,
+        "state": "empty"
+      },
+      {
+        "row": 4,
+        "col": 5,
+        "state": "empty"
+      },
+      {
+        "row": 4,
+        "col": 6,
+        "state": "item",
+        "item": "chain2_bar_3_juice_glass",
+        "bubble": false
+      },
+      {
+        "row": 5,
+        "col": 0,
+        "state": "empty"
+      },
+      {
+        "row": 5,
+        "col": 1,
+        "state": "empty"
+      },
+      {
+        "row": 5,
+        "col": 2,
+        "state": "item",
+        "item": "chain1_beach_2_small_shell",
+        "bubble": false
+      },
+      {
+        "row": 5,
+        "col": 3,
+        "state": "empty"
+      },
+      {
+        "row": 5,
+        "col": 4,
+        "state": "empty"
+      },
+      {
+        "row": 5,
+        "col": 5,
+        "state": "empty"
+      },
+      {
+        "row": 5,
+        "col": 6,
+        "state": "empty"
+      },
+      {
+        "row": 6,
+        "col": 0,
+        "state": "empty"
+      },
+      {
+        "row": 6,
+        "col": 1,
+        "state": "item",
+        "item": "chain3_surf_2_wax_comb",
+        "bubble": false
+      },
+      {
+        "row": 6,
+        "col": 2,
+        "state": "empty"
+      },
+      {
+        "row": 6,
+        "col": 3,
+        "state": "empty"
+      },
+      {
+        "row": 6,
+        "col": 4,
+        "state": "empty"
+      },
+      {
+        "row": 6,
+        "col": 5,
+        "state": "empty"
+      },
+      {
+        "row": 6,
+        "col": 6,
+        "state": "empty"
+      },
+      {
+        "row": 7,
+        "col": 0,
+        "state": "empty"
+      },
+      {
+        "row": 7,
+        "col": 1,
+        "state": "empty"
+      },
+      {
+        "row": 7,
+        "col": 2,
+        "state": "empty"
+      },
+      {
+        "row": 7,
+        "col": 3,
+        "state": "empty"
+      },
+      {
+        "row": 7,
+        "col": 4,
+        "state": "empty"
+      },
+      {
+        "row": 7,
+        "col": 5,
+        "state": "item",
+        "item": "chain5_garden_2_sprout",
+        "bubble": false
+      },
+      {
+        "row": 7,
+        "col": 6,
+        "state": "empty"
+      },
+      {
+        "row": 8,
+        "col": 0,
+        "state": "locked",
+        "unlockLevel": 10
+      },
+      {
+        "row": 8,
+        "col": 1,
+        "state": "locked",
+        "unlockLevel": 10
+      },
+      {
+        "row": 8,
+        "col": 2,
+        "state": "locked",
+        "unlockLevel": 10
+      },
+      {
+        "row": 8,
+        "col": 3,
+        "state": "locked",
+        "unlockLevel": 10
+      },
+      {
+        "row": 8,
+        "col": 4,
+        "state": "locked",
+        "unlockLevel": 10
+      },
+      {
+        "row": 8,
+        "col": 5,
+        "state": "locked",
+        "unlockLevel": 10
+      },
+      {
+        "row": 8,
+        "col": 6,
+        "state": "locked",
+        "unlockLevel": 10
+      }
+    ]
+  },
+  "generatorsRuntime": [
+    {
+      "id": "gen1_beach_crate",
+      "charges": 6,
+      "maxCharges": 8,
+      "upgraded": true,
+      "produced": 0
+    },
+    {
+      "id": "gen2_bar_cart",
+      "charges": 3,
+      "maxCharges": 8,
+      "upgraded": true,
+      "produced": 0
+    },
+    {
+      "id": "gen3_surf_locker",
+      "charges": 8,
+      "maxCharges": 8,
+      "upgraded": false,
+      "produced": 0
+    },
+    {
+      "id": "gen4_tool_chest",
+      "charges": 0,
+      "maxCharges": 8,
+      "upgraded": false,
+      "produced": 0
+    },
+    {
+      "id": "gen5_garden_basket",
+      "charges": 5,
+      "maxCharges": 8,
+      "upgraded": false,
+      "produced": 0
+    }
+  ],
+  "restoration": {
+    "area": "beachbar",
+    "state": "partial",
+    "placedElements": [
+      "elem_counter",
+      "elem_roof",
+      "elem_sign",
+      "elem_chair_a"
+    ]
+  },
+  "orders": {
+    "campaign": "campaign_01",
+    "completedOrderIds": [
+      "order_01",
+      "order_02",
+      "order_03",
+      "order_04",
+      "order_05",
+      "order_06",
+      "order_07",
+      "order_08",
+      "order_09",
+      "order_10",
+      "order_11",
+      "order_12",
+      "order_13",
+      "order_14",
+      "order_15",
+      "order_16",
+      "order_17"
+    ],
+    "activeOrderId": "order_18"
+  },
+  "inbox": [],
+  "campaignComplete": false,
+  "tutorial": {
+    "active": false,
+    "campaign": "tutorial_campaign_01",
+    "currentStep": null,
+    "completedSteps": [
+      "tut_done"
+    ],
+    "interrupted": false
+  },
+  "clock": {
+    "lastSavedWallClock": null,
+    "lastSavedMonotonic": null,
+    "clockAnomaly": false
+  }
+}

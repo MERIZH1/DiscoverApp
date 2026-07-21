@@ -1,0 +1,739 @@
+{
+  "schemaVersion": "1.0.0",
+  "generated": "2026-07-21",
+  "campaign": "campaign_01",
+  "title": "Willkommen zurück in Sunny Cove",
+  "note": "Aufträge streng sequenziell (sequence). restorationActions: 'set_state:<id>' schaltet Bauzustand, 'unlock_element:<id>' ein platzierbares Element frei.",
+  "orders": [
+    {
+      "id": "order_01",
+      "sequence": 1,
+      "character": "gull",
+      "portrait": "characters/char_gull_happy.svg",
+      "portraitPose": "happy",
+      "dialog": "Willkommen zurück in Sunny Cove, Marina! Der Sturm war fies. Sammel mir ein paar Muscheln, dann fangen wir an.",
+      "requiredItems": [
+        {
+          "item": "chain1_beach_2_small_shell",
+          "asset": "items/chain1_beach_2_small_shell.svg",
+          "displayName": "Kleine Muschel",
+          "count": 2
+        }
+      ],
+      "rewards": {
+        "coins": 40
+      },
+      "xp": 10,
+      "restorationActions": []
+    },
+    {
+      "id": "order_02",
+      "sequence": 2,
+      "character": "marina",
+      "portrait": "characters/char_marina_friendly.svg",
+      "portraitPose": "friendly",
+      "dialog": "Erst mal aufräumen. Bring mir noch ein paar Muscheln vom Strand.",
+      "requiredItems": [
+        {
+          "item": "chain1_beach_2_small_shell",
+          "asset": "items/chain1_beach_2_small_shell.svg",
+          "displayName": "Kleine Muschel",
+          "count": 3
+        }
+      ],
+      "rewards": {
+        "coins": 55
+      },
+      "xp": 12,
+      "restorationActions": []
+    },
+    {
+      "id": "order_03",
+      "sequence": 3,
+      "character": "kai",
+      "portrait": "characters/char_kai_friendly.svg",
+      "portraitPose": "friendly",
+      "dialog": "Hey! Ich bin Kai. Für die Bar brauchen wir Limetten – tipp die Getränkekiste an.",
+      "requiredItems": [
+        {
+          "item": "chain2_bar_2_limes",
+          "asset": "items/chain2_bar_2_limes.svg",
+          "displayName": "Limetten",
+          "count": 2
+        }
+      ],
+      "rewards": {
+        "coins": 70,
+        "energy": 5
+      },
+      "xp": 14,
+      "restorationActions": []
+    },
+    {
+      "id": "order_04",
+      "sequence": 4,
+      "character": "gull",
+      "portrait": "characters/char_gull_neutral.svg",
+      "portraitPose": "neutral",
+      "dialog": "Ohne Werkzeug wird das nichts. Zeig mir, dass du eine Schraube auftreiben kannst.",
+      "requiredItems": [
+        {
+          "item": "chain4_tool_1_screw",
+          "asset": "items/chain4_tool_1_screw.svg",
+          "displayName": "Schraube",
+          "count": 3
+        }
+      ],
+      "rewards": {
+        "coins": 80
+      },
+      "xp": 16,
+      "restorationActions": []
+    },
+    {
+      "id": "order_05",
+      "sequence": 5,
+      "character": "marina",
+      "portrait": "characters/char_marina_thoughtful.svg",
+      "portraitPose": "thoughtful",
+      "dialog": "Ein frischer Saft hilft beim Denken. Mixt du mir einen?",
+      "requiredItems": [
+        {
+          "item": "chain2_bar_3_juice_glass",
+          "asset": "items/chain2_bar_3_juice_glass.svg",
+          "displayName": "Saftglas",
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 90,
+        "gems": 1
+      },
+      "xp": 18,
+      "restorationActions": []
+    },
+    {
+      "id": "order_06",
+      "sequence": 6,
+      "character": "kai",
+      "portrait": "characters/char_kai_excited.svg",
+      "portraitPose": "excited",
+      "dialog": "Die alte Theke lässt sich retten! Bring einen Schraubendreher, dann bau ich sie ein.",
+      "requiredItems": [
+        {
+          "item": "chain4_tool_3_screwdriver",
+          "asset": "items/chain4_tool_3_screwdriver.svg",
+          "displayName": "Schraubendreher",
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 120,
+        "energy": 10
+      },
+      "xp": 22,
+      "restorationActions": [
+        "unlock_element:elem_counter"
+      ]
+    },
+    {
+      "id": "order_07",
+      "sequence": 7,
+      "character": "shelly",
+      "portrait": "characters/char_shelly_neutral.svg",
+      "portraitPose": "neutral",
+      "dialog": "Hallo, ich bin Shelly. Für meinen Garten – hast du ein Samenkorn?",
+      "requiredItems": [
+        {
+          "item": "chain5_garden_1_seed",
+          "asset": "items/chain5_garden_1_seed.svg",
+          "displayName": "Samenkorn",
+          "count": 3
+        }
+      ],
+      "rewards": {
+        "coins": 110
+      },
+      "xp": 20,
+      "restorationActions": []
+    },
+    {
+      "id": "order_08",
+      "sequence": 8,
+      "character": "marina",
+      "portrait": "characters/char_marina_friendly.svg",
+      "portraitPose": "friendly",
+      "dialog": "Die Gäste kommen bald. Ein paar bunte Muscheln als Deko wären schön.",
+      "requiredItems": [
+        {
+          "item": "chain1_beach_3_shell_trio",
+          "asset": "items/chain1_beach_3_shell_trio.svg",
+          "displayName": "Bunte Muscheln",
+          "count": 2
+        }
+      ],
+      "rewards": {
+        "coins": 140
+      },
+      "xp": 24,
+      "restorationActions": []
+    },
+    {
+      "id": "order_09",
+      "sequence": 9,
+      "character": "kai",
+      "portrait": "characters/char_kai_pointing.svg",
+      "portraitPose": "pointing",
+      "dialog": "Zeit fürs Dach! Mit einem Hammer kriegen wir das Gerüst hoch.",
+      "requiredItems": [
+        {
+          "item": "chain4_tool_4_hammer",
+          "asset": "items/chain4_tool_4_hammer.svg",
+          "displayName": "Hammer",
+          "count": 1
+        },
+        {
+          "item": "chain1_beach_3_shell_trio",
+          "asset": "items/chain1_beach_3_shell_trio.svg",
+          "displayName": "Bunte Muscheln",
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 180,
+        "gems": 2,
+        "energy": 15
+      },
+      "xp": 40,
+      "restorationActions": [
+        "set_state:partial",
+        "unlock_element:elem_roof"
+      ]
+    },
+    {
+      "id": "order_10",
+      "sequence": 10,
+      "character": "gull",
+      "portrait": "characters/char_gull_happy.svg",
+      "portraitPose": "happy",
+      "dialog": "Sieht schon besser aus! Ein kühler Kokosdrink zur Feier?",
+      "requiredItems": [
+        {
+          "item": "chain2_bar_5_coconut_drink",
+          "asset": "items/chain2_bar_5_coconut_drink.svg",
+          "displayName": "Kokosdrink",
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 160
+      },
+      "xp": 28,
+      "restorationActions": []
+    },
+    {
+      "id": "order_11",
+      "sequence": 11,
+      "character": "marina",
+      "portrait": "characters/char_marina_thoughtful.svg",
+      "portraitPose": "thoughtful",
+      "dialog": "Sammel bitte eine kleine Muschelsammlung – die häng ich auf.",
+      "requiredItems": [
+        {
+          "item": "chain1_beach_4_shell_collection",
+          "asset": "items/chain1_beach_4_shell_collection.svg",
+          "displayName": "Muschelsammlung",
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 190,
+        "energy": 10
+      },
+      "xp": 32,
+      "restorationActions": []
+    },
+    {
+      "id": "order_12",
+      "sequence": 12,
+      "character": "kai",
+      "portrait": "characters/char_kai_excited.svg",
+      "portraitPose": "excited",
+      "dialog": "Das Schild muss wieder ran, damit man uns findet!",
+      "requiredItems": [
+        {
+          "item": "chain4_tool_5_tool_bag",
+          "asset": "items/chain4_tool_5_tool_bag.svg",
+          "displayName": "Werkzeugtasche",
+          "count": 1
+        },
+        {
+          "item": "chain2_bar_4_lemonade",
+          "asset": "items/chain2_bar_4_lemonade.svg",
+          "displayName": "Limonade",
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 220,
+        "gems": 1
+      },
+      "xp": 38,
+      "restorationActions": [
+        "unlock_element:elem_sign"
+      ]
+    },
+    {
+      "id": "order_13",
+      "sequence": 13,
+      "character": "shelly",
+      "portrait": "characters/char_shelly_happy.svg",
+      "portraitPose": "happy",
+      "dialog": "Meine erste Pflanze wächst! Bring mir eine kleine Pflanze zum Vergleich.",
+      "requiredItems": [
+        {
+          "item": "chain5_garden_3_small_plant",
+          "asset": "items/chain5_garden_3_small_plant.svg",
+          "displayName": "Kleine Pflanze",
+          "count": 2
+        }
+      ],
+      "rewards": {
+        "coins": 200
+      },
+      "xp": 34,
+      "restorationActions": []
+    },
+    {
+      "id": "order_14",
+      "sequence": 14,
+      "character": "marina",
+      "portrait": "characters/char_marina_friendly.svg",
+      "portraitPose": "friendly",
+      "dialog": "Die Surfer fragen schon. Hast du etwas Surf-Wachs für sie?",
+      "requiredItems": [
+        {
+          "item": "chain3_surf_2_wax_comb",
+          "asset": "items/chain3_surf_2_wax_comb.svg",
+          "displayName": "Wachs & Kamm",
+          "count": 2
+        }
+      ],
+      "rewards": {
+        "coins": 210,
+        "energy": 15
+      },
+      "xp": 36,
+      "restorationActions": []
+    },
+    {
+      "id": "order_15",
+      "sequence": 15,
+      "character": "kai",
+      "portrait": "characters/char_kai_friendly.svg",
+      "portraitPose": "friendly",
+      "dialog": "Setz dich – nachdem du diesen Barhocker herbeigeschafft hast.",
+      "requiredItems": [
+        {
+          "item": "chain4_tool_5_tool_bag",
+          "asset": "items/chain4_tool_5_tool_bag.svg",
+          "displayName": "Werkzeugtasche",
+          "count": 1
+        },
+        {
+          "item": "chain5_garden_3_small_plant",
+          "asset": "items/chain5_garden_3_small_plant.svg",
+          "displayName": "Kleine Pflanze",
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 240,
+        "gems": 2
+      },
+      "xp": 42,
+      "restorationActions": [
+        "unlock_element:elem_chair_a"
+      ]
+    },
+    {
+      "id": "order_16",
+      "sequence": 16,
+      "character": "gull",
+      "portrait": "characters/char_gull_neutral.svg",
+      "portraitPose": "neutral",
+      "dialog": "Ein echter Cocktail wertet die Bar auf. Trau dich!",
+      "requiredItems": [
+        {
+          "item": "chain2_bar_6_tropical_cocktail",
+          "asset": "items/chain2_bar_6_tropical_cocktail.svg",
+          "displayName": "Tropischer Cocktail",
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 260
+      },
+      "xp": 44,
+      "restorationActions": []
+    },
+    {
+      "id": "order_17",
+      "sequence": 17,
+      "character": "marina",
+      "portrait": "characters/char_marina_excited.svg",
+      "portraitPose": "excited",
+      "dialog": "Noch ein Hocker, dann können zwei Gäste anstoßen.",
+      "requiredItems": [
+        {
+          "item": "chain4_tool_6_toolbox",
+          "asset": "items/chain4_tool_6_toolbox.svg",
+          "displayName": "Werkzeugkasten",
+          "count": 1
+        },
+        {
+          "item": "chain2_bar_5_coconut_drink",
+          "asset": "items/chain2_bar_5_coconut_drink.svg",
+          "displayName": "Kokosdrink",
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 300,
+        "gems": 3,
+        "energy": 20
+      },
+      "xp": 50,
+      "restorationActions": [
+        "unlock_element:elem_chair_b"
+      ]
+    },
+    {
+      "id": "order_18",
+      "sequence": 18,
+      "character": "shelly",
+      "portrait": "characters/char_shelly_surprised.svg",
+      "portraitPose": "surprised",
+      "dialog": "Oh! Ein Hibiskus im Topf – genau der fehlt meinem Garten.",
+      "requiredItems": [
+        {
+          "item": "chain5_garden_4_hibiscus_pot",
+          "asset": "items/chain5_garden_4_hibiscus_pot.svg",
+          "displayName": "Hibiskus",
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 280
+      },
+      "xp": 46,
+      "restorationActions": []
+    },
+    {
+      "id": "order_19",
+      "sequence": 19,
+      "character": "kai",
+      "portrait": "characters/char_kai_thoughtful.svg",
+      "portraitPose": "thoughtful",
+      "dialog": "Für die Abende brauchen wir Licht. Ein einfaches Surfboard tausch ich gegen die Lichterkette.",
+      "requiredItems": [
+        {
+          "item": "chain3_surf_5_simple_board",
+          "asset": "items/chain3_surf_5_simple_board.svg",
+          "displayName": "Einfaches Surfboard",
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 320
+      },
+      "xp": 48,
+      "restorationActions": []
+    },
+    {
+      "id": "order_20",
+      "sequence": 20,
+      "character": "marina",
+      "portrait": "characters/char_marina_excited.svg",
+      "portraitPose": "excited",
+      "dialog": "Lichterkette anbringen! Bring mir Werkzeug und einen Drink für Kai.",
+      "requiredItems": [
+        {
+          "item": "chain4_tool_6_toolbox",
+          "asset": "items/chain4_tool_6_toolbox.svg",
+          "displayName": "Werkzeugkasten",
+          "count": 1
+        },
+        {
+          "item": "chain2_bar_6_tropical_cocktail",
+          "asset": "items/chain2_bar_6_tropical_cocktail.svg",
+          "displayName": "Tropischer Cocktail",
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 360,
+        "gems": 3,
+        "energy": 25
+      },
+      "xp": 60,
+      "restorationActions": [
+        "unlock_element:elem_string_lights"
+      ]
+    },
+    {
+      "id": "order_21",
+      "sequence": 21,
+      "character": "gull",
+      "portrait": "characters/char_gull_happy.svg",
+      "portraitPose": "happy",
+      "dialog": "Die Gäste lieben Blumen. Ein Blumenstrauß von Shellys Beet?",
+      "requiredItems": [
+        {
+          "item": "chain5_garden_5_bouquet",
+          "asset": "items/chain5_garden_5_bouquet.svg",
+          "displayName": "Blumenstrauß",
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 340
+      },
+      "xp": 52,
+      "restorationActions": []
+    },
+    {
+      "id": "order_22",
+      "sequence": 22,
+      "character": "shelly",
+      "portrait": "characters/char_shelly_happy.svg",
+      "portraitPose": "happy",
+      "dialog": "Mein Pflanzgefäß ist fertig bepflanzt – schau es dir an und bring mir noch Muscheln.",
+      "requiredItems": [
+        {
+          "item": "chain5_garden_6_tropical_planter",
+          "asset": "items/chain5_garden_6_tropical_planter.svg",
+          "displayName": "Tropisches Pflanzgefäß",
+          "count": 1
+        },
+        {
+          "item": "chain1_beach_4_shell_collection",
+          "asset": "items/chain1_beach_4_shell_collection.svg",
+          "displayName": "Muschelsammlung",
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 380,
+        "gems": 1
+      },
+      "xp": 56,
+      "restorationActions": []
+    },
+    {
+      "id": "order_23",
+      "sequence": 23,
+      "character": "marina",
+      "portrait": "characters/char_marina_friendly.svg",
+      "portraitPose": "friendly",
+      "dialog": "Frische Blumen an die Theke! Dann strahlt die Bar richtig.",
+      "requiredItems": [
+        {
+          "item": "chain5_garden_5_bouquet",
+          "asset": "items/chain5_garden_5_bouquet.svg",
+          "displayName": "Blumenstrauß",
+          "count": 2
+        }
+      ],
+      "rewards": {
+        "coins": 420,
+        "gems": 2,
+        "energy": 20
+      },
+      "xp": 64,
+      "restorationActions": [
+        "unlock_element:elem_flowers"
+      ]
+    },
+    {
+      "id": "order_24",
+      "sequence": 24,
+      "character": "kai",
+      "portrait": "characters/char_kai_excited.svg",
+      "portraitPose": "excited",
+      "dialog": "Ein Profi-Surfboard als Deko – das zieht die Surfer an.",
+      "requiredItems": [
+        {
+          "item": "chain3_surf_6_pro_board",
+          "asset": "items/chain3_surf_6_pro_board.svg",
+          "displayName": "Profi-Surfboard",
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 460
+      },
+      "xp": 66,
+      "restorationActions": []
+    },
+    {
+      "id": "order_25",
+      "sequence": 25,
+      "character": "gull",
+      "portrait": "characters/char_gull_neutral.svg",
+      "portraitPose": "neutral",
+      "dialog": "Für die große Eröffnung: ein Cocktailtablett voller Drinks.",
+      "requiredItems": [
+        {
+          "item": "chain2_bar_7_cocktail_tray",
+          "asset": "items/chain2_bar_7_cocktail_tray.svg",
+          "displayName": "Cocktailtablett",
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 500,
+        "gems": 3,
+        "energy": 30
+      },
+      "xp": 72,
+      "restorationActions": []
+    },
+    {
+      "id": "order_26",
+      "sequence": 26,
+      "character": "marina",
+      "portrait": "characters/char_marina_excited.svg",
+      "portraitPose": "excited",
+      "dialog": "Häng das Surfbrett als Deko auf – bring Board und Werkzeug!",
+      "requiredItems": [
+        {
+          "item": "chain3_surf_6_pro_board",
+          "asset": "items/chain3_surf_6_pro_board.svg",
+          "displayName": "Profi-Surfboard",
+          "count": 1
+        },
+        {
+          "item": "chain4_tool_7_workbench",
+          "asset": "items/chain4_tool_7_workbench.svg",
+          "displayName": "Werkbank",
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 560,
+        "gems": 3
+      },
+      "xp": 80,
+      "restorationActions": [
+        "unlock_element:elem_surfboard_deco"
+      ]
+    },
+    {
+      "id": "order_27",
+      "sequence": 27,
+      "character": "shelly",
+      "portrait": "characters/char_shelly_happy.svg",
+      "portraitPose": "happy",
+      "dialog": "Fast geschafft! Meine dekorative Palme wartet auf ihren Platz.",
+      "requiredItems": [
+        {
+          "item": "chain5_garden_7_palm_pot",
+          "asset": "items/chain5_garden_7_palm_pot.svg",
+          "displayName": "Dekorative Palme",
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 600,
+        "gems": 2,
+        "energy": 25
+      },
+      "xp": 84,
+      "restorationActions": []
+    },
+    {
+      "id": "order_28",
+      "sequence": 28,
+      "character": "marina",
+      "portrait": "characters/char_marina_excited.svg",
+      "portraitPose": "excited",
+      "dialog": "Zeit für die letzte Palme – dann ist Marinas Strandbar zurück!",
+      "requiredItems": [
+        {
+          "item": "chain5_garden_7_palm_pot",
+          "asset": "items/chain5_garden_7_palm_pot.svg",
+          "displayName": "Dekorative Palme",
+          "count": 1
+        },
+        {
+          "item": "chain4_tool_7_workbench",
+          "asset": "items/chain4_tool_7_workbench.svg",
+          "displayName": "Werkbank",
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 900,
+        "gems": 5,
+        "energy": 40
+      },
+      "xp": 120,
+      "restorationActions": [
+        "set_state:restored",
+        "unlock_element:elem_palm"
+      ]
+    },
+    {
+      "id": "order_29",
+      "sequence": 29,
+      "character": "kai",
+      "portrait": "characters/char_kai_excited.svg",
+      "portraitPose": "excited",
+      "dialog": "Grande Opening! Ein legendäres Surf-Set als Blickfang.",
+      "requiredItems": [
+        {
+          "item": "chain3_surf_8_legendary_set",
+          "asset": "items/chain3_surf_8_legendary_set.svg",
+          "displayName": "Legendäres Sunny-Cove-Set",
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 1200,
+        "gems": 4
+      },
+      "xp": 140,
+      "restorationActions": []
+    },
+    {
+      "id": "order_30",
+      "sequence": 30,
+      "character": "gull",
+      "portrait": "characters/char_gull_happy.svg",
+      "portraitPose": "happy",
+      "dialog": "Sunny Cove erstrahlt wieder. Krön den Tag mit einem Strandbar-Gedeck – auf Marina!",
+      "requiredItems": [
+        {
+          "item": "chain2_bar_8_luxury_bar_set",
+          "asset": "items/chain2_bar_8_luxury_bar_set.svg",
+          "displayName": "Strandbar-Gedeck",
+          "count": 1
+        },
+        {
+          "item": "chain1_beach_6_pearl_necklace",
+          "asset": "items/chain1_beach_6_pearl_necklace.svg",
+          "displayName": "Perlenkette",
+          "count": 1
+        }
+      ],
+      "rewards": {
+        "coins": 2000,
+        "gems": 8,
+        "energy": 50
+      },
+      "xp": 300,
+      "restorationActions": []
+    }
+  ]
+}

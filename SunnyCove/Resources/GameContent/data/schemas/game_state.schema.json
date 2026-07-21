@@ -1,0 +1,238 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GameState",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string"
+    },
+    "saveVersion": {
+      "type": "integer"
+    },
+    "generated": {
+      "type": "string"
+    },
+    "config": {
+      "type": "object"
+    },
+    "player": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "type": "integer"
+        },
+        "xp": {
+          "type": "integer"
+        },
+        "energy": {
+          "type": "number"
+        },
+        "coins": {
+          "type": "integer"
+        },
+        "gems": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "level",
+        "xp",
+        "energy",
+        "coins",
+        "gems"
+      ],
+      "additionalProperties": true
+    },
+    "board": {
+      "type": "object",
+      "properties": {
+        "cols": {
+          "type": "integer"
+        },
+        "rows": {
+          "type": "integer"
+        },
+        "cells": {
+          "type": "array",
+          "minItems": 63,
+          "maxItems": 63,
+          "items": {
+            "type": "object",
+            "properties": {
+              "row": {
+                "type": "integer"
+              },
+              "col": {
+                "type": "integer"
+              },
+              "state": {
+                "enum": [
+                  "empty",
+                  "locked",
+                  "sand",
+                  "cobweb",
+                  "generator",
+                  "item"
+                ]
+              },
+              "item": {
+                "type": "string"
+              },
+              "generator": {
+                "type": "string"
+              },
+              "bubble": {
+                "type": "boolean"
+              },
+              "sandLevel": {
+                "type": "integer"
+              },
+              "unlockLevel": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "row",
+              "col",
+              "state"
+            ],
+            "additionalProperties": true
+          }
+        }
+      },
+      "required": [
+        "cols",
+        "rows",
+        "cells"
+      ],
+      "additionalProperties": true
+    },
+    "generatorsRuntime": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "charges": {
+            "type": "integer"
+          },
+          "maxCharges": {
+            "type": "integer"
+          },
+          "produced": {
+            "type": "integer"
+          },
+          "upgraded": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "charges",
+          "maxCharges",
+          "produced",
+          "upgraded"
+        ],
+        "additionalProperties": true
+      }
+    },
+    "inbox": {
+      "type": "array"
+    },
+    "orders": {
+      "type": "object",
+      "properties": {
+        "campaign": {
+          "type": "string"
+        },
+        "activeOrderId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "completedOrderIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "campaign",
+        "activeOrderId"
+      ],
+      "additionalProperties": true
+    },
+    "restoration": {
+      "type": "object",
+      "properties": {
+        "area": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "placedElements": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "area",
+        "state"
+      ],
+      "additionalProperties": true
+    },
+    "tutorial": {
+      "type": "object",
+      "properties": {
+        "active": {
+          "type": "boolean"
+        },
+        "campaign": {
+          "type": "string"
+        },
+        "currentStep": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "completedSteps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "interrupted": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "active",
+        "currentStep"
+      ],
+      "additionalProperties": true
+    },
+    "clock": {
+      "type": "object"
+    },
+    "campaignComplete": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "saveVersion",
+    "player",
+    "board",
+    "orders",
+    "tutorial"
+  ],
+  "additionalProperties": true
+}

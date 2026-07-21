@@ -1,0 +1,156 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Generators",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string"
+    },
+    "generated": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string"
+    },
+    "generators": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "producesChain": {
+            "type": "string"
+          },
+          "states": {
+            "type": "object",
+            "properties": {
+              "ready": {
+                "type": "string"
+              },
+              "producing": {
+                "type": "string"
+              },
+              "cooldown": {
+                "type": "string"
+              },
+              "upgraded": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "ready",
+              "producing",
+              "cooldown",
+              "upgraded"
+            ],
+            "additionalProperties": true
+          },
+          "base": {
+            "type": "object",
+            "properties": {
+              "energyCostPerTap": {
+                "type": "integer"
+              },
+              "maxCharges": {
+                "type": "integer"
+              },
+              "rechargeSeconds": {
+                "type": "integer"
+              },
+              "productionAnimationMs": {
+                "type": "integer"
+              },
+              "dropTable": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "stage": {
+                      "type": "integer"
+                    },
+                    "weight": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "stage",
+                    "weight"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "required": [
+              "energyCostPerTap",
+              "maxCharges",
+              "rechargeSeconds",
+              "dropTable"
+            ],
+            "additionalProperties": true
+          },
+          "upgraded": {
+            "type": "object",
+            "properties": {
+              "energyCostPerTap": {
+                "type": "integer"
+              },
+              "maxCharges": {
+                "type": "integer"
+              },
+              "rechargeSeconds": {
+                "type": "integer"
+              },
+              "productionAnimationMs": {
+                "type": "integer"
+              },
+              "dropTable": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "stage": {
+                      "type": "integer"
+                    },
+                    "weight": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "stage",
+                    "weight"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "required": [
+              "energyCostPerTap",
+              "maxCharges",
+              "rechargeSeconds",
+              "dropTable"
+            ],
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "id",
+          "producesChain",
+          "states",
+          "base",
+          "upgraded"
+        ],
+        "additionalProperties": true
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "generators"
+  ],
+  "additionalProperties": true
+}

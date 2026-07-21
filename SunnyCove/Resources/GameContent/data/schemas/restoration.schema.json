@@ -1,0 +1,92 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Restoration",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string"
+    },
+    "generated": {
+      "type": "string"
+    },
+    "area": {
+      "type": "string"
+    },
+    "displayName": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string"
+    },
+    "states": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "order": {
+            "type": "integer"
+          },
+          "asset": {
+            "type": "string"
+          },
+          "unlockOrder": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "order",
+          "asset",
+          "unlockOrder"
+        ],
+        "additionalProperties": true
+      }
+    },
+    "placeableElements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "order": {
+            "type": "integer"
+          },
+          "asset": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "unlockOrder": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "order",
+          "asset",
+          "unlockOrder"
+        ],
+        "additionalProperties": true
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "area",
+    "states",
+    "placeableElements"
+  ],
+  "additionalProperties": true
+}

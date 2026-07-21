@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ContentManifest",
+  "type": "object",
+  "properties": {
+    "$comment": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "type": "string"
+    },
+    "contentVersion": {
+      "type": "string"
+    },
+    "minAppVersion": {
+      "type": "string"
+    },
+    "generatedAt": {
+      "type": "string"
+    },
+    "integrity": {
+      "type": "object",
+      "properties": {
+        "algorithm": {
+          "type": "string"
+        },
+        "manifestHash": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "algorithm",
+        "manifestHash"
+      ],
+      "additionalProperties": true
+    },
+    "dataFiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "hash": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "hash"
+        ],
+        "additionalProperties": true
+      }
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "hash": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "hash"
+        ],
+        "additionalProperties": true
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "contentVersion",
+    "minAppVersion",
+    "integrity",
+    "assets"
+  ],
+  "additionalProperties": true
+}

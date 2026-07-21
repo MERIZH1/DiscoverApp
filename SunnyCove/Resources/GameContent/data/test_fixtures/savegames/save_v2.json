@@ -1,0 +1,93 @@
+{
+  "schemaVersion": "1.0.0",
+  "saveVersion": 2,
+  "player": {
+    "level": 7,
+    "xp": 880,
+    "energy": 75,
+    "energyMax": 120,
+    "coins": 1500,
+    "gems": 22
+  },
+  "board": {
+    "cols": 7,
+    "rows": 9,
+    "_fixtureNote": "gekürztes Board — Fixture prüft Feld-Transformationen, nicht die 63-Feld-Regel",
+    "cells": [
+      {
+        "row": 0,
+        "col": 0,
+        "state": "generator",
+        "generator": "gen1_beach_crate"
+      },
+      {
+        "row": 1,
+        "col": 1,
+        "state": "item",
+        "item": "chain1_beach_3_shell_trio",
+        "bubble": false
+      },
+      {
+        "row": 6,
+        "col": 0,
+        "state": "locked",
+        "unlockLevel": 3
+      }
+    ]
+  },
+  "generatorsRuntime": [
+    {
+      "id": "gen3_surf_locker",
+      "charges": 8,
+      "maxCharges": 8,
+      "level": 1
+    },
+    {
+      "id": "gen4_tool_chest",
+      "charges": 0,
+      "maxCharges": 8,
+      "level": 0
+    }
+  ],
+  "restoration": {
+    "area": "beachbar",
+    "state": "partial",
+    "placedElements": [
+      "elem_counter",
+      "elem_roof",
+      "elem_sign"
+    ]
+  },
+  "orders": {
+    "campaign": "campaign_01",
+    "current": "order_17",
+    "completedOrderIds": [
+      "order_01",
+      "order_02",
+      "order_03",
+      "order_04",
+      "order_05",
+      "order_06",
+      "order_07",
+      "order_08",
+      "order_09",
+      "order_10",
+      "order_11",
+      "order_12",
+      "order_13",
+      "order_14",
+      "order_15",
+      "order_16"
+    ]
+  },
+  "inbox": [],
+  "campaignComplete": false,
+  "tutorial": {
+    "active": false,
+    "campaign": "tutorial_campaign_01",
+    "currentStep": null,
+    "completedSteps": [
+      "tut_done"
+    ]
+  }
+}

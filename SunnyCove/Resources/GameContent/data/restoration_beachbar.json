@@ -1,0 +1,95 @@
+{
+  "schemaVersion": "1.0.0",
+  "generated": "2026-07-21",
+  "area": "beachbar",
+  "displayName": "Marinas Strandbar",
+  "note": "states.order = Reihenfolge der Bauzustände. placeableElements.order = Einblend-Reihenfolge; unlockOrder = Auftrags-ID aus orders_campaign_01.json, die das Element freischaltet.",
+  "states": [
+    {
+      "id": "damaged",
+      "order": 0,
+      "asset": "restoration/beachbar_damaged.svg",
+      "unlockOrder": null,
+      "description": "Ausgangszustand nach dem Sturm: eingebrochenes Dach, herausgebrochene Bretter, schiefes Schild."
+    },
+    {
+      "id": "partial",
+      "order": 1,
+      "asset": "restoration/beachbar_partial.svg",
+      "unlockOrder": "order_09",
+      "description": "Grundgerüst steht wieder: Dach und Theke reparaturbereit, erste Aufbauten sichtbar."
+    },
+    {
+      "id": "restored",
+      "order": 2,
+      "asset": "restoration/beachbar_restored.svg",
+      "unlockOrder": "order_28",
+      "description": "Voll restauriert: rotes Dach, Gold-Schild, Lichterkette, Hocker, Blumen, Surfbrett-Deko."
+    }
+  ],
+  "placeableElements": [
+    {
+      "id": "elem_counter",
+      "order": 1,
+      "asset": "restoration/elem_counter.svg",
+      "displayName": "Theke",
+      "unlockOrder": "order_06"
+    },
+    {
+      "id": "elem_roof",
+      "order": 2,
+      "asset": "restoration/elem_roof.svg",
+      "displayName": "Dach",
+      "unlockOrder": "order_09"
+    },
+    {
+      "id": "elem_sign",
+      "order": 3,
+      "asset": "restoration/elem_sign.svg",
+      "displayName": "Schild",
+      "unlockOrder": "order_12"
+    },
+    {
+      "id": "elem_chair_a",
+      "order": 4,
+      "asset": "restoration/elem_chair_a.svg",
+      "displayName": "Barhocker (blau)",
+      "unlockOrder": "order_15"
+    },
+    {
+      "id": "elem_chair_b",
+      "order": 5,
+      "asset": "restoration/elem_chair_b.svg",
+      "displayName": "Barhocker (rosa)",
+      "unlockOrder": "order_17"
+    },
+    {
+      "id": "elem_string_lights",
+      "order": 6,
+      "asset": "restoration/elem_string_lights.svg",
+      "displayName": "Lichterkette",
+      "unlockOrder": "order_20"
+    },
+    {
+      "id": "elem_flowers",
+      "order": 7,
+      "asset": "restoration/elem_flowers.svg",
+      "displayName": "Blumen",
+      "unlockOrder": "order_23"
+    },
+    {
+      "id": "elem_surfboard_deco",
+      "order": 8,
+      "asset": "restoration/elem_surfboard_deco.svg",
+      "displayName": "Surfbrett-Deko",
+      "unlockOrder": "order_26"
+    },
+    {
+      "id": "elem_palm",
+      "order": 9,
+      "asset": "restoration/elem_palm.svg",
+      "displayName": "Palme",
+      "unlockOrder": "order_28"
+    }
+  ]
+}

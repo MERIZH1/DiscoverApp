@@ -1,0 +1,98 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MergeChains",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string"
+    },
+    "generated": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string"
+    },
+    "chains": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "theme": {
+            "type": "string"
+          },
+          "boardColor": {
+            "type": "string"
+          },
+          "generator": {
+            "type": "string"
+          },
+          "maxStage": {
+            "type": "integer"
+          },
+          "stages": {
+            "type": "array",
+            "minItems": 8,
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "properties": {
+                "stage": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 8
+                },
+                "id": {
+                  "type": "string"
+                },
+                "asset": {
+                  "type": "string"
+                },
+                "displayName": {
+                  "type": "string"
+                },
+                "sellValue": {
+                  "type": "integer"
+                },
+                "xpValue": {
+                  "type": "integer"
+                },
+                "unlockedByDefault": {
+                  "type": "boolean"
+                },
+                "mergeInto": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "stage",
+                "id",
+                "asset",
+                "sellValue",
+                "xpValue",
+                "mergeInto"
+              ],
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "id",
+          "generator",
+          "stages"
+        ],
+        "additionalProperties": true
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "chains"
+  ],
+  "additionalProperties": true
+}

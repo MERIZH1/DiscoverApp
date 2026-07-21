@@ -1,0 +1,919 @@
+{
+  "schemaVersion": "1.0.0",
+  "contentVersion": "2026.07.0",
+  "minAppVersion": "0.1.0",
+  "generatedAt": "2026-07-21T00:00:00Z",
+  "integrity": {
+    "algorithm": "sha256",
+    "manifestHash": "sha256:generated-at-build"
+  },
+  "dataFiles": [
+    {
+      "path": "data/asset_manifest.json",
+      "bytes": 55773,
+      "hash": "sha256:2b5b914c23a1759db81a11e2046b7d1bd80d91a0eb97c71359e0709f4a8402d4"
+    },
+    {
+      "path": "data/content-manifest.example.json",
+      "bytes": 1418,
+      "hash": "sha256:b0f6e6cecc74b69cfb0fcd6157b1e5ad6a5c46bd38d214a59824b5bd05ab5b96"
+    },
+    {
+      "path": "data/generators.json",
+      "bytes": 7014,
+      "hash": "sha256:c0455b5daad62089d3b99daf3f5016123ee63124db6a1a9c02b45c9323f6a4bb"
+    },
+    {
+      "path": "data/initial_game_state.json",
+      "bytes": 9642,
+      "hash": "sha256:6c915b73cb348757b1223a480e9b4adbac70a956388eb8847b428033d9e9f559"
+    },
+    {
+      "path": "data/merge_chains.json",
+      "bytes": 14601,
+      "hash": "sha256:5525ee49fc2c74d4aa3a74be882d81ff2d5119836f5c18f61ee200f5d0825813"
+    },
+    {
+      "path": "data/orders_campaign_01.json",
+      "bytes": 21156,
+      "hash": "sha256:a247f9e9df9b0172d0f4f87528319dbebbb5901ae39acf3b4f57a183f24ec08c"
+    },
+    {
+      "path": "data/restoration_beachbar.json",
+      "bytes": 2761,
+      "hash": "sha256:0bde357941c015e92dba47ade5a05a6e8521ec785c61532369e435d1cbd0375f"
+    },
+    {
+      "path": "data/tutorial_campaign_01.json",
+      "bytes": 6136,
+      "hash": "sha256:0d3c5f471e38264ec209eb74ef74f0a1d18f89da83ea3d63d1c3665430f152a1"
+    }
+  ],
+  "assets": [
+    {
+      "path": "appstore/app_icon_1024_fullbleed.svg",
+      "bytes": 4822,
+      "hash": "sha256:8115bdb93642c58aecb906bedb64fc914ef520457c93e1cd36ca9ca007c73b9b"
+    },
+    {
+      "path": "appstore/logo_full.svg",
+      "bytes": 35980,
+      "hash": "sha256:9725b4f7a4de522629cc40b1fbe5710b8eb88ee2c852eb361232eb9b0ddde60b"
+    },
+    {
+      "path": "appstore/logo_wordmark_single.svg",
+      "bytes": 33758,
+      "hash": "sha256:e2d5f687785d0de1b901af2bedc1f43fa8e8d284696fc8ed815be1f7af4e9b76"
+    },
+    {
+      "path": "appstore/logo_wordmark.svg",
+      "bytes": 35499,
+      "hash": "sha256:b5784752a9eea9768a1fe7bdd24485d7f58b5cd4c4d71f334c5a87088b6a6d96"
+    },
+    {
+      "path": "appstore/splash_portrait.svg",
+      "bytes": 38973,
+      "hash": "sha256:61f0412b3d4ad718dce0574757a76f10b7f33f34b2f7a72535b3cf42ec44d637"
+    },
+    {
+      "path": "board/bubble_item.svg",
+      "bytes": 2747,
+      "hash": "sha256:4694d2b70a478bc0df6d31cb1f87ac330b659ee8b551702274fafe595665e44e"
+    },
+    {
+      "path": "board/chest_closed.svg",
+      "bytes": 3333,
+      "hash": "sha256:ff70b5734f13e581922d76975f2b2be462f2ea542f9ed45fa94c9f03e26f3d5a"
+    },
+    {
+      "path": "board/chest_open.svg",
+      "bytes": 5706,
+      "hash": "sha256:1bb3a329e488f1425f11b3a8ea9953300f854deb27c61aecdf07760e647c6c46"
+    },
+    {
+      "path": "board/gift_box.svg",
+      "bytes": 3140,
+      "hash": "sha256:1a8357db3045b051c070c7e1d5ce13ff93362bf31445de08bb450aaa06672bec"
+    },
+    {
+      "path": "board/mystery_crate.svg",
+      "bytes": 3446,
+      "hash": "sha256:c2f3a1d74905d8ff0a7ab1b8e1efe1d05c2a50fe9be784fd096c5c2b1cc45e13"
+    },
+    {
+      "path": "board/order_check.svg",
+      "bytes": 2848,
+      "hash": "sha256:eea1296608efc647e3c9c5be5cd274f2b52fe34301b3e0359523c07ad36d5f91"
+    },
+    {
+      "path": "board/sale_marker.svg",
+      "bytes": 3593,
+      "hash": "sha256:329c9ed596c02e7e5e0ff7cd8dd369a46d2b8518ee521004d0f86847a69d3634"
+    },
+    {
+      "path": "board/tile_cobweb.svg",
+      "bytes": 4734,
+      "hash": "sha256:856212b98b59c041b08000bfb6e8df2620f5c717ca399e900abde11041089fbe"
+    },
+    {
+      "path": "board/tile_drop_invalid.svg",
+      "bytes": 3037,
+      "hash": "sha256:4ef498f9fb6f5ba66bc3cf1d7e2ee778f79b2a261c2c47bba7a6411871fc58e7"
+    },
+    {
+      "path": "board/tile_drop_valid.svg",
+      "bytes": 3055,
+      "hash": "sha256:c030817978260fff863b83b6566277488f7fa9139ac5b5ac053c52309ab46241"
+    },
+    {
+      "path": "board/tile_empty.svg",
+      "bytes": 2629,
+      "hash": "sha256:9673aa717997d59bbafe1d215662e2eddf33ba83fcd6ac7798a7a50cb54e33c8"
+    },
+    {
+      "path": "board/tile_locked.svg",
+      "bytes": 3498,
+      "hash": "sha256:2cec287b8e2aca9c0f14fadf6a81cfb1434b67a2548330ba38e4f265f8fda747"
+    },
+    {
+      "path": "board/tile_sand_1.svg",
+      "bytes": 2905,
+      "hash": "sha256:4eed40970bb6690a77b754854a507b48cb18c0f03290ff751d19a64d1bea11f8"
+    },
+    {
+      "path": "board/tile_sand_2.svg",
+      "bytes": 3408,
+      "hash": "sha256:24fad23159fe21a34bf058adb92659ff686afac4b04e2c67a96eea149425bf22"
+    },
+    {
+      "path": "board/tile_sand_3.svg",
+      "bytes": 4005,
+      "hash": "sha256:852dfc980ecd620cb5a1db44f6356333f9a492d53fae850dc3b5b7734424a814"
+    },
+    {
+      "path": "board/tile_selected.svg",
+      "bytes": 3098,
+      "hash": "sha256:0f7b59930877789251656d04a0e749fb03923a5dfa1a11fb138dbf59d1563893"
+    },
+    {
+      "path": "board/token_coin.svg",
+      "bytes": 2977,
+      "hash": "sha256:d7d386ef81504422d22bec23a9a85432065f5a3ddbf3707afa3ae9322cab85b0"
+    },
+    {
+      "path": "board/token_energy.svg",
+      "bytes": 2804,
+      "hash": "sha256:c269bb66879a57628285939ef2da789bc148445e20e8d8ed3bae7bc6e24cf99f"
+    },
+    {
+      "path": "board/token_gem.svg",
+      "bytes": 3016,
+      "hash": "sha256:5b17c6c427563fc0af5eaa3ebcc38929cdb64826e3c180dfab57fdd3c5a65316"
+    },
+    {
+      "path": "board/token_xp.svg",
+      "bytes": 2994,
+      "hash": "sha256:c681190834e5fb109e59465b0748e4877e9e4d643f2c64a24ed57049ec4b7082"
+    },
+    {
+      "path": "characters/char_gull_happy.svg",
+      "bytes": 2647,
+      "hash": "sha256:324bcd8dc45072c5e85f65d3a3e8302e6ab6ca799dde4f49f8af461fe054f45d"
+    },
+    {
+      "path": "characters/char_gull_neutral.svg",
+      "bytes": 2724,
+      "hash": "sha256:99ff3b3e22ea3183e4fa06b4a44e12dd93cd4b865668ff4456c97b5ddb240df4"
+    },
+    {
+      "path": "characters/char_gull_sad.svg",
+      "bytes": 2795,
+      "hash": "sha256:682e441429b8879d174623b58980dbd62a188c9ac3a74cd7145f43ea4098635e"
+    },
+    {
+      "path": "characters/char_gull_surprised.svg",
+      "bytes": 2757,
+      "hash": "sha256:77e6b1c4672bbdd9266dd805273809019b6d36b43ec079fa4ab19d76cd2e7f7f"
+    },
+    {
+      "path": "characters/char_kai_excited.svg",
+      "bytes": 3258,
+      "hash": "sha256:a527236a2331dba4a4ceb4ba7fd759a50e0f8b749db2941d56c9033c09969c14"
+    },
+    {
+      "path": "characters/char_kai_friendly.svg",
+      "bytes": 2952,
+      "hash": "sha256:36efeb144a8b6eb053f1b8b0c337e1440c020496911c22b88c37358728fe3e16"
+    },
+    {
+      "path": "characters/char_kai_neutral.svg",
+      "bytes": 2952,
+      "hash": "sha256:ba439950c63586c52e2fc7010c1e80453e07160616342c66c25e911fd185ddd0"
+    },
+    {
+      "path": "characters/char_kai_pointing.svg",
+      "bytes": 3051,
+      "hash": "sha256:7c0781ad405a9ecb27515b426edb4e3f274c84371cd0a6f08b2f1272ebda533f"
+    },
+    {
+      "path": "characters/char_kai_sad.svg",
+      "bytes": 3084,
+      "hash": "sha256:3a0d08ed85cd265d003463cde8d0f4072c11d88fff2e3737b081f47b517eb007"
+    },
+    {
+      "path": "characters/char_kai_surprised.svg",
+      "bytes": 2976,
+      "hash": "sha256:4cfc95bbf8b6b75e9149c3cd78f0028484c01c7f48ff8e8943068871249af6fa"
+    },
+    {
+      "path": "characters/char_kai_thoughtful.svg",
+      "bytes": 2952,
+      "hash": "sha256:9d5bf92e0af1ecdc5e005c15160e3b0d87d1c3208a45613597d94f981532ce7c"
+    },
+    {
+      "path": "characters/char_kai_worried.svg",
+      "bytes": 3087,
+      "hash": "sha256:68bf8aaab20e7a48d5065205beabc5e2c6da0d7744a127ca0038bf406ae1a6d9"
+    },
+    {
+      "path": "characters/char_marina_excited.svg",
+      "bytes": 3758,
+      "hash": "sha256:01c332eaaf8a70035a1c8105d9c214caea671ead91d62ae822fd30aac52b8728"
+    },
+    {
+      "path": "characters/char_marina_friendly.svg",
+      "bytes": 3451,
+      "hash": "sha256:2bc97463fdb5b4179cd5bd2946c15b568b45ded63b4550b487d389d41bd4f7f2"
+    },
+    {
+      "path": "characters/char_marina_neutral.svg",
+      "bytes": 3451,
+      "hash": "sha256:7fb25dd902caa08765608c3cf1f6a07e49135f11521339dd9af5a1401bdb6236"
+    },
+    {
+      "path": "characters/char_marina_pointing.svg",
+      "bytes": 3551,
+      "hash": "sha256:438ebfd788810276f088b7becd508705371ab7ee337a06e76529f5a85c2e0e6a"
+    },
+    {
+      "path": "characters/char_marina_sad.svg",
+      "bytes": 3584,
+      "hash": "sha256:a85165dde478b8453ad115756219021362ccb0735b315ab67383c9a0a27879f2"
+    },
+    {
+      "path": "characters/char_marina_surprised.svg",
+      "bytes": 3476,
+      "hash": "sha256:490ca8c6c4ccf7644767f20fabe1de5899ecc405829ea97236bf9568d35f76f6"
+    },
+    {
+      "path": "characters/char_marina_thoughtful.svg",
+      "bytes": 3452,
+      "hash": "sha256:3e834da4060e13bd37737594f336538ee8a7a3d3e8812650b0b3a967b16d53e8"
+    },
+    {
+      "path": "characters/char_marina_worried.svg",
+      "bytes": 3587,
+      "hash": "sha256:62409e4644a32d96999b7b605c56af44b829ac92323fc9385edd8fd41340f706"
+    },
+    {
+      "path": "characters/char_shelly_happy.svg",
+      "bytes": 2620,
+      "hash": "sha256:9b211db0174952c18783f7e9fe774dfd2b3c5384f205f54faf47d39a1071e610"
+    },
+    {
+      "path": "characters/char_shelly_neutral.svg",
+      "bytes": 2683,
+      "hash": "sha256:039c78f117910e2fe51a4007b88b123f51ea6efebec016f0b7048296a368a195"
+    },
+    {
+      "path": "characters/char_shelly_sad.svg",
+      "bytes": 2840,
+      "hash": "sha256:1cc3659daa69a1eb1d8907417c7290b5ed1ad0eb9f8880f70c93c731179011ab"
+    },
+    {
+      "path": "characters/char_shelly_surprised.svg",
+      "bytes": 2698,
+      "hash": "sha256:3d204663d6d9028c96cb7c67b03283859a2c86c69a882d9a1ca41556c55db161"
+    },
+    {
+      "path": "generators/gen1_beach_crate_cooldown.svg",
+      "bytes": 4603,
+      "hash": "sha256:800c5f26fd1ca47403d939621526a94bd20a8d5eb3a7a23a04d0860b87e4e989"
+    },
+    {
+      "path": "generators/gen1_beach_crate_producing.svg",
+      "bytes": 5052,
+      "hash": "sha256:cf5ffd9a60af5eb83c420dbb4e2a3ae6bcc912e51d9d3ae24440b24acc4a68fb"
+    },
+    {
+      "path": "generators/gen1_beach_crate_ready.svg",
+      "bytes": 4465,
+      "hash": "sha256:823cd46e51e1f8663c6b50486e8ea4c7dbdec56c4462b85da800a21f9baa3100"
+    },
+    {
+      "path": "generators/gen1_beach_crate_upgraded.svg",
+      "bytes": 4757,
+      "hash": "sha256:fe7d16aa2af798dfe6bb2375fca489621a13404cd43fe3bf748e7732a5f54a43"
+    },
+    {
+      "path": "generators/gen2_bar_cart_cooldown.svg",
+      "bytes": 4580,
+      "hash": "sha256:2f06ca4d5309c879c8943b35d43a58c8507248cb77e6e39b165b2d06962d37f3"
+    },
+    {
+      "path": "generators/gen2_bar_cart_producing.svg",
+      "bytes": 4759,
+      "hash": "sha256:e1f6356202d650c270defc461e40fc7ef8f01e3059735c4911c68dde278e90a7"
+    },
+    {
+      "path": "generators/gen2_bar_cart_ready.svg",
+      "bytes": 4442,
+      "hash": "sha256:d09b2c3c62cbe329fcba0e468c9e82539d5823944ce6d092d6d8772b7f555553"
+    },
+    {
+      "path": "generators/gen2_bar_cart_upgraded.svg",
+      "bytes": 4734,
+      "hash": "sha256:8376c34ee0e49edff6e711389e4edd2520d7e652f22ab8087219acb980c3090d"
+    },
+    {
+      "path": "generators/gen3_surf_locker_cooldown.svg",
+      "bytes": 5145,
+      "hash": "sha256:18a92f1ef5d7efd80e01494a0c9bec2248ea401fc360ec449dc0b901b563db63"
+    },
+    {
+      "path": "generators/gen3_surf_locker_producing.svg",
+      "bytes": 5288,
+      "hash": "sha256:fa0696f3ac0891f92140fb22a6f90cca286aee341f844583095486060519134d"
+    },
+    {
+      "path": "generators/gen3_surf_locker_ready.svg",
+      "bytes": 5007,
+      "hash": "sha256:2d43a8517241b6925fa505d87558763fd738b6cb854aee6d8518b9e35827010d"
+    },
+    {
+      "path": "generators/gen3_surf_locker_upgraded.svg",
+      "bytes": 5299,
+      "hash": "sha256:5835d1fa258c06a62e9041622f457b75e970b18a367a190ac28d496118cfe3bb"
+    },
+    {
+      "path": "generators/gen4_tool_chest_cooldown.svg",
+      "bytes": 4246,
+      "hash": "sha256:322d9819f41c801f79a1e7c1a05c30c47bdc56fb54a29266b4d2793208cf9d70"
+    },
+    {
+      "path": "generators/gen4_tool_chest_producing.svg",
+      "bytes": 4621,
+      "hash": "sha256:dfbedaed32efc7474bfb4f09d044d90859a00f79dce4814d262322b544a085d3"
+    },
+    {
+      "path": "generators/gen4_tool_chest_ready.svg",
+      "bytes": 4108,
+      "hash": "sha256:ec6f36d84b4f582ebbf9399523b58b7d81e2a27542c64debcd77569f2153a58c"
+    },
+    {
+      "path": "generators/gen4_tool_chest_upgraded.svg",
+      "bytes": 4400,
+      "hash": "sha256:558d9605c8aa1e25a4353cc6400c5eebaff019ebbef491c86d739b8d985dc01f"
+    },
+    {
+      "path": "generators/gen5_garden_basket_cooldown.svg",
+      "bytes": 5816,
+      "hash": "sha256:1bebbc21bd6b20d09621227bb0da2d58827dfc6575f887a8bae9d33c095d0b8d"
+    },
+    {
+      "path": "generators/gen5_garden_basket_producing.svg",
+      "bytes": 6727,
+      "hash": "sha256:fe07eadb2e998ecc046f091a1ddfe6cc58dbe8f946ece85dd018f7e432fc69f5"
+    },
+    {
+      "path": "generators/gen5_garden_basket_ready.svg",
+      "bytes": 5678,
+      "hash": "sha256:e3492b834fea7912afacf7e53d2c19a0d4b6597470ee95db953dadcac4b49640"
+    },
+    {
+      "path": "generators/gen5_garden_basket_upgraded.svg",
+      "bytes": 5970,
+      "hash": "sha256:5b317c3a0164611b571abd6df68fdef3bb67c5ac8917fd73a79de305f0572da3"
+    },
+    {
+      "path": "items/chain1_beach_1_shell_shard.svg",
+      "bytes": 2871,
+      "hash": "sha256:5470513346c94fb2d0be7a9bbb34a78a15b0d1c8ae565775df42c5a708e23fd7"
+    },
+    {
+      "path": "items/chain1_beach_2_small_shell.svg",
+      "bytes": 2866,
+      "hash": "sha256:3985656a50f2c800f6c571801b088991c958400d61987a72570e857855a253da"
+    },
+    {
+      "path": "items/chain1_beach_3_shell_trio.svg",
+      "bytes": 3833,
+      "hash": "sha256:8a3e52b598498268cfb70296d1ab192d164b759f4414fd38fb86a05323a44272"
+    },
+    {
+      "path": "items/chain1_beach_4_shell_collection.svg",
+      "bytes": 4328,
+      "hash": "sha256:be1c428d44a74e4885519f867b4fcdd188abca804e1aa94c619ee2309abb8a34"
+    },
+    {
+      "path": "items/chain1_beach_5_pearl_shell.svg",
+      "bytes": 3336,
+      "hash": "sha256:57ea6dcf52ea7b50c351cdacb8d6b77b88bf5b0ee04cab06cf986589ba481bcd"
+    },
+    {
+      "path": "items/chain1_beach_6_pearl_necklace.svg",
+      "bytes": 5383,
+      "hash": "sha256:95aa118ff4dab45e119682c767072d2b20bd8ad8e0772e8de7e24eebba2c7307"
+    },
+    {
+      "path": "items/chain1_beach_7_jewelry_box.svg",
+      "bytes": 3997,
+      "hash": "sha256:717c3b3c61fdc371011e676ef9e8b8395c5501c05002e44c9b7c1b9151823338"
+    },
+    {
+      "path": "items/chain1_beach_8_treasure_crown.svg",
+      "bytes": 5497,
+      "hash": "sha256:5f6ff34b4ebc6cde2671d6b687289949fe463f492d82fbe47f3eec9f91bc254d"
+    },
+    {
+      "path": "items/chain2_bar_1_lime_slice.svg",
+      "bytes": 3073,
+      "hash": "sha256:993b760c8e8cfb9f3bd741811bb9bdb9358491fe8b10950ccbc888dc5b52ab13"
+    },
+    {
+      "path": "items/chain2_bar_2_limes.svg",
+      "bytes": 3546,
+      "hash": "sha256:3333cc60c77fed04aa9fecfeaca5ca0fbf603d6519c811389b65193100d480a7"
+    },
+    {
+      "path": "items/chain2_bar_3_juice_glass.svg",
+      "bytes": 2994,
+      "hash": "sha256:58606b101b947ea5ad48242ea3389dd65ce6cb3e9575dd47d10e11a06ba0d026"
+    },
+    {
+      "path": "items/chain2_bar_4_lemonade.svg",
+      "bytes": 3909,
+      "hash": "sha256:046717738e2e4210fdf4348d1613d42737a46cf6fa2ccddab7f97ce7c9308ed5"
+    },
+    {
+      "path": "items/chain2_bar_5_coconut_drink.svg",
+      "bytes": 3821,
+      "hash": "sha256:b560f0d225dc8dd6db129553fc1319b72c0fd24f8ce7476e3c9576b412f9aff6"
+    },
+    {
+      "path": "items/chain2_bar_6_tropical_cocktail.svg",
+      "bytes": 4117,
+      "hash": "sha256:933cc2d089c0542976972aebf0ee21d2f6d3419b2b8758e52dd8a7c05e5b0cf9"
+    },
+    {
+      "path": "items/chain2_bar_7_cocktail_tray.svg",
+      "bytes": 4761,
+      "hash": "sha256:90c8235b31b278872c1f4f8932760a1b7db7e6b45a6310979d37ce06370ff7e0"
+    },
+    {
+      "path": "items/chain2_bar_8_luxury_bar_set.svg",
+      "bytes": 4628,
+      "hash": "sha256:97a8524b332627c2cd04f5ec9c39f4492257595e0e4e4fde205bf462084ada12"
+    },
+    {
+      "path": "items/chain3_surf_1_wax.svg",
+      "bytes": 2873,
+      "hash": "sha256:802c2aba0e4cfd9b7836fdfbeda3524c8d51f2e28393afd1b32e928fe027f390"
+    },
+    {
+      "path": "items/chain3_surf_2_wax_comb.svg",
+      "bytes": 3475,
+      "hash": "sha256:b77b3e27ededf0b2aad7a853e21aa62edb61b9575fcd9463a158f4182f158296"
+    },
+    {
+      "path": "items/chain3_surf_3_fin.svg",
+      "bytes": 2797,
+      "hash": "sha256:3541b8bd76cef54dda3dc2ce9b221a94f9668a24d8a7f0cc3eb0c5ee5fecc541"
+    },
+    {
+      "path": "items/chain3_surf_4_bodyboard.svg",
+      "bytes": 2942,
+      "hash": "sha256:d545f0f5e6f89922aba847bbc3f5263ffbb39bfe020c753397540c4166a4e85e"
+    },
+    {
+      "path": "items/chain3_surf_5_simple_board.svg",
+      "bytes": 2777,
+      "hash": "sha256:63306a3b7ab6cd451250de94ad716eca93c206ad720e371359e4a811d8d6f710"
+    },
+    {
+      "path": "items/chain3_surf_6_pro_board.svg",
+      "bytes": 3735,
+      "hash": "sha256:1783f74b582c2f77257bbf772c36b520faf4a1899711773737c9895687390ff2"
+    },
+    {
+      "path": "items/chain3_surf_7_surf_gear.svg",
+      "bytes": 3400,
+      "hash": "sha256:8e81acd3f948a2a15cf969f59aed3212e6a7f6ec9645d028d6dad8d6b44c67d1"
+    },
+    {
+      "path": "items/chain3_surf_8_legendary_set.svg",
+      "bytes": 4764,
+      "hash": "sha256:5f756a86e3e5f58aeac1e7529ea19698625a96c001f92d75ec7402330ebc1890"
+    },
+    {
+      "path": "items/chain4_tool_1_screw.svg",
+      "bytes": 2784,
+      "hash": "sha256:3edd502bde2e6c4565dcbab5b3f863f475e22dbb9abea37f05c4729f2733453f"
+    },
+    {
+      "path": "items/chain4_tool_2_screw_pack.svg",
+      "bytes": 3842,
+      "hash": "sha256:c2c83e4c888b9763ee268c0cda9a80e671eaa5a255a2cbbb97dcc60088939fe6"
+    },
+    {
+      "path": "items/chain4_tool_3_screwdriver.svg",
+      "bytes": 2996,
+      "hash": "sha256:00329e11458b2cc1c946a2f37fcdf6b1797ff79a4af26fdc909ad662c62ce838"
+    },
+    {
+      "path": "items/chain4_tool_4_hammer.svg",
+      "bytes": 2956,
+      "hash": "sha256:12898adfd8704021c5ed657bb2ede1a88bb186a40604aceff96e90f3f92fd516"
+    },
+    {
+      "path": "items/chain4_tool_5_tool_bag.svg",
+      "bytes": 3261,
+      "hash": "sha256:e65d66de799b6acb852584824b8d2acec91cfcd274ad946c40ba75ed0aedab45"
+    },
+    {
+      "path": "items/chain4_tool_6_toolbox.svg",
+      "bytes": 3060,
+      "hash": "sha256:db586d49315a57dfa31105defabe36382e1992002238193b91ef48d03297b20d"
+    },
+    {
+      "path": "items/chain4_tool_7_workbench.svg",
+      "bytes": 3786,
+      "hash": "sha256:f818ab32d2c3a6ff5fe837dd2456f23b7b040c654e86210bc6d25e57f98117c5"
+    },
+    {
+      "path": "items/chain4_tool_8_island_workshop.svg",
+      "bytes": 4738,
+      "hash": "sha256:f529493b5ca87eba127d8a0d016ba7a2a9535d51f927dcdd25078f0924af6bd2"
+    },
+    {
+      "path": "items/chain5_garden_1_seed.svg",
+      "bytes": 2826,
+      "hash": "sha256:ffe6b1986c252d59745ea2f0fea144ba601d4979f939a695038fa488cbae45e9"
+    },
+    {
+      "path": "items/chain5_garden_2_sprout.svg",
+      "bytes": 2820,
+      "hash": "sha256:ccca8e2410a0c45e45c58688b68fd8d34d86b7d3e9c4de42ea8f1f8042d24321"
+    },
+    {
+      "path": "items/chain5_garden_3_small_plant.svg",
+      "bytes": 3355,
+      "hash": "sha256:b9ea0a141f1dfbc4d0b98296fe358aac60e9be8444764562c5a3216a7d0f934f"
+    },
+    {
+      "path": "items/chain5_garden_4_hibiscus_pot.svg",
+      "bytes": 4185,
+      "hash": "sha256:cf05abe323a4e03c1925edd16efe1253193c6826b291974052abd989b250cf82"
+    },
+    {
+      "path": "items/chain5_garden_5_bouquet.svg",
+      "bytes": 5727,
+      "hash": "sha256:018cf7d630c9869e0fe6ca3d803f5c06cc97ac1789d65cca132aafe0318b203d"
+    },
+    {
+      "path": "items/chain5_garden_6_tropical_planter.svg",
+      "bytes": 5728,
+      "hash": "sha256:94b5fd7b17b3a6a82233e35d5ed174a5798939febe1271e4b59ea0ae62dc9b26"
+    },
+    {
+      "path": "items/chain5_garden_7_palm_pot.svg",
+      "bytes": 3662,
+      "hash": "sha256:6a8e9e75db0c06d3a6bfdaab37c803c6babb4e6d40b52a4d07eb2a406899a52b"
+    },
+    {
+      "path": "items/chain5_garden_8_garden_arch.svg",
+      "bytes": 8260,
+      "hash": "sha256:c2c38901907b5761061463b9e4e612ac2e7fa967742408b2b09a8cef2a52af6e"
+    },
+    {
+      "path": "restoration/beachbar_damaged.svg",
+      "bytes": 9848,
+      "hash": "sha256:0351595592cc10865dfccae4647362bf241ade388eec0adcc0be9647becb9f9f"
+    },
+    {
+      "path": "restoration/beachbar_partial.svg",
+      "bytes": 8127,
+      "hash": "sha256:79f955d7707c9a945956f313868baea294bf8576d1f08f3e90bfbd036a724b63"
+    },
+    {
+      "path": "restoration/beachbar_restored.svg",
+      "bytes": 11386,
+      "hash": "sha256:83f2e5ecb9505c1aad76b180c691f657a3101ccc426e8f692e51bfac651983c5"
+    },
+    {
+      "path": "restoration/elem_chair_a.svg",
+      "bytes": 2927,
+      "hash": "sha256:7d3488b7c1067df645642174a76ef1c94c6d35fd5e0fe7fada4347e8140b4fac"
+    },
+    {
+      "path": "restoration/elem_chair_b.svg",
+      "bytes": 2927,
+      "hash": "sha256:1f41fa81bdb04c3e8744d2037e265d3d799abb12f43e69cc372c96d4a995c972"
+    },
+    {
+      "path": "restoration/elem_counter.svg",
+      "bytes": 3794,
+      "hash": "sha256:bb77bd915bab7f4a45f5a109cb3a6e565fa91e0663c6aacf83118a70febbd2b8"
+    },
+    {
+      "path": "restoration/elem_flowers.svg",
+      "bytes": 4898,
+      "hash": "sha256:c1ee899a7976dae15a7c18636892897ce317663e80f6faa6fd8e6ea2ae5de68d"
+    },
+    {
+      "path": "restoration/elem_palm.svg",
+      "bytes": 3420,
+      "hash": "sha256:d93619cfc33ae8f0ecec3f24b1e4b8700711b152940a5c82b1e2ecaff88ba8a7"
+    },
+    {
+      "path": "restoration/elem_roof.svg",
+      "bytes": 3477,
+      "hash": "sha256:3edaf42cb13386ad7ea1fff4d44b7aae66d8223a022022c12b93cba43db3c488"
+    },
+    {
+      "path": "restoration/elem_sign.svg",
+      "bytes": 3018,
+      "hash": "sha256:e265d731abfec35d14022735bb88f2eacace8d93c492430ee7ef3f073653bc33"
+    },
+    {
+      "path": "restoration/elem_string_lights.svg",
+      "bytes": 3402,
+      "hash": "sha256:eaa1e8401ee4b266188f8cfbf1e724a2f563e1e7f0be8820de034b1bbd0ed7c3"
+    },
+    {
+      "path": "restoration/elem_surfboard_deco.svg",
+      "bytes": 2996,
+      "hash": "sha256:2b38947b2fc1fadc98e5408c320287045097666e56ae0dd850e273988f0d34ce"
+    },
+    {
+      "path": "ui/btn_audio_disabled.svg",
+      "bytes": 3000,
+      "hash": "sha256:d8d9c9b9dc838c31540013d2d6db4e7b88401ac8568ad3017a688ea91c1567bd"
+    },
+    {
+      "path": "ui/btn_audio_highlighted.svg",
+      "bytes": 3049,
+      "hash": "sha256:fb89eea7babaacc79b95a4bd2f986fb886e77c5635d4d33315b8713e34f8c995"
+    },
+    {
+      "path": "ui/btn_audio_normal.svg",
+      "bytes": 2997,
+      "hash": "sha256:0181fd5f9825be4f8af323b8f81938d4dec5236e61f814a49650cfd5036d92b6"
+    },
+    {
+      "path": "ui/btn_audio_pressed.svg",
+      "bytes": 2874,
+      "hash": "sha256:93f5dd9930f13481c4e1a8c2bd33af9a051746fc4ed1f70d0b149a4c1791a57b"
+    },
+    {
+      "path": "ui/btn_back_disabled.svg",
+      "bytes": 2852,
+      "hash": "sha256:232ac683bb56eb814a6048e18f6c7b694980398f4e567e4301ee1ea27ca5240e"
+    },
+    {
+      "path": "ui/btn_back_highlighted.svg",
+      "bytes": 2903,
+      "hash": "sha256:73d9ef77427469b3372787c06e1eec0b07cc959b7ba186d4e6720be1fc1fa973"
+    },
+    {
+      "path": "ui/btn_back_normal.svg",
+      "bytes": 2851,
+      "hash": "sha256:65751a61da3cebe975aabe86b7ec3f74970613cd0dd209541a53ff7a890fdbac"
+    },
+    {
+      "path": "ui/btn_back_pressed.svg",
+      "bytes": 2728,
+      "hash": "sha256:063b54eb666d73937460a8e492b37841c1cd8460745a9d0eb7b967e323cb8b5c"
+    },
+    {
+      "path": "ui/btn_cancel_disabled.svg",
+      "bytes": 2838,
+      "hash": "sha256:b76a368f49916a7038497f87fd84ca3345d201ecd7076ddb9aac5efb416e0433"
+    },
+    {
+      "path": "ui/btn_cancel_highlighted.svg",
+      "bytes": 2886,
+      "hash": "sha256:d4fe308bb06cd6234fe75832debd59fc41cddb8ce4bdc8adb3bad603bfc09cd2"
+    },
+    {
+      "path": "ui/btn_cancel_normal.svg",
+      "bytes": 2834,
+      "hash": "sha256:7ff764722ad360a195df90977062f390c73af27db67e626054bc4e3592a20404"
+    },
+    {
+      "path": "ui/btn_cancel_pressed.svg",
+      "bytes": 2711,
+      "hash": "sha256:48735a008c3ad07bbd46ae7893c64873f842161d7b0799f1234ee2f7e812911d"
+    },
+    {
+      "path": "ui/btn_close_disabled.svg",
+      "bytes": 2838,
+      "hash": "sha256:1ae701aaa1b8549eb89785ca60666e206e4fe47a032156a11368eb2ff781e667"
+    },
+    {
+      "path": "ui/btn_close_highlighted.svg",
+      "bytes": 2886,
+      "hash": "sha256:76bb4096b7b339800d552ccd7ebe600c6c2dce5a4bd62cfd477516014647fcbc"
+    },
+    {
+      "path": "ui/btn_close_normal.svg",
+      "bytes": 2834,
+      "hash": "sha256:0bd4f21edcd1da347283402ec3ec5af1f900b7c3527cf7e4d61f44e787f18b22"
+    },
+    {
+      "path": "ui/btn_close_pressed.svg",
+      "bytes": 2711,
+      "hash": "sha256:8da2a89c1f0036ef3bf2db85f0c50775e7174cfc3b40f8e5321591d522f1b343"
+    },
+    {
+      "path": "ui/btn_confirm_disabled.svg",
+      "bytes": 2852,
+      "hash": "sha256:2ac2edaefface15f688505f72137836dd382f6fec3ba27dc9288721c07f4e79d"
+    },
+    {
+      "path": "ui/btn_confirm_highlighted.svg",
+      "bytes": 2902,
+      "hash": "sha256:b2cbc73253b93f4f96b51890b527daec12f2e07ddf3fa61e9cc0de4e9c3baa19"
+    },
+    {
+      "path": "ui/btn_confirm_normal.svg",
+      "bytes": 2850,
+      "hash": "sha256:f549e0669fd2356689db1f769ef00c08b2afab3052b75a6248be4b2f2d68ffc1"
+    },
+    {
+      "path": "ui/btn_confirm_pressed.svg",
+      "bytes": 2727,
+      "hash": "sha256:4c15c8eec7f7cde51872af6dc31ebf748e6f6c85c9801fb10622ab899fcac090"
+    },
+    {
+      "path": "ui/btn_info_disabled.svg",
+      "bytes": 2864,
+      "hash": "sha256:7b9285a4b9b9d394210d71b50d02d6645d4751e759023883acd5554b54dcaa3f"
+    },
+    {
+      "path": "ui/btn_info_highlighted.svg",
+      "bytes": 2913,
+      "hash": "sha256:ce6fd15c457a26b8aea47f0c3a1d85755b3a40e083f504176e49ef40da8b32db"
+    },
+    {
+      "path": "ui/btn_info_normal.svg",
+      "bytes": 2861,
+      "hash": "sha256:ac9c808b2367ca7954b7fb3e723431d14ceda7928714c4550163bf3b0f09ab7a"
+    },
+    {
+      "path": "ui/btn_info_pressed.svg",
+      "bytes": 2738,
+      "hash": "sha256:50fdda358bdc17b1a988f9a090112b31c93afcb154d848c76cb1ef4f6949f5d5"
+    },
+    {
+      "path": "ui/btn_settings_disabled.svg",
+      "bytes": 2870,
+      "hash": "sha256:5de5c2932ba9ae1d1f37741526e49a909109d432bbb56afaecc876e91b74ae9e"
+    },
+    {
+      "path": "ui/btn_settings_highlighted.svg",
+      "bytes": 2919,
+      "hash": "sha256:26e4a7c25d5401f71a3f5fe13851bc6e7e6da8b6e87a9a09565978cf2cc572be"
+    },
+    {
+      "path": "ui/btn_settings_normal.svg",
+      "bytes": 2867,
+      "hash": "sha256:8363b62cacfc89840ce6912e6a4cae445b34863a3dbad013622ac63929dbbd6e"
+    },
+    {
+      "path": "ui/btn_settings_pressed.svg",
+      "bytes": 2744,
+      "hash": "sha256:1d8f3324e3bd5b06a16de0e3e46f826c4fbdf06b9b5861b2e990f34941a89917"
+    },
+    {
+      "path": "ui/btn_wide_primary_disabled.svg",
+      "bytes": 2888,
+      "hash": "sha256:48d921e626faf1930c0d20ffce1054c053fa0c1bbd7f7ce1dd85cad24285f2b8"
+    },
+    {
+      "path": "ui/btn_wide_primary_highlighted.svg",
+      "bytes": 2874,
+      "hash": "sha256:891ee03c08bc06ce270da410b760596b5516501e3041a9c4404b05190436fa54"
+    },
+    {
+      "path": "ui/btn_wide_primary_normal.svg",
+      "bytes": 2805,
+      "hash": "sha256:5c24f9bd3343121e4112c3d54761ff1eba2db5d007fd9ed94be367e258a15daf"
+    },
+    {
+      "path": "ui/btn_wide_primary_pressed.svg",
+      "bytes": 2588,
+      "hash": "sha256:616b32d32160464679df402ed47a56149c5d53e7a3d1889b8cbe678b543debb3"
+    },
+    {
+      "path": "ui/btn_wide_secondary_disabled.svg",
+      "bytes": 2888,
+      "hash": "sha256:48d921e626faf1930c0d20ffce1054c053fa0c1bbd7f7ce1dd85cad24285f2b8"
+    },
+    {
+      "path": "ui/btn_wide_secondary_highlighted.svg",
+      "bytes": 2875,
+      "hash": "sha256:a4269c2b214df53ec1ca9b18605a02df1d064e0b4b873f803f8de815b6f3b2fb"
+    },
+    {
+      "path": "ui/btn_wide_secondary_normal.svg",
+      "bytes": 2806,
+      "hash": "sha256:09530e192fbd3e10bb52c0c91e9381326843b72dd74f0267b51df5cada2e2031"
+    },
+    {
+      "path": "ui/btn_wide_secondary_pressed.svg",
+      "bytes": 2589,
+      "hash": "sha256:89bad32b359acf3c9635f41f9cc92d2c5a2c7688f2b8accbe7d6ce4af2fc5a92"
+    },
+    {
+      "path": "ui/btn_wide_tertiary_disabled.svg",
+      "bytes": 2888,
+      "hash": "sha256:48d921e626faf1930c0d20ffce1054c053fa0c1bbd7f7ce1dd85cad24285f2b8"
+    },
+    {
+      "path": "ui/btn_wide_tertiary_highlighted.svg",
+      "bytes": 2873,
+      "hash": "sha256:89dd4d4672633dc8f2e8c48bc7ab2ffec695e675234b426bc497df6cd3ea5413"
+    },
+    {
+      "path": "ui/btn_wide_tertiary_normal.svg",
+      "bytes": 2804,
+      "hash": "sha256:4c1e8f3a9233742325158346509c59d97abd6eaca93791c67067bdb651058260"
+    },
+    {
+      "path": "ui/btn_wide_tertiary_pressed.svg",
+      "bytes": 2587,
+      "hash": "sha256:f6e552770d3fef11a4145796ca7a9574ff7208fb798625112941a31d5001b33d"
+    },
+    {
+      "path": "ui/daily_reward.svg",
+      "bytes": 9637,
+      "hash": "sha256:5b2404b7fca4e7e09becd6129e65f991185e9779d6191a16c91a18440600fdaf"
+    },
+    {
+      "path": "ui/dialog_box.svg",
+      "bytes": 3281,
+      "hash": "sha256:431f2f46149a6271a2aa195a152b222f2ca66efb90d869aaa7d2d88f81929514"
+    },
+    {
+      "path": "ui/order_card_large.svg",
+      "bytes": 3350,
+      "hash": "sha256:1cb7dd033660e664447598e72b6eaa8442cd206fb9d8b6fe7c435dd074040ca0"
+    },
+    {
+      "path": "ui/order_card_medium.svg",
+      "bytes": 3204,
+      "hash": "sha256:c16d6ae270c8190ea4d429d31f2c328b7b4037c558a787d1c752c1c9c6d53146"
+    },
+    {
+      "path": "ui/order_card_small.svg",
+      "bytes": 3086,
+      "hash": "sha256:02f249b402fc03b88e3ccbd4d8671f004ac17c3e43a04809308e5f0ac1e89387"
+    },
+    {
+      "path": "ui/panel_settings.svg",
+      "bytes": 4952,
+      "hash": "sha256:e8651c9ca08268bdc1d236fa365b50e356554b248fc887e10182a234b8f3f338"
+    },
+    {
+      "path": "ui/popup_levelup.svg",
+      "bytes": 5584,
+      "hash": "sha256:40bc33fb8767d259596e5d19f3a63335ad47c9ad0324b1daf0cf49614bb57d63"
+    },
+    {
+      "path": "ui/popup_reward.svg",
+      "bytes": 5715,
+      "hash": "sha256:30c176ed51137af685b94a282b0f8b91dba331904ca9dae7b580410d2ee7146e"
+    },
+    {
+      "path": "ui/shop_card_featured.svg",
+      "bytes": 3232,
+      "hash": "sha256:e2ea18f16a87578ccf6dc372c25d9c3c7f18edd2b8d13efb712d83162a8e7292"
+    },
+    {
+      "path": "ui/shop_card.svg",
+      "bytes": 2992,
+      "hash": "sha256:c73b02e924ecde92536918425539decb442c9f72eb504fc586c2947b8ef427d8"
+    },
+    {
+      "path": "ui/task_list.svg",
+      "bytes": 5792,
+      "hash": "sha256:d68030e958787f15ae427daaa41eef6aec3c42368d84044e92427fd37e0f1ae7"
+    },
+    {
+      "path": "ui/topbar.svg",
+      "bytes": 5874,
+      "hash": "sha256:d4c560fbae0e858ab205de6ee391dcdb5920bed36ac8c96e62ee2fdfe6fca7c5"
+    }
+  ]
+}

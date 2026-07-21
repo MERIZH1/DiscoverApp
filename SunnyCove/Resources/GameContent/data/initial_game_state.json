@@ -1,0 +1,515 @@
+{
+  "schemaVersion": "1.0.0",
+  "saveVersion": 3,
+  "generated": "2026-07-21",
+  "config": {
+    "board": {
+      "cols": 7,
+      "rows": 9,
+      "cells": 63,
+      "bubbleChance": 0.08,
+      "bubbleChanceUpgraded": 0.12
+    },
+    "energy": {
+      "max": 120,
+      "start": 120,
+      "regenSeconds": 15,
+      "levelUpRefill": true,
+      "rewardsMayOverfill": true
+    },
+    "generators": {
+      "autoUpgradeAfterProduced": 60,
+      "chargeRegenFormula": "rechargeSeconds/maxCharges"
+    },
+    "levels": {
+      "thresholds": [
+        0,
+        50,
+        120,
+        210,
+        330,
+        480,
+        660,
+        880,
+        1140,
+        1450,
+        1810,
+        2230,
+        2720,
+        3290,
+        3950,
+        4680
+      ],
+      "beyondIncrement": 800,
+      "rewardGemsPerLevel": 2,
+      "energyRefillOnLevelUp": true,
+      "unlockRowAtLevel": {
+        "6": 3,
+        "7": 6,
+        "8": 10
+      }
+    },
+    "currency": {
+      "startCoins": 50,
+      "startGems": 5
+    },
+    "sell": {
+      "grantsXp": false
+    },
+    "clearing": {
+      "sandCoinsPerLayer": 15,
+      "cobwebCoins": 30,
+      "unlockCellCoinsFormula": "100*2^rowIndex"
+    },
+    "offline": {
+      "maxRegenHours": 24,
+      "appliesToEnergy": true,
+      "appliesToCharges": true,
+      "itemsProduced": false
+    },
+    "gems": {
+      "energyRefillCost": 10,
+      "energyRefillAmount": 60,
+      "skipCooldownCost": 5,
+      "instantUpgradeCost": 20
+    },
+    "overflow": {
+      "inboxSlots": 5,
+      "generatorTapRejectedWhenFull": true
+    },
+    "undo": {
+      "windowSeconds": 5,
+      "actions": [
+        "merge",
+        "move",
+        "sell"
+      ]
+    }
+  },
+  "player": {
+    "level": 1,
+    "xp": 0,
+    "energy": 120,
+    "coins": 50,
+    "gems": 5
+  },
+  "board": {
+    "cols": 7,
+    "rows": 9,
+    "cells": [
+      {
+        "row": 0,
+        "col": 0,
+        "state": "generator",
+        "generator": "gen1_beach_crate"
+      },
+      {
+        "row": 0,
+        "col": 1,
+        "state": "empty"
+      },
+      {
+        "row": 0,
+        "col": 2,
+        "state": "empty"
+      },
+      {
+        "row": 0,
+        "col": 3,
+        "state": "generator",
+        "generator": "gen2_bar_cart"
+      },
+      {
+        "row": 0,
+        "col": 4,
+        "state": "empty"
+      },
+      {
+        "row": 0,
+        "col": 5,
+        "state": "empty"
+      },
+      {
+        "row": 0,
+        "col": 6,
+        "state": "generator",
+        "generator": "gen3_surf_locker"
+      },
+      {
+        "row": 1,
+        "col": 0,
+        "state": "empty"
+      },
+      {
+        "row": 1,
+        "col": 1,
+        "state": "item",
+        "item": "chain1_beach_1_shell_shard",
+        "bubble": false
+      },
+      {
+        "row": 1,
+        "col": 2,
+        "state": "empty"
+      },
+      {
+        "row": 1,
+        "col": 3,
+        "state": "empty"
+      },
+      {
+        "row": 1,
+        "col": 4,
+        "state": "item",
+        "item": "chain1_beach_1_shell_shard",
+        "bubble": false
+      },
+      {
+        "row": 1,
+        "col": 5,
+        "state": "empty"
+      },
+      {
+        "row": 1,
+        "col": 6,
+        "state": "empty"
+      },
+      {
+        "row": 2,
+        "col": 0,
+        "state": "generator",
+        "generator": "gen4_tool_chest"
+      },
+      {
+        "row": 2,
+        "col": 1,
+        "state": "empty"
+      },
+      {
+        "row": 2,
+        "col": 2,
+        "state": "sand",
+        "sandLevel": 2
+      },
+      {
+        "row": 2,
+        "col": 3,
+        "state": "empty"
+      },
+      {
+        "row": 2,
+        "col": 4,
+        "state": "empty"
+      },
+      {
+        "row": 2,
+        "col": 5,
+        "state": "generator",
+        "generator": "gen5_garden_basket"
+      },
+      {
+        "row": 2,
+        "col": 6,
+        "state": "empty"
+      },
+      {
+        "row": 3,
+        "col": 0,
+        "state": "empty"
+      },
+      {
+        "row": 3,
+        "col": 1,
+        "state": "empty"
+      },
+      {
+        "row": 3,
+        "col": 2,
+        "state": "sand",
+        "sandLevel": 2
+      },
+      {
+        "row": 3,
+        "col": 3,
+        "state": "cobweb"
+      },
+      {
+        "row": 3,
+        "col": 4,
+        "state": "empty"
+      },
+      {
+        "row": 3,
+        "col": 5,
+        "state": "empty"
+      },
+      {
+        "row": 3,
+        "col": 6,
+        "state": "empty"
+      },
+      {
+        "row": 4,
+        "col": 0,
+        "state": "empty"
+      },
+      {
+        "row": 4,
+        "col": 1,
+        "state": "item",
+        "item": "chain2_bar_1_lime_slice",
+        "bubble": false
+      },
+      {
+        "row": 4,
+        "col": 2,
+        "state": "empty"
+      },
+      {
+        "row": 4,
+        "col": 3,
+        "state": "empty"
+      },
+      {
+        "row": 4,
+        "col": 4,
+        "state": "empty"
+      },
+      {
+        "row": 4,
+        "col": 5,
+        "state": "item",
+        "item": "chain4_tool_1_screw",
+        "bubble": false
+      },
+      {
+        "row": 4,
+        "col": 6,
+        "state": "empty"
+      },
+      {
+        "row": 5,
+        "col": 0,
+        "state": "empty"
+      },
+      {
+        "row": 5,
+        "col": 1,
+        "state": "empty"
+      },
+      {
+        "row": 5,
+        "col": 2,
+        "state": "empty"
+      },
+      {
+        "row": 5,
+        "col": 3,
+        "state": "sand",
+        "sandLevel": 1
+      },
+      {
+        "row": 5,
+        "col": 4,
+        "state": "empty"
+      },
+      {
+        "row": 5,
+        "col": 5,
+        "state": "empty"
+      },
+      {
+        "row": 5,
+        "col": 6,
+        "state": "empty"
+      },
+      {
+        "row": 6,
+        "col": 0,
+        "state": "locked",
+        "unlockLevel": 3
+      },
+      {
+        "row": 6,
+        "col": 1,
+        "state": "locked",
+        "unlockLevel": 3
+      },
+      {
+        "row": 6,
+        "col": 2,
+        "state": "locked",
+        "unlockLevel": 3
+      },
+      {
+        "row": 6,
+        "col": 3,
+        "state": "locked",
+        "unlockLevel": 3
+      },
+      {
+        "row": 6,
+        "col": 4,
+        "state": "locked",
+        "unlockLevel": 3
+      },
+      {
+        "row": 6,
+        "col": 5,
+        "state": "locked",
+        "unlockLevel": 3
+      },
+      {
+        "row": 6,
+        "col": 6,
+        "state": "locked",
+        "unlockLevel": 3
+      },
+      {
+        "row": 7,
+        "col": 0,
+        "state": "locked",
+        "unlockLevel": 6
+      },
+      {
+        "row": 7,
+        "col": 1,
+        "state": "locked",
+        "unlockLevel": 6
+      },
+      {
+        "row": 7,
+        "col": 2,
+        "state": "locked",
+        "unlockLevel": 6
+      },
+      {
+        "row": 7,
+        "col": 3,
+        "state": "locked",
+        "unlockLevel": 6
+      },
+      {
+        "row": 7,
+        "col": 4,
+        "state": "locked",
+        "unlockLevel": 6
+      },
+      {
+        "row": 7,
+        "col": 5,
+        "state": "locked",
+        "unlockLevel": 6
+      },
+      {
+        "row": 7,
+        "col": 6,
+        "state": "locked",
+        "unlockLevel": 6
+      },
+      {
+        "row": 8,
+        "col": 0,
+        "state": "locked",
+        "unlockLevel": 10
+      },
+      {
+        "row": 8,
+        "col": 1,
+        "state": "locked",
+        "unlockLevel": 10
+      },
+      {
+        "row": 8,
+        "col": 2,
+        "state": "locked",
+        "unlockLevel": 10
+      },
+      {
+        "row": 8,
+        "col": 3,
+        "state": "locked",
+        "unlockLevel": 10
+      },
+      {
+        "row": 8,
+        "col": 4,
+        "state": "locked",
+        "unlockLevel": 10
+      },
+      {
+        "row": 8,
+        "col": 5,
+        "state": "locked",
+        "unlockLevel": 10
+      },
+      {
+        "row": 8,
+        "col": 6,
+        "state": "locked",
+        "unlockLevel": 10
+      }
+    ]
+  },
+  "generatorsRuntime": [
+    {
+      "id": "gen1_beach_crate",
+      "charges": 8,
+      "maxCharges": 8,
+      "produced": 0,
+      "upgraded": false
+    },
+    {
+      "id": "gen2_bar_cart",
+      "charges": 8,
+      "maxCharges": 8,
+      "produced": 0,
+      "upgraded": false
+    },
+    {
+      "id": "gen3_surf_locker",
+      "charges": 8,
+      "maxCharges": 8,
+      "produced": 0,
+      "upgraded": false
+    },
+    {
+      "id": "gen4_tool_chest",
+      "charges": 8,
+      "maxCharges": 8,
+      "produced": 0,
+      "upgraded": false
+    },
+    {
+      "id": "gen5_garden_basket",
+      "charges": 8,
+      "maxCharges": 8,
+      "produced": 0,
+      "upgraded": false
+    }
+  ],
+  "inbox": [],
+  "orders": {
+    "campaign": "campaign_01",
+    "activeOrderId": "order_01",
+    "completedOrderIds": []
+  },
+  "restoration": {
+    "area": "beachbar",
+    "state": "damaged",
+    "placedElements": []
+  },
+  "tutorial": {
+    "active": true,
+    "campaign": "tutorial_campaign_01",
+    "currentStep": "tut_01",
+    "completedSteps": [],
+    "interrupted": false
+  },
+  "clock": {
+    "lastSavedWallClock": null,
+    "lastSavedMonotonic": null,
+    "clockAnomaly": false
+  },
+  "campaignComplete": false
+}

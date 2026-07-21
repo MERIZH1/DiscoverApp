@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "1.0.0",
+  "contentVersion": "2026.08.0",
+  "minAppVersion": "1.0.0",
+  "generatedAt": "2026-07-21T00:00:00Z",
+  "integrity": {
+    "algorithm": "sha256",
+    "manifestHash": "sha256:<signiert-separat>",
+    "signature": "ed25519:<PLATZHALTER>"
+  },
+  "dataFiles": [
+    {
+      "path": "data/merge_chains.json",
+      "bytes": 14601,
+      "hash": "sha256:5525ee49fc2c74d4aa3a74be882d81ff2d5119836f5c18f61ee200f5d0825813"
+    },
+    {
+      "path": "data/generators.json",
+      "bytes": 7014,
+      "hash": "sha256:c0455b5daad62089d3b99daf3f5016123ee63124db6a1a9c02b45c9323f6a4bb"
+    },
+    {
+      "path": "data/orders_campaign_01.json",
+      "bytes": 21156,
+      "hash": "sha256:a247f9e9df9b0172d0f4f87528319dbebbb5901ae39acf3b4f57a183f24ec08c"
+    }
+  ],
+  "assets": [
+    {
+      "path": "items/chain1_beach_1_shell_shard.svg",
+      "bytes": 2871,
+      "hash": "sha256:5470513346c94fb2d0be7a9bbb34a78a15b0d1c8ae565775df42c5a708e23fd7"
+    },
+    {
+      "path": "board/token_coin.svg",
+      "bytes": 2977,
+      "hash": "sha256:d7d386ef81504422d22bec23a9a85432065f5a3ddbf3707afa3ae9322cab85b0"
+    }
+  ]
+}

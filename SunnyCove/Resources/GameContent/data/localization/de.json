@@ -1,0 +1,383 @@
+{
+  "meta": {
+    "locale": "de",
+    "version": "1.0.0",
+    "placeholders": "{count},{max},{amount},{name} werden von der App gefüllt",
+    "note": "Stabile Schlüssel; Zahlen als Platzhalter; Pluralformen unter 'plural.*'"
+  },
+  "common": {
+    "play": "Spielen",
+    "continue": "Weiter",
+    "collect": "Einsammeln",
+    "give": "Abgeben",
+    "cancel": "Abbrechen",
+    "confirm": "Bestätigen",
+    "settings": "Einstellungen",
+    "shop": "Shop",
+    "back": "Zurück",
+    "sell": "Verkaufen",
+    "restoration": "Restaurierung",
+    "retry": "Nochmal",
+    "welcomeBack": "Willkommen zurück!",
+    "boardFull": "Board voll",
+    "levelUp": "Level geschafft!",
+    "orderComplete": "Auftrag erfüllt!",
+    "notEnough": "Noch nicht genug"
+  },
+  "plural": {
+    "coins": {
+      "one": "{count} Münze",
+      "other": "{count} Münzen"
+    },
+    "gems": {
+      "one": "{count} Edelstein",
+      "other": "{count} Edelsteine"
+    },
+    "stars": {
+      "one": "{count} Stern",
+      "other": "{count} Sterne"
+    },
+    "days": {
+      "one": "{count} Tag",
+      "other": "{count} Tage"
+    },
+    "energy": {
+      "other": "{count} Energie"
+    },
+    "xp": {
+      "other": "{count} EP"
+    },
+    "level": {
+      "other": "Level {count}"
+    },
+    "itemsLeft": {
+      "one": "noch {count}",
+      "other": "noch {count}"
+    }
+  },
+  "hud": {
+    "level": "Level {count}",
+    "energy": "{count}/{max}",
+    "gain": "+{amount}"
+  },
+  "item": {
+    "chain1_beach_1_shell_shard": {
+      "name": "Muschelsplitter"
+    },
+    "chain1_beach_2_small_shell": {
+      "name": "Kleine Muschel"
+    },
+    "chain1_beach_3_shell_trio": {
+      "name": "Bunte Muscheln"
+    },
+    "chain1_beach_4_shell_collection": {
+      "name": "Muschelsammlung"
+    },
+    "chain1_beach_5_pearl_shell": {
+      "name": "Perlenmuschel"
+    },
+    "chain1_beach_6_pearl_necklace": {
+      "name": "Perlenkette"
+    },
+    "chain1_beach_7_jewelry_box": {
+      "name": "Schmuckschatulle"
+    },
+    "chain1_beach_8_treasure_crown": {
+      "name": "Meeresschatzkrone"
+    },
+    "chain2_bar_1_lime_slice": {
+      "name": "Limettenscheibe"
+    },
+    "chain2_bar_2_limes": {
+      "name": "Limetten"
+    },
+    "chain2_bar_3_juice_glass": {
+      "name": "Saftglas"
+    },
+    "chain2_bar_4_lemonade": {
+      "name": "Limonade"
+    },
+    "chain2_bar_5_coconut_drink": {
+      "name": "Kokosdrink"
+    },
+    "chain2_bar_6_tropical_cocktail": {
+      "name": "Tropischer Cocktail"
+    },
+    "chain2_bar_7_cocktail_tray": {
+      "name": "Cocktailtablett"
+    },
+    "chain2_bar_8_luxury_bar_set": {
+      "name": "Strandbar-Gedeck"
+    },
+    "chain3_surf_1_wax": {
+      "name": "Surf-Wachs"
+    },
+    "chain3_surf_2_wax_comb": {
+      "name": "Wachs & Kamm"
+    },
+    "chain3_surf_3_fin": {
+      "name": "Finne"
+    },
+    "chain3_surf_4_bodyboard": {
+      "name": "Bodyboard"
+    },
+    "chain3_surf_5_simple_board": {
+      "name": "Einfaches Surfboard"
+    },
+    "chain3_surf_6_pro_board": {
+      "name": "Profi-Surfboard"
+    },
+    "chain3_surf_7_surf_gear": {
+      "name": "Surf-Ausrüstung"
+    },
+    "chain3_surf_8_legendary_set": {
+      "name": "Legendäres Sunny-Cove-Set"
+    },
+    "chain4_tool_1_screw": {
+      "name": "Schraube"
+    },
+    "chain4_tool_2_screw_pack": {
+      "name": "Schraubenpäckchen"
+    },
+    "chain4_tool_3_screwdriver": {
+      "name": "Schraubendreher"
+    },
+    "chain4_tool_4_hammer": {
+      "name": "Hammer"
+    },
+    "chain4_tool_5_tool_bag": {
+      "name": "Werkzeugtasche"
+    },
+    "chain4_tool_6_toolbox": {
+      "name": "Werkzeugkasten"
+    },
+    "chain4_tool_7_workbench": {
+      "name": "Werkbank"
+    },
+    "chain4_tool_8_island_workshop": {
+      "name": "Inselwerkstatt"
+    },
+    "chain5_garden_1_seed": {
+      "name": "Samenkorn"
+    },
+    "chain5_garden_2_sprout": {
+      "name": "Keimling"
+    },
+    "chain5_garden_3_small_plant": {
+      "name": "Kleine Pflanze"
+    },
+    "chain5_garden_4_hibiscus_pot": {
+      "name": "Hibiskus"
+    },
+    "chain5_garden_5_bouquet": {
+      "name": "Blumenstrauß"
+    },
+    "chain5_garden_6_tropical_planter": {
+      "name": "Tropisches Pflanzgefäß"
+    },
+    "chain5_garden_7_palm_pot": {
+      "name": "Dekorative Palme"
+    },
+    "chain5_garden_8_garden_arch": {
+      "name": "Tropischer Gartenbogen"
+    }
+  },
+  "generator": {
+    "gen1_beach_crate": {
+      "name": "Angeschwemmte Strandkiste"
+    },
+    "gen2_bar_cart": {
+      "name": "Strandbar-Wagen"
+    },
+    "gen3_surf_locker": {
+      "name": "Surf-Spind"
+    },
+    "gen4_tool_chest": {
+      "name": "Alte Werkzeugkiste"
+    },
+    "gen5_garden_basket": {
+      "name": "Gartenkorb"
+    }
+  },
+  "restorationElement": {
+    "elem_counter": {
+      "name": "Theke"
+    },
+    "elem_roof": {
+      "name": "Dach"
+    },
+    "elem_sign": {
+      "name": "Schild"
+    },
+    "elem_chair_a": {
+      "name": "Barhocker (blau)"
+    },
+    "elem_chair_b": {
+      "name": "Barhocker (rosa)"
+    },
+    "elem_string_lights": {
+      "name": "Lichterkette"
+    },
+    "elem_flowers": {
+      "name": "Blumen"
+    },
+    "elem_surfboard_deco": {
+      "name": "Surfbrett-Deko"
+    },
+    "elem_palm": {
+      "name": "Palme"
+    }
+  },
+  "restorationState": {
+    "damaged": {
+      "name": "Beschädigt"
+    },
+    "partial": {
+      "name": "Teilweise restauriert"
+    },
+    "restored": {
+      "name": "Restauriert"
+    }
+  },
+  "character": {
+    "marina": {
+      "name": "Marina"
+    },
+    "kai": {
+      "name": "Kai"
+    },
+    "shelly": {
+      "name": "Shelly"
+    },
+    "gull": {
+      "name": "Gull"
+    }
+  },
+  "order": {
+    "order_01": {
+      "dialog": "Willkommen zurück in Sunny Cove, Marina! Der Sturm war fies. Sammel mir ein paar Muscheln, dann fangen wir an."
+    },
+    "order_02": {
+      "dialog": "Erst mal aufräumen. Bring mir noch ein paar Muscheln vom Strand."
+    },
+    "order_03": {
+      "dialog": "Hey! Ich bin Kai. Für die Bar brauchen wir Limetten – tipp die Getränkekiste an."
+    },
+    "order_04": {
+      "dialog": "Ohne Werkzeug wird das nichts. Zeig mir, dass du eine Schraube auftreiben kannst."
+    },
+    "order_05": {
+      "dialog": "Ein frischer Saft hilft beim Denken. Mixt du mir einen?"
+    },
+    "order_06": {
+      "dialog": "Die alte Theke lässt sich retten! Bring einen Schraubendreher, dann bau ich sie ein."
+    },
+    "order_07": {
+      "dialog": "Hallo, ich bin Shelly. Für meinen Garten – hast du ein Samenkorn?"
+    },
+    "order_08": {
+      "dialog": "Die Gäste kommen bald. Ein paar bunte Muscheln als Deko wären schön."
+    },
+    "order_09": {
+      "dialog": "Zeit fürs Dach! Mit einem Hammer kriegen wir das Gerüst hoch."
+    },
+    "order_10": {
+      "dialog": "Sieht schon besser aus! Ein kühler Kokosdrink zur Feier?"
+    },
+    "order_11": {
+      "dialog": "Sammel bitte eine kleine Muschelsammlung – die häng ich auf."
+    },
+    "order_12": {
+      "dialog": "Das Schild muss wieder ran, damit man uns findet!"
+    },
+    "order_13": {
+      "dialog": "Meine erste Pflanze wächst! Bring mir eine kleine Pflanze zum Vergleich."
+    },
+    "order_14": {
+      "dialog": "Die Surfer fragen schon. Hast du etwas Surf-Wachs für sie?"
+    },
+    "order_15": {
+      "dialog": "Setz dich – nachdem du diesen Barhocker herbeigeschafft hast."
+    },
+    "order_16": {
+      "dialog": "Ein echter Cocktail wertet die Bar auf. Trau dich!"
+    },
+    "order_17": {
+      "dialog": "Noch ein Hocker, dann können zwei Gäste anstoßen."
+    },
+    "order_18": {
+      "dialog": "Oh! Ein Hibiskus im Topf – genau der fehlt meinem Garten."
+    },
+    "order_19": {
+      "dialog": "Für die Abende brauchen wir Licht. Ein einfaches Surfboard tausch ich gegen die Lichterkette."
+    },
+    "order_20": {
+      "dialog": "Lichterkette anbringen! Bring mir Werkzeug und einen Drink für Kai."
+    },
+    "order_21": {
+      "dialog": "Die Gäste lieben Blumen. Ein Blumenstrauß von Shellys Beet?"
+    },
+    "order_22": {
+      "dialog": "Mein Pflanzgefäß ist fertig bepflanzt – schau es dir an und bring mir noch Muscheln."
+    },
+    "order_23": {
+      "dialog": "Frische Blumen an die Theke! Dann strahlt die Bar richtig."
+    },
+    "order_24": {
+      "dialog": "Ein Profi-Surfboard als Deko – das zieht die Surfer an."
+    },
+    "order_25": {
+      "dialog": "Für die große Eröffnung: ein Cocktailtablett voller Drinks."
+    },
+    "order_26": {
+      "dialog": "Häng das Surfbrett als Deko auf – bring Board und Werkzeug!"
+    },
+    "order_27": {
+      "dialog": "Fast geschafft! Meine dekorative Palme wartet auf ihren Platz."
+    },
+    "order_28": {
+      "dialog": "Zeit für die letzte Palme – dann ist Marinas Strandbar zurück!"
+    },
+    "order_29": {
+      "dialog": "Grande Opening! Ein legendäres Surf-Set als Blickfang."
+    },
+    "order_30": {
+      "dialog": "Sunny Cove erstrahlt wieder. Krön den Tag mit einem Strandbar-Gedeck – auf Marina!"
+    }
+  },
+  "tutorial": {
+    "tut_01": {
+      "text": "Na endlich zurück, Marina! Der Sturm hat Omas Strandbar ganz schön zugerichtet. Keine Sorge – zusammen kriegen wir das wieder hin. Lass mich dir zeigen, wie."
+    },
+    "tut_02": {
+      "text": "Alles beginnt am Strand. Tipp die angeschwemmte Strandkiste an – sie spuckt Fundstücke aus."
+    },
+    "tut_03": {
+      "text": "Zwei gleiche Fundstücke ergeben ein besseres. Schieb zwei Muschelsplitter aufeinander!"
+    },
+    "tut_04": {
+      "text": "Jeder Kisten-Tipp kostet ein bisschen Energie – oben in der Leiste. Energie füllt sich mit der Zeit von selbst wieder auf. Also immer schön dosieren!"
+    },
+    "tut_05": {
+      "text": "Für den ersten Auftrag brauchen wir zwei kleine Muscheln. Tipp die Kiste weiter an und merge, bis du zwei hast."
+    },
+    "tut_06": {
+      "text": "Perfekt! Öffne die Auftragskarte und gib die zwei Muscheln ab."
+    },
+    "tut_07": {
+      "text": "Und schon klingelt die Kasse! Sammel deine Belohnung ein."
+    },
+    "tut_08": {
+      "text": "Jede Abgabe bringt die Bar ein Stück zurück. Wirf einen Blick in die Restaurierungsansicht!"
+    },
+    "tut_09": {
+      "text": "Wird das Board mal eng, verkauf einfach ein Item für Münzen. Probier es kurz aus."
+    },
+    "tut_10": {
+      "text": "Die verhangenen Felder unten sind noch gesperrt – die schaltest du frei, wenn du im Level aufsteigst. Und jetzt: ran an den Wiederaufbau von Sunny Cove!"
+    },
+    "tut_done": {
+      "text": "Du hast den Dreh raus! Ab hier führen dich die Aufträge weiter."
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "$comment": "BEISPIEL-Vorlage für später versionierte Inhaltsauslieferung. Hash-/bytes-Werte sind Platzhalter und werden beim Build gefüllt.",
+  "schemaVersion": "1.0.0",
+  "contentVersion": "2026.07.0",
+  "minAppVersion": "1.0.0",
+  "generatedAt": "2026-07-21T00:00:00Z",
+  "integrity": {
+    "algorithm": "sha256",
+    "manifestHash": "sha256:<PLATZHALTER>"
+  },
+  "dataFiles": [
+    {
+      "path": "data/asset_manifest.json",
+      "hash": "sha256:<PLATZHALTER>"
+    },
+    {
+      "path": "data/merge_chains.json",
+      "hash": "sha256:<PLATZHALTER>"
+    },
+    {
+      "path": "data/generators.json",
+      "hash": "sha256:<PLATZHALTER>"
+    },
+    {
+      "path": "data/orders_campaign_01.json",
+      "hash": "sha256:<PLATZHALTER>"
+    },
+    {
+      "path": "data/restoration_beachbar.json",
+      "hash": "sha256:<PLATZHALTER>"
+    }
+  ],
+  "assets": [
+    {
+      "path": "items/chain1_beach_1_shell_shard.svg",
+      "bytes": 0,
+      "hash": "sha256:<PLATZHALTER>"
+    },
+    {
+      "path": "items/chain1_beach_2_small_shell.svg",
+      "bytes": 0,
+      "hash": "sha256:<PLATZHALTER>"
+    },
+    {
+      "path": "items/chain1_beach_3_shell_trio.svg",
+      "bytes": 0,
+      "hash": "sha256:<PLATZHALTER>"
+    },
+    {
+      "path": "appstore/app_icon_1024_fullbleed.svg",
+      "bytes": 0,
+      "hash": "sha256:<PLATZHALTER>"
+    }
+  ]
+}

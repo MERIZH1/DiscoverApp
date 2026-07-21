@@ -1,0 +1,452 @@
+{
+  "schemaVersion": "1.0.0",
+  "generated": "2026-07-21",
+  "note": "sellValue in Münzen, xpValue in Erfahrungspunkten. mergeInto = Ziel-Item beim Zusammenlegen zweier gleicher.",
+  "chains": [
+    {
+      "id": "chain_beach",
+      "theme": "Strandfundstücke",
+      "boardColor": "#F27AA8",
+      "generator": "gen1_beach_crate",
+      "maxStage": 8,
+      "stages": [
+        {
+          "stage": 1,
+          "id": "chain1_beach_1_shell_shard",
+          "asset": "items/chain1_beach_1_shell_shard.svg",
+          "displayName": "Muschelsplitter",
+          "sellValue": 2,
+          "xpValue": 1,
+          "unlockedByDefault": true,
+          "mergeInto": "chain1_beach_2_small_shell"
+        },
+        {
+          "stage": 2,
+          "id": "chain1_beach_2_small_shell",
+          "asset": "items/chain1_beach_2_small_shell.svg",
+          "displayName": "Kleine Muschel",
+          "sellValue": 5,
+          "xpValue": 2,
+          "unlockedByDefault": false,
+          "mergeInto": "chain1_beach_3_shell_trio"
+        },
+        {
+          "stage": 3,
+          "id": "chain1_beach_3_shell_trio",
+          "asset": "items/chain1_beach_3_shell_trio.svg",
+          "displayName": "Bunte Muscheln",
+          "sellValue": 12,
+          "xpValue": 4,
+          "unlockedByDefault": false,
+          "mergeInto": "chain1_beach_4_shell_collection"
+        },
+        {
+          "stage": 4,
+          "id": "chain1_beach_4_shell_collection",
+          "asset": "items/chain1_beach_4_shell_collection.svg",
+          "displayName": "Muschelsammlung",
+          "sellValue": 30,
+          "xpValue": 8,
+          "unlockedByDefault": false,
+          "mergeInto": "chain1_beach_5_pearl_shell"
+        },
+        {
+          "stage": 5,
+          "id": "chain1_beach_5_pearl_shell",
+          "asset": "items/chain1_beach_5_pearl_shell.svg",
+          "displayName": "Perlenmuschel",
+          "sellValue": 75,
+          "xpValue": 16,
+          "unlockedByDefault": false,
+          "mergeInto": "chain1_beach_6_pearl_necklace"
+        },
+        {
+          "stage": 6,
+          "id": "chain1_beach_6_pearl_necklace",
+          "asset": "items/chain1_beach_6_pearl_necklace.svg",
+          "displayName": "Perlenkette",
+          "sellValue": 180,
+          "xpValue": 32,
+          "unlockedByDefault": false,
+          "mergeInto": "chain1_beach_7_jewelry_box"
+        },
+        {
+          "stage": 7,
+          "id": "chain1_beach_7_jewelry_box",
+          "asset": "items/chain1_beach_7_jewelry_box.svg",
+          "displayName": "Schmuckschatulle",
+          "sellValue": 450,
+          "xpValue": 64,
+          "unlockedByDefault": false,
+          "mergeInto": "chain1_beach_8_treasure_crown"
+        },
+        {
+          "stage": 8,
+          "id": "chain1_beach_8_treasure_crown",
+          "asset": "items/chain1_beach_8_treasure_crown.svg",
+          "displayName": "Meeresschatzkrone",
+          "sellValue": 1200,
+          "xpValue": 150,
+          "unlockedByDefault": false,
+          "mergeInto": null
+        }
+      ]
+    },
+    {
+      "id": "chain_bar",
+      "theme": "Strandbar",
+      "boardColor": "#FFA42E",
+      "generator": "gen2_bar_cart",
+      "maxStage": 8,
+      "stages": [
+        {
+          "stage": 1,
+          "id": "chain2_bar_1_lime_slice",
+          "asset": "items/chain2_bar_1_lime_slice.svg",
+          "displayName": "Limettenscheibe",
+          "sellValue": 2,
+          "xpValue": 1,
+          "unlockedByDefault": true,
+          "mergeInto": "chain2_bar_2_limes"
+        },
+        {
+          "stage": 2,
+          "id": "chain2_bar_2_limes",
+          "asset": "items/chain2_bar_2_limes.svg",
+          "displayName": "Limetten",
+          "sellValue": 5,
+          "xpValue": 2,
+          "unlockedByDefault": false,
+          "mergeInto": "chain2_bar_3_juice_glass"
+        },
+        {
+          "stage": 3,
+          "id": "chain2_bar_3_juice_glass",
+          "asset": "items/chain2_bar_3_juice_glass.svg",
+          "displayName": "Saftglas",
+          "sellValue": 12,
+          "xpValue": 4,
+          "unlockedByDefault": false,
+          "mergeInto": "chain2_bar_4_lemonade"
+        },
+        {
+          "stage": 4,
+          "id": "chain2_bar_4_lemonade",
+          "asset": "items/chain2_bar_4_lemonade.svg",
+          "displayName": "Limonade",
+          "sellValue": 30,
+          "xpValue": 8,
+          "unlockedByDefault": false,
+          "mergeInto": "chain2_bar_5_coconut_drink"
+        },
+        {
+          "stage": 5,
+          "id": "chain2_bar_5_coconut_drink",
+          "asset": "items/chain2_bar_5_coconut_drink.svg",
+          "displayName": "Kokosdrink",
+          "sellValue": 75,
+          "xpValue": 16,
+          "unlockedByDefault": false,
+          "mergeInto": "chain2_bar_6_tropical_cocktail"
+        },
+        {
+          "stage": 6,
+          "id": "chain2_bar_6_tropical_cocktail",
+          "asset": "items/chain2_bar_6_tropical_cocktail.svg",
+          "displayName": "Tropischer Cocktail",
+          "sellValue": 180,
+          "xpValue": 32,
+          "unlockedByDefault": false,
+          "mergeInto": "chain2_bar_7_cocktail_tray"
+        },
+        {
+          "stage": 7,
+          "id": "chain2_bar_7_cocktail_tray",
+          "asset": "items/chain2_bar_7_cocktail_tray.svg",
+          "displayName": "Cocktailtablett",
+          "sellValue": 450,
+          "xpValue": 64,
+          "unlockedByDefault": false,
+          "mergeInto": "chain2_bar_8_luxury_bar_set"
+        },
+        {
+          "stage": 8,
+          "id": "chain2_bar_8_luxury_bar_set",
+          "asset": "items/chain2_bar_8_luxury_bar_set.svg",
+          "displayName": "Strandbar-Gedeck",
+          "sellValue": 1200,
+          "xpValue": 150,
+          "unlockedByDefault": false,
+          "mergeInto": null
+        }
+      ]
+    },
+    {
+      "id": "chain_surf",
+      "theme": "Surfausrüstung",
+      "boardColor": "#1FA9D6",
+      "generator": "gen3_surf_locker",
+      "maxStage": 8,
+      "stages": [
+        {
+          "stage": 1,
+          "id": "chain3_surf_1_wax",
+          "asset": "items/chain3_surf_1_wax.svg",
+          "displayName": "Surf-Wachs",
+          "sellValue": 2,
+          "xpValue": 1,
+          "unlockedByDefault": true,
+          "mergeInto": "chain3_surf_2_wax_comb"
+        },
+        {
+          "stage": 2,
+          "id": "chain3_surf_2_wax_comb",
+          "asset": "items/chain3_surf_2_wax_comb.svg",
+          "displayName": "Wachs & Kamm",
+          "sellValue": 5,
+          "xpValue": 2,
+          "unlockedByDefault": false,
+          "mergeInto": "chain3_surf_3_fin"
+        },
+        {
+          "stage": 3,
+          "id": "chain3_surf_3_fin",
+          "asset": "items/chain3_surf_3_fin.svg",
+          "displayName": "Finne",
+          "sellValue": 12,
+          "xpValue": 4,
+          "unlockedByDefault": false,
+          "mergeInto": "chain3_surf_4_bodyboard"
+        },
+        {
+          "stage": 4,
+          "id": "chain3_surf_4_bodyboard",
+          "asset": "items/chain3_surf_4_bodyboard.svg",
+          "displayName": "Bodyboard",
+          "sellValue": 30,
+          "xpValue": 8,
+          "unlockedByDefault": false,
+          "mergeInto": "chain3_surf_5_simple_board"
+        },
+        {
+          "stage": 5,
+          "id": "chain3_surf_5_simple_board",
+          "asset": "items/chain3_surf_5_simple_board.svg",
+          "displayName": "Einfaches Surfboard",
+          "sellValue": 75,
+          "xpValue": 16,
+          "unlockedByDefault": false,
+          "mergeInto": "chain3_surf_6_pro_board"
+        },
+        {
+          "stage": 6,
+          "id": "chain3_surf_6_pro_board",
+          "asset": "items/chain3_surf_6_pro_board.svg",
+          "displayName": "Profi-Surfboard",
+          "sellValue": 180,
+          "xpValue": 32,
+          "unlockedByDefault": false,
+          "mergeInto": "chain3_surf_7_surf_gear"
+        },
+        {
+          "stage": 7,
+          "id": "chain3_surf_7_surf_gear",
+          "asset": "items/chain3_surf_7_surf_gear.svg",
+          "displayName": "Surf-Ausrüstung",
+          "sellValue": 450,
+          "xpValue": 64,
+          "unlockedByDefault": false,
+          "mergeInto": "chain3_surf_8_legendary_set"
+        },
+        {
+          "stage": 8,
+          "id": "chain3_surf_8_legendary_set",
+          "asset": "items/chain3_surf_8_legendary_set.svg",
+          "displayName": "Legendäres Sunny-Cove-Set",
+          "sellValue": 1200,
+          "xpValue": 150,
+          "unlockedByDefault": false,
+          "mergeInto": null
+        }
+      ]
+    },
+    {
+      "id": "chain_tool",
+      "theme": "Reparaturwerkzeug",
+      "boardColor": "#E0392E",
+      "generator": "gen4_tool_chest",
+      "maxStage": 8,
+      "stages": [
+        {
+          "stage": 1,
+          "id": "chain4_tool_1_screw",
+          "asset": "items/chain4_tool_1_screw.svg",
+          "displayName": "Schraube",
+          "sellValue": 2,
+          "xpValue": 1,
+          "unlockedByDefault": true,
+          "mergeInto": "chain4_tool_2_screw_pack"
+        },
+        {
+          "stage": 2,
+          "id": "chain4_tool_2_screw_pack",
+          "asset": "items/chain4_tool_2_screw_pack.svg",
+          "displayName": "Schraubenpäckchen",
+          "sellValue": 5,
+          "xpValue": 2,
+          "unlockedByDefault": false,
+          "mergeInto": "chain4_tool_3_screwdriver"
+        },
+        {
+          "stage": 3,
+          "id": "chain4_tool_3_screwdriver",
+          "asset": "items/chain4_tool_3_screwdriver.svg",
+          "displayName": "Schraubendreher",
+          "sellValue": 12,
+          "xpValue": 4,
+          "unlockedByDefault": false,
+          "mergeInto": "chain4_tool_4_hammer"
+        },
+        {
+          "stage": 4,
+          "id": "chain4_tool_4_hammer",
+          "asset": "items/chain4_tool_4_hammer.svg",
+          "displayName": "Hammer",
+          "sellValue": 30,
+          "xpValue": 8,
+          "unlockedByDefault": false,
+          "mergeInto": "chain4_tool_5_tool_bag"
+        },
+        {
+          "stage": 5,
+          "id": "chain4_tool_5_tool_bag",
+          "asset": "items/chain4_tool_5_tool_bag.svg",
+          "displayName": "Werkzeugtasche",
+          "sellValue": 75,
+          "xpValue": 16,
+          "unlockedByDefault": false,
+          "mergeInto": "chain4_tool_6_toolbox"
+        },
+        {
+          "stage": 6,
+          "id": "chain4_tool_6_toolbox",
+          "asset": "items/chain4_tool_6_toolbox.svg",
+          "displayName": "Werkzeugkasten",
+          "sellValue": 180,
+          "xpValue": 32,
+          "unlockedByDefault": false,
+          "mergeInto": "chain4_tool_7_workbench"
+        },
+        {
+          "stage": 7,
+          "id": "chain4_tool_7_workbench",
+          "asset": "items/chain4_tool_7_workbench.svg",
+          "displayName": "Werkbank",
+          "sellValue": 450,
+          "xpValue": 64,
+          "unlockedByDefault": false,
+          "mergeInto": "chain4_tool_8_island_workshop"
+        },
+        {
+          "stage": 8,
+          "id": "chain4_tool_8_island_workshop",
+          "asset": "items/chain4_tool_8_island_workshop.svg",
+          "displayName": "Inselwerkstatt",
+          "sellValue": 1200,
+          "xpValue": 150,
+          "unlockedByDefault": false,
+          "mergeInto": null
+        }
+      ]
+    },
+    {
+      "id": "chain_garden",
+      "theme": "Tropischer Garten",
+      "boardColor": "#3FA824",
+      "generator": "gen5_garden_basket",
+      "maxStage": 8,
+      "stages": [
+        {
+          "stage": 1,
+          "id": "chain5_garden_1_seed",
+          "asset": "items/chain5_garden_1_seed.svg",
+          "displayName": "Samenkorn",
+          "sellValue": 2,
+          "xpValue": 1,
+          "unlockedByDefault": true,
+          "mergeInto": "chain5_garden_2_sprout"
+        },
+        {
+          "stage": 2,
+          "id": "chain5_garden_2_sprout",
+          "asset": "items/chain5_garden_2_sprout.svg",
+          "displayName": "Keimling",
+          "sellValue": 5,
+          "xpValue": 2,
+          "unlockedByDefault": false,
+          "mergeInto": "chain5_garden_3_small_plant"
+        },
+        {
+          "stage": 3,
+          "id": "chain5_garden_3_small_plant",
+          "asset": "items/chain5_garden_3_small_plant.svg",
+          "displayName": "Kleine Pflanze",
+          "sellValue": 12,
+          "xpValue": 4,
+          "unlockedByDefault": false,
+          "mergeInto": "chain5_garden_4_hibiscus_pot"
+        },
+        {
+          "stage": 4,
+          "id": "chain5_garden_4_hibiscus_pot",
+          "asset": "items/chain5_garden_4_hibiscus_pot.svg",
+          "displayName": "Hibiskus",
+          "sellValue": 30,
+          "xpValue": 8,
+          "unlockedByDefault": false,
+          "mergeInto": "chain5_garden_5_bouquet"
+        },
+        {
+          "stage": 5,
+          "id": "chain5_garden_5_bouquet",
+          "asset": "items/chain5_garden_5_bouquet.svg",
+          "displayName": "Blumenstrauß",
+          "sellValue": 75,
+          "xpValue": 16,
+          "unlockedByDefault": false,
+          "mergeInto": "chain5_garden_6_tropical_planter"
+        },
+        {
+          "stage": 6,
+          "id": "chain5_garden_6_tropical_planter",
+          "asset": "items/chain5_garden_6_tropical_planter.svg",
+          "displayName": "Tropisches Pflanzgefäß",
+          "sellValue": 180,
+          "xpValue": 32,
+          "unlockedByDefault": false,
+          "mergeInto": "chain5_garden_7_palm_pot"
+        },
+        {
+          "stage": 7,
+          "id": "chain5_garden_7_palm_pot",
+          "asset": "items/chain5_garden_7_palm_pot.svg",
+          "displayName": "Dekorative Palme",
+          "sellValue": 450,
+          "xpValue": 64,
+          "unlockedByDefault": false,
+          "mergeInto": "chain5_garden_8_garden_arch"
+        },
+        {
+          "stage": 8,
+          "id": "chain5_garden_8_garden_arch",
+          "asset": "items/chain5_garden_8_garden_arch.svg",
+          "displayName": "Tropischer Gartenbogen",
+          "sellValue": 1200,
+          "xpValue": 150,
+          "unlockedByDefault": false,
+          "mergeInto": null
+        }
+      ]
+    }
+  ]
+}
