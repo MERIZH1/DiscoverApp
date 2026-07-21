@@ -21,10 +21,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.sunnycove.game
-        INFOPLIST_KEY_CFBundleDisplayName: Sunny Cove
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
-        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        TARGETED_DEVICE_FAMILY: "1"
+        SUPPORTS_MACCATALYST: NO
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         MARKETING_VERSION: 0.1.0
         CURRENT_PROJECT_VERSION: 1
@@ -33,9 +31,17 @@ targets:
     info:
       path: Supporting/Info.plist
       properties:
+        CFBundleDisplayName: Sunny Cove
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        ContentManifestURL: ""
+        ContentVersion: 2026.07.0
         ITSAppUsesNonExemptEncryption: false
+        UIApplicationSupportsIndirectInputEvents: true
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
   SunnyCoveTests:
     type: bundle.unit-test
     platform: iOS
