@@ -297,4 +297,3 @@ private enum StarterTutorial {
         ]
     }
 }
-}

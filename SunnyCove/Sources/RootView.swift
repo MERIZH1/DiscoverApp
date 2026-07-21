@@ -45,6 +45,7 @@ struct GameView: View {
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 3) {
                     ForEach(game.cells) { cell in BoardCellView(cell: cell).onTapGesture { game.tapCell(cell.id) }
+                    }
                 }
                 .padding(6).background(.blue.opacity(0.22), in: RoundedRectangle(cornerRadius: 16)).padding(.horizontal, 6)
             }
