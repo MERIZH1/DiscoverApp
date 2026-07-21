@@ -43,3 +43,12 @@ targets:
     sources: Tests
     dependencies:
       - target: SunnyCove
+schemes:
+  SunnyCove:
+    build:
+      targets:
+        SunnyCove: all
+        SunnyCoveTests: [test]
+    test:
+      targets:
+        - SunnyCoveTests
