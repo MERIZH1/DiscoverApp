@@ -1,8 +1,8 @@
 {
   "schemaVersion": "1.0.0",
-  "contentVersion": "2026.07.0",
-  "minAppVersion": "0.1.0",
-  "generatedAt": "2026-07-21T00:00:00Z",
+  "contentVersion": "2026.07.1",
+  "minAppVersion": "0.2.0",
+  "generatedAt": "2026-07-21T23:30:00Z",
   "integrity": {
     "algorithm": "sha256",
     "manifestHash": "sha256:generated-at-build"
@@ -26,7 +26,7 @@
     {
       "path": "data/initial_game_state.json",
       "bytes": 9642,
-      "hash": "sha256:6c915b73cb348757b1223a480e9b4adbac70a956388eb8847b428033d9e9f559"
+      "hash": "sha256:de107addc94fb296b96408e8805b6b2d4e600ae9a529efd02242c6c764fdab7a"
     },
     {
       "path": "data/merge_chains.json",

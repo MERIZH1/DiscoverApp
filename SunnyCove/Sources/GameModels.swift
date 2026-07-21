@@ -82,6 +82,37 @@ struct TutorialStep: Identifiable, Codable, Hashable, Sendable {
     let character: String
     let portrait: String
     let text: String
+    let completion: TutorialCompletion
+}
+
+struct TutorialCompletion: Codable, Hashable, Sendable {
+    let type: String
+    let generator: String?
+    let chain: String?
+    let toStage: Int?
+    let item: String?
+    let count: Int?
+    let order: String?
+
+    init(type: String, generator: String? = nil, chain: String? = nil,
+         toStage: Int? = nil, item: String? = nil, count: Int? = nil,
+         order: String? = nil) {
+        self.type = type
+        self.generator = generator
+        self.chain = chain
+        self.toStage = toStage
+        self.item = item
+        self.count = count
+        self.order = order
+    }
+}
+
+struct RestorationElementDefinition: Identifiable, Codable, Hashable, Sendable {
+    let id: String
+    let order: Int
+    let asset: String
+    let displayName: String
+    let unlockOrder: String
 }
 
 struct PlayerState: Codable, Equatable, Sendable {
@@ -109,7 +140,7 @@ struct GameRules: Codable, Sendable {
 
     static let `default` = GameRules(energyMax: 120, energyStart: 120, startCoins: 50, startGems: 5, energyRegenSeconds: 15,
         autoUpgradeAfterProduced: 60,
-        levelThresholds: [0, 50, 120, 210, 330, 480, 660, 880, 1140, 1450, 1810, 2230, 2720, 3290, 3950, 4680],
+        levelThresholds: [0, 20, 60, 120, 220, 480, 660, 880, 1140, 1450, 1810, 2230, 2720, 3290, 3950, 4680],
         rewardGemsPerLevel: 2, energyRefillOnLevelUp: true, rewardsMayOverfillEnergy: true,
         unlockRowAtLevel: [6: 3, 7: 6, 8: 10], sandCoinsPerLayer: 15, cobwebCoins: 30)
 }

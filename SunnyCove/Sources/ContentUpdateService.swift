@@ -46,7 +46,7 @@ final class ContentUpdateService: ObservableObject {
             switch self {
             case .idle: "Noch nicht geprüft"
             case .checking: "Suche nach neuen Inhalten …"
-            case .available(let version): "Neue Inhalte verfügbar: (version)"
+            case .available(let version): "Neue Inhalte verfügbar: \(version)"
             case .current: "Inhalte sind aktuell"
             case .failed(let reason): reason
             }

@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UIKit
 
 @MainActor
 final class GameStore: ObservableObject {
@@ -9,12 +10,14 @@ final class GameStore: ObservableObject {
     @Published private(set) var activeOrderIndex = 0
     @Published private(set) var completedOrderIDs: [String] = []
     @Published private(set) var restorationState = "damaged"
+    @Published private(set) var placedElements: [String] = []
     @Published private(set) var tutorialStep = 0
     @Published var selectedCellID: Int?
     @Published var message: String?
     @Published var showRestoration = false
     @Published var showSettings = false
     @Published private(set) var canUndo = false
+    @Published private(set) var levelUpNotice: Int?
 
     let catalog: ContentCatalog
     private let saveURL: URL
@@ -41,6 +44,12 @@ final class GameStore: ObservableObject {
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         saveURL = folder.appendingPathComponent("sunny-cove-save-v3.json")
         if !load() { reset() }
+        let onboardingKey = "sunnycove.verticalSliceOnboardingV1"
+        if activeOrderIndex == 0 && !UserDefaults.standard.bool(forKey: onboardingKey) {
+            tutorialStep = 0
+            UserDefaults.standard.set(true, forKey: onboardingKey)
+            save()
+        }
         applyOfflineProgress()
         ticker = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.tick() }
@@ -60,8 +69,10 @@ final class GameStore: ObservableObject {
         activeOrderIndex = 0
         completedOrderIDs = []
         restorationState = "damaged"
+        placedElements = []
         tutorialStep = 0
         selectedCellID = nil
+        levelUpNotice = nil
         lastEnergyUpdate = Date()
         save()
     }
@@ -87,6 +98,11 @@ final class GameStore: ObservableObject {
 
     func produce(from generatorID: String?) {
         guard let generatorID, let definition = catalog.generators[generatorID], var runtime = generatorRuntime[generatorID] else { return }
+        guard canUseGenerator(generatorID) else {
+            message = "Dieser Generator wird mit Level \(generatorUnlockLevel(generatorID)) freigeschaltet."
+            haptic(.rigid)
+            return
+        }
         refill(&runtime, definition: definition)
         guard player.energy >= definition.energyCost else { message = GameError.noEnergy.localizedDescription; return }
         guard runtime.charges > 0 else { message = GameError.noCharge.localizedDescription; return }
@@ -107,6 +123,9 @@ final class GameStore: ObservableObject {
             message = "\(definition.displayName) wurde verbessert!"
         }
         generatorRuntime[generatorID] = runtime
+        haptic(.light)
+        completeTutorial(type: "item_produced", generator: generatorID)
+        completeInventoryTutorialIfNeeded()
         save()
     }
 
@@ -115,6 +134,7 @@ final class GameStore: ObservableObject {
               let target = cells.firstIndex(where: { $0.id == targetID }),
               cells[source].state == .item else { selectedCellID = nil; return }
         captureUndo()
+        var mergedItem: ItemDefinition?
         if cells[target].state == .empty {
             cells[target] = BoardCell(row: cells[target].row, col: cells[target].col, state: .item,
                 item: cells[source].item, bubble: cells[source].bubble)
@@ -125,10 +145,17 @@ final class GameStore: ObservableObject {
             cells[target].bubble = false
             cells[source] = BoardCell(row: cells[source].row, col: cells[source].col, state: .empty)
             player.xp += catalog.items[next]?.xpValue ?? 1
+            mergedItem = catalog.items[next]
             updateLevel()
         } else {
             message = GameError.invalidMove.localizedDescription
         }
+        if let mergedItem {
+            haptic(.medium)
+            completeTutorial(type: "merge_completed", chain: mergedItem.chainID,
+                toStage: mergedItem.stage)
+        }
+        completeInventoryTutorialIfNeeded()
         selectedCellID = nil
         save()
     }
@@ -152,7 +179,9 @@ final class GameStore: ObservableObject {
         completedOrderIDs.append(order.id)
         apply(actions: order.restorationActions)
         activeOrderIndex += 1
+        completeTutorial(type: "order_completed", order: order.id)
         updateLevel()
+        haptic(.heavy)
         message = "Auftrag geschafft! +\(order.coins) Münzen"
         save()
     }
@@ -166,17 +195,108 @@ final class GameStore: ObservableObject {
     func item(for cell: BoardCell) -> ItemDefinition? { cell.item.flatMap { catalog.items[$0] } }
     func generator(for cell: BoardCell) -> GeneratorDefinition? { cell.generator.flatMap { catalog.generators[$0] } }
 
+    var selectedItem: ItemDefinition? {
+        guard let selectedCellID,
+              let cell = cells.first(where: { $0.id == selectedCellID }) else { return nil }
+        return item(for: cell)
+    }
+
+    var levelProgressText: String {
+        let thresholds = catalog.rules.levelThresholds
+        guard thresholds.indices.contains(player.level) else { return "MAX" }
+        return "\(player.xp)/\(thresholds[player.level]) XP"
+    }
+
+    func generatorUnlockLevel(_ generatorID: String) -> Int {
+        switch generatorID {
+        case "gen2_bar_cart": return 2
+        case "gen4_tool_chest": return 3
+        case "gen5_garden_basket": return 4
+        case "gen3_surf_locker": return 5
+        default: return 1
+        }
+    }
+
+    func canUseGenerator(_ generatorID: String) -> Bool {
+        player.level >= generatorUnlockLevel(generatorID)
+    }
+
+    func isTutorialTarget(_ cell: BoardCell) -> Bool {
+        guard let completion = activeTutorial?.completion else { return false }
+        switch completion.type {
+        case "item_produced":
+            return cell.generator == completion.generator
+        case "merge_completed":
+            guard let item = item(for: cell) else { return false }
+            return item.chainID == completion.chain && item.stage == max(1, (completion.toStage ?? 2) - 1)
+        case "inventory_at_least":
+            guard let targetID = completion.item, let target = catalog.items[targetID] else { return false }
+            if let generator = generator(for: cell) { return generator.chainID == target.chainID }
+            guard let item = item(for: cell) else { return false }
+            return item.chainID == target.chainID && item.stage <= target.stage
+        case "item_sold":
+            return cell.state == .item
+        default:
+            return false
+        }
+    }
+
+    func levelUnlockText(for level: Int) -> String {
+        switch level {
+        case 2: return "Neu: Strandbar-Wagen und frische Getränke"
+        case 3: return "Neu: Werkzeugkiste und eine weitere Board-Reihe"
+        case 4: return "Neu: Gartenkorb und tropische Pflanzen"
+        case 5: return "Neu: Surf-Spind und die fünfte Merge-Kette"
+        default: return "+\(catalog.rules.rewardGemsPerLevel) Edelsteine und volle Energie"
+        }
+    }
+
+    func dismissLevelUp() {
+        levelUpNotice = nil
+    }
+
     var activeTutorial: TutorialStep? {
         catalog.tutorialSteps.indices.contains(tutorialStep) ? catalog.tutorialSteps[tutorialStep] : nil
     }
 
     func advanceTutorial() {
-        tutorialStep = min(tutorialStep + 1, catalog.tutorialSteps.count)
+        advanceTutorialStep()
         save()
     }
 
     func skipTutorial() {
         tutorialStep = catalog.tutorialSteps.count
+        save()
+    }
+
+    var tutorialAllowsContinue: Bool {
+        guard let type = activeTutorial?.completion.type else { return false }
+        return ["dialog_dismissed", "reward_collected", "tutorial_finished"].contains(type)
+    }
+
+    var tutorialActionHint: String {
+        switch activeTutorial?.completion.type {
+        case "item_produced": "Tippe den markierten Generator an."
+        case "merge_completed": "Führe zwei gleiche Gegenstände zusammen."
+        case "inventory_at_least": "Produziere und merge die benötigten Gegenstände."
+        case "order_completed": "Gib den fertigen Auftrag ab."
+        case "restoration_opened": "Öffne die Strandbar-Ansicht."
+        case "item_sold": "Wähle einen Gegenstand und verkaufe ihn."
+        default: "Führe die beschriebene Aktion aus."
+        }
+    }
+
+    var tutorialButtonTitle: String {
+        switch activeTutorial?.completion.type {
+        case "reward_collected": "Einsammeln"
+        case "tutorial_finished": "Los geht’s!"
+        default: "Weiter"
+        }
+    }
+
+    func openRestoration() {
+        showRestoration = true
+        completeTutorial(type: "restoration_opened")
         save()
     }
 
@@ -191,6 +311,8 @@ final class GameStore: ObservableObject {
         player.coins += item.sellValue
         self.selectedCellID = nil
         message = "+\(item.sellValue) Münzen"
+        haptic(.soft)
+        completeTutorial(type: "item_sold")
         save()
     }
 
@@ -223,6 +345,7 @@ final class GameStore: ObservableObject {
         let level = cells[index].sandLevel ?? 1
         if level > 1 { cells[index].sandLevel = level - 1 }
         else { cells[index] = BoardCell(row: cells[index].row, col: cells[index].col, state: .empty) }
+        haptic(.light)
         save()
     }
 
@@ -230,6 +353,7 @@ final class GameStore: ObservableObject {
         guard player.coins >= catalog.rules.cobwebCoins else { message = "Du brauchst \(catalog.rules.cobwebCoins) Münzen."; return }
         player.coins -= catalog.rules.cobwebCoins
         cells[index] = BoardCell(row: cells[index].row, col: cells[index].col, state: .empty)
+        haptic(.light)
         save()
     }
 
@@ -238,6 +362,7 @@ final class GameStore: ObservableObject {
         let newLevel = max(1, thresholds.lastIndex(where: { player.xp >= $0 }).map { $0 + 1 } ?? 1)
         if newLevel > player.level {
             player.level = newLevel
+            levelUpNotice = newLevel
             player.gems += catalog.rules.rewardGemsPerLevel
             if catalog.rules.energyRefillOnLevelUp { player.energy = catalog.rules.energyMax }
             for index in cells.indices where cells[index].state == .locked && (cells[index].unlockLevel ?? 999) <= newLevel {
@@ -251,6 +376,38 @@ final class GameStore: ObservableObject {
         for action in actions {
             if action == "set_state:partial" { restorationState = "partial" }
             if action == "set_state:restored" { restorationState = "restored" }
+            if action.hasPrefix("unlock_element:") {
+                let element = String(action.dropFirst("unlock_element:".count))
+                if !element.isEmpty && !placedElements.contains(element) {
+                    placedElements.append(element)
+                }
+            }
+        }
+    }
+
+    private func completeTutorial(type: String, generator: String? = nil,
+                                  chain: String? = nil, toStage: Int? = nil,
+                                  order: String? = nil) {
+        guard let completion = activeTutorial?.completion, completion.type == type else { return }
+        if let expected = completion.generator, expected != generator { return }
+        if let expected = completion.chain, expected != chain { return }
+        if let expected = completion.toStage, expected != toStage { return }
+        if let expected = completion.order, expected != order { return }
+        advanceTutorialStep()
+    }
+
+    private func advanceTutorialStep() {
+        tutorialStep = min(tutorialStep + 1, catalog.tutorialSteps.count)
+        completeInventoryTutorialIfNeeded()
+    }
+
+    private func completeInventoryTutorialIfNeeded() {
+        while let completion = activeTutorial?.completion,
+              completion.type == "inventory_at_least",
+              let item = completion.item,
+              let count = completion.count,
+              cells.filter({ $0.item == item }).count >= count {
+            tutorialStep = min(tutorialStep + 1, catalog.tutorialSteps.count)
         }
     }
 
@@ -286,6 +443,14 @@ final class GameStore: ObservableObject {
         return drops.last?.stage ?? 1
     }
 
+    private func haptic(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
+        guard UserDefaults.standard.object(forKey: "sunnycove.hapticsEnabled") == nil
+                || UserDefaults.standard.bool(forKey: "sunnycove.hapticsEnabled") else { return }
+        let generator = UIImpactFeedbackGenerator(style: style)
+        generator.prepare()
+        generator.impactOccurred()
+    }
+
     private func applyOfflineProgress() {
         guard let data = try? Data(contentsOf: saveURL), let save = try? JSONDecoder().decode(GameSave.self, from: data) else { return }
         let elapsed = min(Date().timeIntervalSince(save.lastSaved), 24 * 3600)
@@ -298,7 +463,7 @@ final class GameStore: ObservableObject {
     private func save() {
         let save = GameSave(player: player, cells: cells, generators: Array(generatorRuntime.values),
             activeOrderIndex: activeOrderIndex, completedOrderIDs: completedOrderIDs,
-            restorationState: restorationState, placedElements: [], tutorialStep: tutorialStep,
+            restorationState: restorationState, placedElements: placedElements, tutorialStep: tutorialStep,
             lastSaved: Date(), campaignComplete: activeOrderIndex >= catalog.orders.count)
         guard let data = try? JSONEncoder().encode(save) else { return }
         let temporary = saveURL.appendingPathExtension("tmp")
@@ -314,6 +479,7 @@ final class GameStore: ObservableObject {
         activeOrderIndex = save.activeOrderIndex
         completedOrderIDs = save.completedOrderIDs
         restorationState = save.restorationState
+        placedElements = save.placedElements
         tutorialStep = save.tutorialStep
         return cells.count == 63
     }

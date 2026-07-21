@@ -27,9 +27,12 @@ final class GameEngineTests: XCTestCase {
     }
 
     func testFallbackContainsFullCampaign() {
-        XCTAssertEqual(ContentCatalog.bundled().orders.count, 30)
-        XCTAssertEqual(ContentCatalog.bundled().orders.last?.id, "order_30")
-        XCTAssertEqual(ContentCatalog.bundled().tutorialSteps.count, 3)
+        let catalog = ContentCatalog.bundled()
+        XCTAssertEqual(catalog.orders.count, 30)
+        XCTAssertEqual(catalog.orders.last?.id, "order_30")
+        XCTAssertEqual(catalog.tutorialSteps.count, 3)
+        XCTAssertEqual(catalog.tutorialSteps[1].completion.type, "item_produced")
+        XCTAssertEqual(catalog.restorationElements.count, 9)
     }
 
     func testCatalogLoaderAlwaysReturnsPlayableContent() {
@@ -37,7 +40,8 @@ final class GameEngineTests: XCTestCase {
         XCTAssertEqual(catalog.items.count, 40)
         XCTAssertEqual(catalog.generators.count, 5)
         XCTAssertGreaterThanOrEqual(catalog.orders.count, 30)
-        XCTAssertFalse(catalog.tutorialSteps.isEmpty)
+        XCTAssertEqual(catalog.tutorialSteps.count, 11)
+        XCTAssertEqual(catalog.restorationElements.count, 9)
     }
 
     func testContentManifestHashIsDeterministic() {
@@ -45,5 +49,33 @@ final class GameEngineTests: XCTestCase {
         let second = ContentUpdateService.sha256(of: Data("sunny-cove".utf8))
         XCTAssertEqual(first, second)
         XCTAssertEqual(first.count, 64)
+    }
+
+    func testFirstFiveLevelsHaveVerticalSlicePacing() {
+        XCTAssertEqual(Array(GameRules.default.levelThresholds.prefix(5)), [0, 20, 60, 120, 220])
+    }
+
+    @MainActor
+    func testInitialBoardCanPerformFirstMerge() {
+        let game = GameStore()
+        game.reset()
+        game.moveOrMerge(from: 8, to: 11)
+        XCTAssertEqual(game.cells.first(where: { $0.id == 11 })?.item, "chain1_beach_2_small_shell")
+        XCTAssertEqual(game.cells.first(where: { $0.id == 8 })?.state, .empty)
+    }
+
+    @MainActor
+    func testGeneratorsUnlockAcrossFirstFiveLevels() {
+        let game = GameStore()
+        game.reset()
+        XCTAssertTrue(game.canUseGenerator("gen1_beach_crate"))
+        XCTAssertFalse(game.canUseGenerator("gen2_bar_cart"))
+        XCTAssertEqual(game.generatorUnlockLevel("gen3_surf_locker"), 5)
+    }
+
+    func testRasterizedGameAssetsAreBundled() {
+        XCTAssertNotNil(Bundle.main.url(forResource: "chain1_beach_1_shell_shard", withExtension: "png"))
+        XCTAssertNotNil(Bundle.main.url(forResource: "gen1_beach_crate_ready", withExtension: "png"))
+        XCTAssertNotNil(Bundle.main.url(forResource: "char_marina_friendly", withExtension: "png"))
     }
 }

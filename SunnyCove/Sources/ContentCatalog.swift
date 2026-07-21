@@ -6,6 +6,7 @@ struct ContentCatalog: Sendable {
     var orders: [OrderDefinition]
     var rules: GameRules = .default
     var tutorialSteps: [TutorialStep] = []
+    var restorationElements: [RestorationElementDefinition] = []
 
     /// Lädt die von Claude gelieferten JSON-Dateien aus dem App-Bundle.
     /// Falls die Dateien beim ersten Prototyp-Build noch nicht eingebunden sind,
@@ -60,7 +61,11 @@ struct ContentCatalog: Sendable {
             from: data(named: "initial_game_state", in: bundle, overrideRoot: overrideRoot) ?? Data()))?.rules ?? .default
         let tutorial = (try? JSONDecoder().decode(TutorialFile.self,
             from: data(named: "tutorial_campaign_01", in: bundle, overrideRoot: overrideRoot) ?? Data()))?.stepsAsModels ?? StarterTutorial.make()
-        return ContentCatalog(items: items, generators: generators, orders: orders, rules: rules, tutorialSteps: tutorial)
+        let restoration = (try? JSONDecoder().decode(RestorationFile.self,
+            from: data(named: "restoration_beachbar", in: bundle, overrideRoot: overrideRoot) ?? Data()))?.placeableElements
+            ?? StarterRestoration.make()
+        return ContentCatalog(items: items, generators: generators, orders: orders,
+            rules: rules, tutorialSteps: tutorial, restorationElements: restoration)
     }
 
     private static func data(named name: String, in bundle: Bundle, overrideRoot: URL?) -> Data? {
@@ -122,7 +127,8 @@ struct ContentCatalog: Sendable {
                 baseDrops: [.init(stage: 1, weight: 0.55), .init(stage: 2, weight: 0.32), .init(stage: 3, weight: 0.13)],
                 upgradedDrops: [.init(stage: 1, weight: 0.4), .init(stage: 2, weight: 0.35), .init(stage: 3, weight: 0.2), .init(stage: 4, weight: 0.05)])
         }
-        return ContentCatalog(items: items, generators: generators, orders: StarterOrders.make(), tutorialSteps: StarterTutorial.make())
+        return ContentCatalog(items: items, generators: generators, orders: StarterOrders.make(),
+            tutorialSteps: StarterTutorial.make(), restorationElements: StarterRestoration.make())
     }
 }
 
@@ -238,10 +244,16 @@ private struct TutorialFile: Decodable {
         let character: String
         let portrait: String
         let text: String
+        let completion: TutorialCompletion
     }
     var stepsAsModels: [TutorialStep] {
-        steps.map { TutorialStep(id: $0.id, character: $0.character, portrait: $0.portrait, text: $0.text) }
+        steps.map { TutorialStep(id: $0.id, character: $0.character,
+            portrait: $0.portrait, text: $0.text, completion: $0.completion) }
     }
+}
+
+private struct RestorationFile: Decodable {
+    let placeableElements: [RestorationElementDefinition]
 }
 
 private enum StarterOrders {
@@ -291,9 +303,35 @@ private enum StarterOrders {
 private enum StarterTutorial {
     static func make() -> [TutorialStep] {
         [
-            TutorialStep(id: "tut_01", character: "gull", portrait: "characters/char_gull_happy.svg", text: "Der Sturm hat Omas Strandbar zugerichtet. Zusammen bauen wir Sunny Cove wieder auf."),
-            TutorialStep(id: "tut_02", character: "kai", portrait: "characters/char_kai_pointing.svg", text: "Tipp eine Generator-Kiste an. Sie liefert dir die ersten Fundstücke."),
-            TutorialStep(id: "tut_03", character: "marina", portrait: "characters/char_marina_friendly.svg", text: "Zwei gleiche Gegenstände ergeben durch Zusammenführen eine bessere Stufe.")
+            TutorialStep(id: "tut_01", character: "gull", portrait: "characters/char_gull_happy.svg",
+                text: "Der Sturm hat Omas Strandbar zugerichtet. Zusammen bauen wir Sunny Cove wieder auf.",
+                completion: .init(type: "dialog_dismissed")),
+            TutorialStep(id: "tut_02", character: "kai", portrait: "characters/char_kai_pointing.svg",
+                text: "Tipp eine Generator-Kiste an. Sie liefert dir die ersten Fundstücke.",
+                completion: .init(type: "item_produced", generator: "gen1_beach_crate")),
+            TutorialStep(id: "tut_03", character: "marina", portrait: "characters/char_marina_friendly.svg",
+                text: "Zwei gleiche Gegenstände ergeben durch Zusammenführen eine bessere Stufe.",
+                completion: .init(type: "merge_completed", chain: "chain_beach", toStage: 2))
         ]
+    }
+}
+
+private enum StarterRestoration {
+    static func make() -> [RestorationElementDefinition] {
+        [
+            ("elem_counter", "Theke", "order_06"),
+            ("elem_roof", "Dach", "order_09"),
+            ("elem_sign", "Schild", "order_12"),
+            ("elem_chair_a", "Barhocker (blau)", "order_15"),
+            ("elem_chair_b", "Barhocker (rosa)", "order_17"),
+            ("elem_string_lights", "Lichterkette", "order_20"),
+            ("elem_flowers", "Blumen", "order_23"),
+            ("elem_surfboard_deco", "Surfbrett-Deko", "order_26"),
+            ("elem_palm", "Palme", "order_28")
+        ].enumerated().map { index, value in
+            RestorationElementDefinition(id: value.0, order: index + 1,
+                asset: "restoration/\(value.0).svg", displayName: value.1,
+                unlockOrder: value.2)
+        }
     }
 }
