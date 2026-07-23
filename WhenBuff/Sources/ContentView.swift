@@ -381,14 +381,24 @@ private struct BuffCalendarCard: View {
             }
             Spacer()
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(isPast ? Color.white.opacity(0.72) : .white)
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .background(
-            WhenBuffPalette.buffColor(for: buff.type).opacity(isPast ? 0.62 : 1),
-            in: RoundedRectangle(cornerRadius: 8)
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isPast ? WhenBuffPalette.pastBuff : WhenBuffPalette.buffColor(for: buff.type))
+                if isPast {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(WhenBuffPalette.buffColor(for: buff.type).opacity(0.16))
+                }
+            }
         )
-        .shadow(color: WhenBuffPalette.buffColor(for: buff.type).opacity(0.24), radius: 4, y: 2)
+        .shadow(
+            color: isPast ? .clear : WhenBuffPalette.buffColor(for: buff.type).opacity(0.24),
+            radius: 4,
+            y: 2
+        )
     }
 
     private static let timeFormatter: DateFormatter = {
@@ -430,6 +440,7 @@ private enum WhenBuffPalette {
     static let live = Color(hex6: 0x86EFAC)
     static let warning = Color(hex6: 0xFDBA74)
     static let notification = Color(hex6: 0xC4B5FD)
+    static let pastBuff = Color(hex6: 0x465569)
     static let alliance = Color(hex6: 0x2563EB)
     static let horde = Color(hex6: 0xB91C1C)
     static let zg = Color(hex6: 0x32A866)
