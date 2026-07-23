@@ -30,6 +30,13 @@ enum WhenBuffAPI {
         )
     }
 
+    static func history(server: String) async throws -> WhenBuffHistoryEnvelope {
+        try await fetch(
+            "api/v1/history",
+            query: [URLQueryItem(name: "server", value: server)]
+        )
+    }
+
     static func events(server: String, after: Int) async throws -> WhenBuffEventEnvelope {
         try await fetch(
             "api/v1/events",

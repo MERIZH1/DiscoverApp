@@ -14,6 +14,10 @@ final class WhenBuffStore: ObservableObject {
     @Published private(set) var isRefreshing = false
 
     private var pollingTask: Task<Void, Never>?
+    private var liveBuffs: [WhenBuffRecord] = []
+    private var historyBuffs: [WhenBuffRecord] = []
+    private var historyServer: String?
+    private var historyLoadedAt: Date?
 
     init() {
         selectedServer = UserDefaults.standard.string(forKey: "whenBuff.selectedServer") ?? "SoulSeeker"
@@ -43,6 +47,10 @@ final class WhenBuffStore: ObservableObject {
         selectedServer = server
         UserDefaults.standard.set(server, forKey: "whenBuff.selectedServer")
         buffs = []
+        liveBuffs = []
+        historyBuffs = []
+        historyServer = nil
+        historyLoadedAt = nil
         statusText = "Server wird geladen …"
         Task { await refresh() }
     }
@@ -72,13 +80,44 @@ final class WhenBuffStore: ObservableObject {
             }
 
             await syncNotificationProfile()
-            let bootstrap = try await WhenBuffAPI.bootstrap(server: selectedServer)
-            buffs = bootstrap.buffs.sorted { $0.scheduledAt < $1.scheduledAt }
+            let requestedServer = selectedServer
+            let bootstrap = try await WhenBuffAPI.bootstrap(server: requestedServer)
+            guard requestedServer == selectedServer else { return }
+            liveBuffs = bootstrap.buffs
+
+            let historyIsStale = historyLoadedAt.map {
+                Date().timeIntervalSince($0) >= 3600
+            } ?? true
+            if historyServer != requestedServer || historyIsStale {
+                do {
+                    let history = try await WhenBuffAPI.history(server: requestedServer)
+                    guard requestedServer == selectedServer else { return }
+                    historyBuffs = history.buffs
+                    historyServer = requestedServer
+                    historyLoadedAt = Date()
+                } catch {
+                    if historyServer != requestedServer {
+                        historyBuffs = []
+                    }
+                }
+            }
+
+            publishCombinedBuffs()
             lastUpdated = Date(timeIntervalSince1970: TimeInterval(bootstrap.generatedAt))
             statusText = "Live · Prüfung alle 5 Sekunden"
         } catch {
             statusText = error.localizedDescription
         }
+    }
+
+    private func publishCombinedBuffs() {
+        var recordsByKey = Dictionary(
+            uniqueKeysWithValues: historyBuffs.map { ($0.key, $0) }
+        )
+        for buff in liveBuffs {
+            recordsByKey[buff.key] = buff
+        }
+        buffs = recordsByKey.values.sorted { $0.scheduledAt < $1.scheduledAt }
     }
 
     private func syncNotificationProfile(force: Bool = false) async {

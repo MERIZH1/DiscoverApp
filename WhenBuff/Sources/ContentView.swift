@@ -193,7 +193,7 @@ private struct WebsiteCalendar: View {
                     .font(.caption.bold())
                     .foregroundStyle(WhenBuffPalette.calendar)
                 Spacer()
-                Label("24 Stunden", systemImage: "clock")
+                Label("90 Tage Verlauf", systemImage: "clock.arrow.circlepath")
                     .font(.caption)
                     .foregroundStyle(WhenBuffPalette.muted)
             }
@@ -349,6 +349,10 @@ private struct NextBuffBanner: View {
 private struct BuffCalendarCard: View {
     let buff: WhenBuffRecord
 
+    private var isPast: Bool {
+        buff.scheduledAt < Int(Date().timeIntervalSince1970)
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             BuffIcon(type: buff.type, size: 38)
@@ -370,13 +374,20 @@ private struct BuffCalendarCard: View {
                         .font(.caption2)
                         .lineLimit(2)
                 }
+                if isPast {
+                    Label("Vergangen", systemImage: "clock.arrow.circlepath")
+                        .font(.caption2.bold())
+                }
             }
             Spacer()
         }
         .foregroundStyle(.white)
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(WhenBuffPalette.buffColor(for: buff.type), in: RoundedRectangle(cornerRadius: 8))
+        .background(
+            WhenBuffPalette.buffColor(for: buff.type).opacity(isPast ? 0.62 : 1),
+            in: RoundedRectangle(cornerRadius: 8)
+        )
         .shadow(color: WhenBuffPalette.buffColor(for: buff.type).opacity(0.24), radius: 4, y: 2)
     }
 

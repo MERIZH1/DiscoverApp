@@ -36,6 +36,13 @@ struct WhenBuffBootstrap: Decodable {
     let generatedAt: Int
 }
 
+struct WhenBuffHistoryEnvelope: Decodable {
+    let server: String
+    let buffs: [WhenBuffRecord]
+    let days: Int
+    let generatedAt: Int
+}
+
 struct WhenBuffEvent: Decodable, Identifiable {
     let id: Int
     let server: String
