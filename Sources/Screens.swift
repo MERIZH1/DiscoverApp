@@ -124,6 +124,7 @@ struct MainView: View {
     @EnvironmentObject var app: AppState
     @State private var showPlayer = false
     @State private var keyboardVisible = false
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -176,6 +177,14 @@ struct MainView: View {
         .onAppear { configureAppearance(glass: app.liquidGlass) }
         .onChange(of: showPlayer) { _, open in
             if open { dismissKeyboard(); keyboardVisible = false }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Sperren/Entsperren feuert Keyboard-Notifications mit unsinnigen Frames
+            // (mid-animation / off-screen) -> keyboardVisible haengt und der Mini-Player
+            // landet "in der Luft". Beim Hintergrund Keyboard schliessen, und in JEDEM
+            // Phasenwechsel den Keyboard-Status sauber zuruecksetzen.
+            if phase == .background { dismissKeyboard() }
+            keyboardVisible = false
         }
         .sheet(isPresented: $showPlayer) { PlayerView() }
     }
