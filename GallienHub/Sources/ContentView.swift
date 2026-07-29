@@ -1,6 +1,11 @@
 import AuthenticationServices
 import SwiftUI
 
+private let hubBackground = Color(red: 0.055, green: 0.067, blue: 0.086)
+private let hubPanel = Color(red: 0.09, green: 0.11, blue: 0.14)
+private let hubBorder = Color(red: 0.18, green: 0.22, blue: 0.27)
+private let hubBlue = Color(red: 0.22, green: 0.47, blue: 0.93)
+
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("gallienHub.endpoint") private var endpointValue = HubEndpoint.tailscale.rawValue
@@ -16,7 +21,7 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            Color(red: 0.025, green: 0.035, blue: 0.075)
+            hubBackground
                 .ignoresSafeArea()
 
             HubWebView(model: web)
@@ -34,12 +39,16 @@ struct ContentView: View {
             }
 
             if authentication.isAuthenticating {
-                Color.black.opacity(0.32)
+                Color.black.opacity(0.45)
                     .ignoresSafeArea()
                 ProgressView("Sichere Anmeldung …")
                     .padding(.horizontal, 24)
                     .padding(.vertical, 18)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22))
+                    .background(hubPanel, in: RoundedRectangle(cornerRadius: 14))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(hubBorder, lineWidth: 1)
+                    }
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -51,7 +60,7 @@ struct ContentView: View {
                 }
             } else if web.isLoading {
                 ProgressView()
-                    .tint(Color(red: 0.34, green: 0.89, blue: 0.98))
+                    .tint(hubBlue)
                     .controlSize(.small)
                     .frame(maxWidth: .infinity)
                     .frame(height: 3)
@@ -143,7 +152,12 @@ private struct ExternalNavigationBar: View {
         .font(.subheadline.weight(.semibold))
         .padding(.horizontal, 16)
         .frame(height: 46)
-        .background(.ultraThinMaterial)
+        .background(hubPanel)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(hubBorder)
+                .frame(height: 1)
+        }
     }
 }
 
@@ -155,28 +169,19 @@ private struct ConnectionErrorView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.025, green: 0.035, blue: 0.075),
-                    Color(red: 0.075, green: 0.04, blue: 0.15)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            hubBackground
+                .ignoresSafeArea()
 
             VStack(spacing: 20) {
                 Image(systemName: "server.rack")
-                    .font(.system(size: 48, weight: .semibold))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.cyan, .purple],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 96, height: 96)
-                    .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 28))
+                    .font(.system(size: 42, weight: .semibold))
+                    .foregroundStyle(hubBlue)
+                    .frame(width: 82, height: 82)
+                    .background(hubPanel, in: RoundedRectangle(cornerRadius: 18))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18)
+                            .stroke(hubBorder, lineWidth: 1)
+                    }
 
                 VStack(spacing: 8) {
                     Text("Server nicht erreichbar")
@@ -217,8 +222,12 @@ private struct ErrorToast: View {
             }
         }
         .padding(14)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
-        .shadow(color: .black.opacity(0.3), radius: 20, y: 8)
+        .background(hubPanel, in: RoundedRectangle(cornerRadius: 14))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(hubBorder, lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.22), radius: 14, y: 6)
     }
 }
 
@@ -228,12 +237,9 @@ private struct PrimaryHubButtonStyle: ButtonStyle {
             .font(.headline)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .foregroundStyle(.black)
-            .background(
-                LinearGradient(colors: [.cyan, Color(red: 0.45, green: 0.95, blue: 0.78)], startPoint: .leading, endPoint: .trailing),
-                in: RoundedRectangle(cornerRadius: 16)
-            )
-            .opacity(configuration.isPressed ? 0.72 : 1)
+            .foregroundStyle(.white)
+            .background(hubBlue, in: RoundedRectangle(cornerRadius: 12))
+            .opacity(configuration.isPressed ? 0.78 : 1)
     }
 }
 
@@ -243,7 +249,14 @@ private struct SecondaryHubButtonStyle: ButtonStyle {
             .font(.subheadline.weight(.semibold))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 13)
-            .background(.white.opacity(configuration.isPressed ? 0.12 : 0.07), in: RoundedRectangle(cornerRadius: 16))
+            .background(
+                configuration.isPressed ? Color(red: 0.13, green: 0.16, blue: 0.2) : hubPanel,
+                in: RoundedRectangle(cornerRadius: 12)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(hubBorder, lineWidth: 1)
+            }
     }
 }
 

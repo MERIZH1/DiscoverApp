@@ -47,7 +47,7 @@ final class HubWebViewModel: NSObject, ObservableObject, WKNavigationDelegate, W
         webView.scrollView.contentInsetAdjustmentBehavior = .automatic
 
         let refresh = UIRefreshControl()
-        refresh.tintColor = UIColor(red: 0.34, green: 0.89, blue: 0.98, alpha: 1)
+        refresh.tintColor = UIColor(red: 0.22, green: 0.47, blue: 0.93, alpha: 1)
         refresh.addTarget(self, action: #selector(refreshPage(_:)), for: .valueChanged)
         webView.scrollView.refreshControl = refresh
     }
