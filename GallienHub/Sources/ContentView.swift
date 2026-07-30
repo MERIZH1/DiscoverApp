@@ -1,10 +1,12 @@
 import AuthenticationServices
 import SwiftUI
 
-private let hubBackground = Color(red: 0.055, green: 0.067, blue: 0.086)
-private let hubPanel = Color(red: 0.09, green: 0.11, blue: 0.14)
-private let hubBorder = Color(red: 0.18, green: 0.22, blue: 0.27)
-private let hubBlue = Color(red: 0.22, green: 0.47, blue: 0.93)
+// Muss mit den Tokens in app/static/style.css uebereinstimmen, damit
+// zwischen nativer Huelle und WebView keine Farbkante sichtbar wird.
+private let hubBackground = Color(red: 0.039, green: 0.043, blue: 0.055)  // #0a0b0e  --bg
+private let hubPanel = Color(red: 0.078, green: 0.086, blue: 0.106)       // #14161b  --panel
+private let hubBorder = Color(red: 0.137, green: 0.153, blue: 0.184)      // #23272f  --line
+private let hubBlue = Color(red: 0.357, green: 0.549, blue: 1.0)          // #5b8cff  --accent
 
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
