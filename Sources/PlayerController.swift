@@ -50,6 +50,49 @@ final class ICYMetadataReader: NSObject, AVPlayerItemMetadataOutputPushDelegate 
 
 /// Nativer Player: Queue + AVPlayer + Lock-Screen. Spielt Tracks (ueber das
 /// Backend aufgeloest) und Live-Radio (direkte Stream-URL). Komplett nativ.
+/// Hoerstand von Podcast-Folgen — LOKAL auf diesem Geraet (UserDefaults).
+/// Bewusst nicht auf dem Server: jedes Geraet hat seinen eigenen Stand.
+enum PodcastProgress {
+    private static let posKey = "podcastProgress.v1"
+    private static let tsKey  = "podcastProgressTs.v1"
+
+    private static var positions: [String: Double] {
+        (UserDefaults.standard.dictionary(forKey: posKey) as? [String: Double]) ?? [:]
+    }
+    private static var stamps: [String: Double] {
+        (UserDefaults.standard.dictionary(forKey: tsKey) as? [String: Double]) ?? [:]
+    }
+
+    /// Gespeicherte Position (0 = kein brauchbarer Stand).
+    static func get(_ uri: String) -> Double {
+        guard !uri.isEmpty else { return 0 }
+        let p = positions[uri] ?? 0
+        return p > 15 ? p : 0
+    }
+
+    /// Speichert den Stand. Unter 15s wird nichts gemerkt (kurzes Reinhoeren),
+    /// ab 30s vor Schluss gilt die Folge als gehoert -> Eintrag faellt weg.
+    static func set(_ uri: String, pos: Double, dur: Double) {
+        guard !uri.isEmpty, pos.isFinite else { return }
+        var p = positions
+        var t = stamps
+        if dur > 0, pos >= dur - 30 {
+            p.removeValue(forKey: uri); t.removeValue(forKey: uri)
+        } else if pos > 15 {
+            p[uri] = pos.rounded(); t[uri] = Date().timeIntervalSince1970
+        } else {
+            return
+        }
+        if p.count > 300 {                                  // aelteste ausduennen
+            for key in t.sorted(by: { $0.value < $1.value }).prefix(p.count - 300).map(\.key) {
+                p.removeValue(forKey: key); t.removeValue(forKey: key)
+            }
+        }
+        UserDefaults.standard.set(p, forKey: posKey)
+        UserDefaults.standard.set(t, forKey: tsKey)
+    }
+}
+
 /// Robuste Audio-Session-Aktivierung: Kategorie .playback + aktiv, mit einmaligem
 /// Retry. Direkt nach dem Resume aus langer Hintergrund-Suspendierung verweigert
 /// iOS die Aktivierung manchmal (eine andere App haelt noch die Session) -> ohne
@@ -179,6 +222,8 @@ final class PlayerController: ObservableObject {
     private var timeObserver: Any?
     private var metaDur: Double = 0   // echte Dauer aus der Stream-Antwort (Fallback gegen iOS-Doppel-Dauer)
     private var statusObs: NSKeyValueObservation?
+    private var pendingSeek: Double = 0        // gespeicherter Podcast-Stand, gesetzt beim Laden
+    private var lastPodSave = Date.distantPast
     private var endObs: NSObjectProtocol?
     private let api: APIClient
 
@@ -692,6 +737,14 @@ final class PlayerController: ObservableObject {
             if queue.indices.contains(real) { index = real; loadCurrent(autoplay: true) }
         }
     }
+    /// Podcast-Hoerstand ~alle 5s lokal sichern (der Zeit-Observer feuert 2x/Sek.).
+    private func savePodcastProgress() {
+        guard isEpisode, let uri = current?.uri, !uri.isEmpty else { return }
+        guard Date().timeIntervalSince(lastPodSave) > 5 else { return }
+        lastPodSave = Date()
+        PodcastProgress.set(uri, pos: currentTime, dur: duration)
+    }
+
     func seek(_ t: Double) {
         if crossfading { abortCrossfade() }
         var target = max(0, t)
@@ -784,6 +837,9 @@ final class PlayerController: ObservableObject {
         persistSnapshot()
         updateRemoteForContent()
         loading = true; currentTime = 0; duration = track.durationSec; source = ""; streamCache = ""; metaDur = knownDuration(for: track)
+        // Podcast: gespeicherten Hoerstand vormerken -> Seek passiert, sobald der
+        // Player bereit ist (siehe readyToPlay-Observer).
+        pendingSeek = track.uri.hasPrefix("spotify:episode:") ? PodcastProgress.get(track.uri) : 0
         diag("play_load_start", "\(trackDiag(track)) prebuf=\(prebuf[track.uri] != nil) busy=\(prebufBusy.contains(track.uri))")
         player.volume = 1                                   // aktiver Track immer voll (Einblenden nur in der Ueberblende)
         AudioSessionManager.activate()                       // Kategorie+aktiv (mit Retry) -> auch nach Stunden Idle kein stummer Song
@@ -925,6 +981,16 @@ final class PlayerController: ObservableObject {
                     self.diag("play_ready", "\(self.trackDiag(self.current)) raw=\(raw.isFinite ? Int(raw) : -1) serverDur=\(Int(self.metaDur))")
                     self.applyDuration(for: it, serverDur: self.metaDur)
                     if let t = self.current { self.streamRetried.remove(t.uri) }
+                    // Podcast an der gemerkten Stelle fortsetzen
+                    if self.pendingSeek > 15 {
+                        let target = self.pendingSeek
+                        self.pendingSeek = 0
+                        self.player.seek(to: CMTime(seconds: target, preferredTimescale: 600),
+                                         toleranceBefore: .zero, toleranceAfter: .zero)
+                        self.currentTime = target
+                        self.updateElapsed()
+                        self.diag("podcast_resume", "\(self.trackDiag(self.current)) pos=\(Int(target))")
+                    }
                     // Wiedergabe durchsetzen, falls play() vor readyToPlay kam (sonst 2x play noetig)
                     if self.wantPlay {
                         self.player.play()
@@ -982,6 +1048,7 @@ final class PlayerController: ObservableObject {
             Task { @MainActor in
                 let c = CMTimeGetSeconds(t)
                 if c.isFinite { self.currentTime = c; self.updateElapsed() }
+                self.savePodcastProgress()
                 self.syncDuration()
                 self.applyFade()
                 self.checkSleep()
