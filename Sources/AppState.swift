@@ -109,9 +109,30 @@ final class AppState: ObservableObject {
 
     /// Playlists zentral holen + cachen. Ueberschreibt den Cache nur bei ERFOLG
     /// (nicht-leer), damit ein fehlgeschlagener/leerer Abruf die Liste nicht platt macht.
+    private var plLoadedAt: Date = .distantPast
+    private var plHealthy = false
+
     func loadPlaylists() async {
-        if let pls = try? await api.playlists(), !pls.isEmpty {
-            playlists = pls
+        guard let pls = try? await api.playlists(), !pls.isEmpty else { return }
+        // Waehrend eines Spotify-Ausfalls liefert der Server NUR die lokalen
+        // Eintraege (YT-Playlists, YouTube-Funde). Eine bestehende, deutlich
+        // groessere Liste damit NICHT ueberschreiben — sonst steht die App
+        // bis zum Neustart auf der Kurzliste.
+        if playlists.count > 20 && pls.count < 10 {
+            plHealthy = false          // beim naechsten Vordergrund erneut versuchen
+            return
+        }
+        playlists  = pls
+        plLoadedAt = Date()
+        plHealthy  = pls.count > 5
+    }
+
+    /// Beim Zurueckkehren in den Vordergrund die Bibliothek auffrischen, wenn sie
+    /// alt ist oder der letzte Ladeversuch verdaechtig kurz ausfiel.
+    func refreshPlaylistsIfStale() {
+        guard profile != nil else { return }
+        if Date().timeIntervalSince(plLoadedAt) > 300 || !plHealthy {
+            Task { await loadPlaylists() }
         }
     }
 

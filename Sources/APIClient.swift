@@ -59,7 +59,32 @@ final class APIClient: ObservableObject {
         return s.addingPercentEncoding(withAllowedCharacters: allowed) ?? s
     }
 
+    /// Ein Abruf mit EINEM Wiederholversuch bei vorruebergehenden Fehlern.
+    /// Ohne das hinterlaesst ein kurzer Netz-Hickup (WLAN-Wechsel, App-Resume,
+    /// kurz ueberlasteter Server) eine leere Seite, die sich erst nach einem
+    /// App-Neustart wieder fuellt — genau das Symptom bei Playlists/Kuenstlern.
+    /// NUR bei GET: ein POST koennte sonst doppelt schreiben.
     private func data(_ path: String, method: String = "GET", json: [String: Any]? = nil) async throws -> Data {
+        do {
+            return try await dataOnce(path, method: method, json: json)
+        } catch {
+            guard method == "GET", Self.isTransient(error) else { throw error }
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            return try await dataOnce(path, method: method, json: json)
+        }
+    }
+
+    /// Lohnt sich ein zweiter Versuch? Netzfehler und 5xx ja — 401/4xx nein.
+    private static func isTransient(_ e: Error) -> Bool {
+        if let api = e as? APIError {
+            if case .http(let code) = api { return code >= 500 }
+            if case .badResponse = api { return true }
+            return false
+        }
+        return (e as NSError).domain == NSURLErrorDomain
+    }
+
+    private func dataOnce(_ path: String, method: String = "GET", json: [String: Any]? = nil) async throws -> Data {
         guard let url = URL(string: base + path) else { throw APIError.badURL }
         var req = URLRequest(url: url)
         req.httpMethod = method

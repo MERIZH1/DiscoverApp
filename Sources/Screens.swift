@@ -184,6 +184,7 @@ struct MainView: View {
             // landet "in der Luft". Beim Hintergrund Keyboard schliessen, und in JEDEM
             // Phasenwechsel den Keyboard-Status sauber zuruecksetzen.
             if phase == .background { dismissKeyboard() }
+            if phase == .active { app.refreshPlaylistsIfStale() }
             keyboardVisible = false
         }
         .sheet(isPresented: $showPlayer) { PlayerView() }
