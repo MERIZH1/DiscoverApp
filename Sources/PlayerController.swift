@@ -236,6 +236,11 @@ final class PlayerController: ObservableObject {
 
     private var ctxName = ""
     private(set) var ctxURI = ""   // aktuell laufender Playlist-/Album-Kontext (fuer "Zu Playlist"-Sortierung lesbar)
+    // Fuer die Hoerstatistik: welches YT-Video laeuft, zu welchem Track, und
+    // ob wir es fuer diesen Durchlauf schon gemeldet haben.
+    private var statVid = ""
+    private var statTrack: Track?
+    private var statSent = false
 
     private func diag(_ ev: String, _ info: String) {
         Task { await api.bgLog(ev, info) }
@@ -669,8 +674,25 @@ final class PlayerController: ObservableObject {
         }
     }
 
+    /// Aktuellen Song an die Statistik melden. Wird beim Wechsel, beim Stoppen
+    /// und beim Wegschalten in den Hintergrund gerufen. `statSent` verhindert
+    /// Doppelmeldungen, wenn mehrere dieser Wege zusammenfallen.
+    func flushPlayStats(completed: Bool) {
+        guard !statSent, !statVid.isEmpty, let t = statTrack else { return }
+        let listened = Int(currentTime.isFinite ? max(0, currentTime) : 0)
+        guard listened > 2 else { return }
+        let dur = Int(duration.isFinite && duration > 0 ? duration : metaDur)
+        let done = completed || (dur > 0 && listened >= dur - 3)
+        statSent = true
+        let vid = statVid, cn = ctxName, cu = ctxURI, src = source
+        Task { await api.postPlayStats(videoId: vid, track: t, listened: listened,
+                                       duration: dur, completed: done,
+                                       contextName: cn, contextURI: cu, source: src) }
+    }
+
     private var lastAutoAdvance = Date.distantPast   // Doppel-Advance-Schutz (EOF + Stall-Fallback)
     func next(auto: Bool = false) {
+        flushPlayStats(completed: auto)   // auto = Song lief bis zum Ende
         if crossfading { completeCrossfade(); return }
         if auto {
             // EOF und der Stall-Fallback koennen fast gleichzeitig next() rufen ->
@@ -708,6 +730,7 @@ final class PlayerController: ObservableObject {
         loadCurrent(autoplay: true)
     }
     func prev() {
+        flushPlayStats(completed: false)
         if isRadio { return }
         if currentTime > 10 || queue.isEmpty { seek(0); return }   // >10s -> Anfang (wie PWA)
         index = (index - 1 + queue.count) % queue.count
@@ -891,6 +914,9 @@ final class PlayerController: ObservableObject {
                 }
                 source = r.source ?? ""
                 streamCache = r.stream_cache ?? ""
+                statVid = r.videoId ?? ""
+                statTrack = track
+                statSent = false
                 metaDur = Double(r.duration ?? 0)
                 if metaDur > 0 { streamDurations[track.uri] = metaDur }
                 let ms = Int(Date().timeIntervalSince(started) * 1000)

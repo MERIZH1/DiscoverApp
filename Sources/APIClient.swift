@@ -725,6 +725,25 @@ final class APIClient: ObservableObject {
         ])
     }
 
+    /// Hoerstatistik melden. Die App hat das bis August 2026 GAR NICHT getan —
+    /// dadurch war alles, was in der App gehoert wurde, fuer die Statistik
+    /// unsichtbar: kein play_count, kein Hoerprotokoll, und der Smart-Cache
+    /// entschied nur anhand des Web-Players.
+    func postPlayStats(videoId: String, track: Track, listened: Int, duration: Int,
+                       completed: Bool, contextName: String = "", contextURI: String = "",
+                       source: String = "") async {
+        guard !videoId.isEmpty, listened > 2 else { return }
+        _ = try? await data("/api/yt/stats/\(videoId)", method: "POST", json: [
+            "listened_sec": listened, "duration_sec": duration,
+            "completed": completed, "partial": false,
+            "artist": track.artist, "title": track.name,
+            "spotify_uri": track.uri, "album": track.album ?? "",
+            "image": track.image ?? "",
+            "context_uri": contextURI, "context_name": contextName,
+            "source": source,
+        ])
+    }
+
     /// Abonnierte Playlists (fuer "Abo"-Markierung in der Bibliothek).
     func subscriptions() async throws -> [SubItem] {
         let r: SubsResponse = try await get("/api/subscriptions")

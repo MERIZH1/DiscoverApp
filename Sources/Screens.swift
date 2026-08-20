@@ -183,7 +183,12 @@ struct MainView: View {
             // (mid-animation / off-screen) -> keyboardVisible haengt und der Mini-Player
             // landet "in der Luft". Beim Hintergrund Keyboard schliessen, und in JEDEM
             // Phasenwechsel den Keyboard-Status sauber zuruecksetzen.
-            if phase == .background { dismissKeyboard() }
+            if phase == .background {
+                dismissKeyboard()
+                // Beim Wegschalten die bisher gehoerte Zeit melden — sonst geht
+                // sie verloren, falls iOS die App danach beendet.
+                app.player.flushPlayStats(completed: false)
+            }
             if phase == .active { app.refreshPlaylistsIfStale() }
             keyboardVisible = false
         }
