@@ -677,17 +677,25 @@ final class PlayerController: ObservableObject {
     /// Aktuellen Song an die Statistik melden. Wird beim Wechsel, beim Stoppen
     /// und beim Wegschalten in den Hintergrund gerufen. `statSent` verhindert
     /// Doppelmeldungen, wenn mehrere dieser Wege zusammenfallen.
-    func flushPlayStats(completed: Bool) {
-        guard !statSent, !statVid.isEmpty, let t = statTrack else { return }
+    /// `partial: true` = Zwischenstand. Der Server zaehlt ihn NICHT als
+    /// Wiedergabe und schreibt ihn nicht ins Hoerprotokoll — er nutzt ihn nur,
+    /// um einen Song ggf. schon mittendrin lokal abzulegen. Wichtig fuer den
+    /// Hintergrund: die App spielt dort WEITER, der Song ist also nicht vorbei.
+    /// Wuerde man das als echte Meldung schicken, waere die spaetere Meldung am
+    /// Songende blockiert und der Song galte faelschlich als abgebrochen.
+    func flushPlayStats(completed: Bool, partial: Bool = false) {
+        guard !statVid.isEmpty, let t = statTrack else { return }
+        if !partial && statSent { return }
         let listened = Int(currentTime.isFinite ? max(0, currentTime) : 0)
         guard listened > 2 else { return }
         let dur = Int(duration.isFinite && duration > 0 ? duration : metaDur)
         let done = completed || (dur > 0 && listened >= dur - 3)
-        statSent = true
+        if !partial { statSent = true }
         let vid = statVid, cn = ctxName, cu = ctxURI, src = source
         Task { await api.postPlayStats(videoId: vid, track: t, listened: listened,
                                        duration: dur, completed: done,
-                                       contextName: cn, contextURI: cu, source: src) }
+                                       contextName: cn, contextURI: cu, source: src,
+                                       partial: partial) }
     }
 
     private var lastAutoAdvance = Date.distantPast   // Doppel-Advance-Schutz (EOF + Stall-Fallback)

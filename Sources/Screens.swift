@@ -185,9 +185,10 @@ struct MainView: View {
             // Phasenwechsel den Keyboard-Status sauber zuruecksetzen.
             if phase == .background {
                 dismissKeyboard()
-                // Beim Wegschalten die bisher gehoerte Zeit melden — sonst geht
-                // sie verloren, falls iOS die App danach beendet.
-                app.player.flushPlayStats(completed: false)
+                // Nur ZWISCHENSTAND: die App spielt im Hintergrund weiter, der
+                // Song ist nicht vorbei. Eine echte Meldung wuerde die Meldung
+                // am Songende blockieren.
+                app.player.flushPlayStats(completed: false, partial: true)
             }
             if phase == .active { app.refreshPlaylistsIfStale() }
             keyboardVisible = false

@@ -731,11 +731,11 @@ final class APIClient: ObservableObject {
     /// entschied nur anhand des Web-Players.
     func postPlayStats(videoId: String, track: Track, listened: Int, duration: Int,
                        completed: Bool, contextName: String = "", contextURI: String = "",
-                       source: String = "") async {
+                       source: String = "", partial: Bool = false) async {
         guard !videoId.isEmpty, listened > 2 else { return }
         _ = try? await data("/api/yt/stats/\(videoId)", method: "POST", json: [
             "listened_sec": listened, "duration_sec": duration,
-            "completed": completed, "partial": false,
+            "completed": completed, "partial": partial,
             "artist": track.artist, "title": track.name,
             "spotify_uri": track.uri, "album": track.album ?? "",
             "image": track.image ?? "",
