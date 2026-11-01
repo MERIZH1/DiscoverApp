@@ -44,13 +44,18 @@ def hls():
             break
         pos += size
     ts = struct.unpack(">I", d[pos + 16:pos + 20])[0]
-    first = struct.unpack(">I", d[pos + 24:pos + 28])[0]
-    count = struct.unpack(">H", d[pos + 30:pos + 32])[0]
+    if d[pos + 8] == 0:
+        first = struct.unpack(">I", d[pos + 24:pos + 28])[0]
+        table = pos + 28
+    else:
+        first = struct.unpack(">Q", d[pos + 28:pos + 36])[0]
+        table = pos + 36
+    count = struct.unpack(">H", d[table + 2:table + 4])[0]
     off = pos + size + first
     lines = ["#EXTM3U", "#EXT-X-VERSION:7", "#EXT-X-TARGETDURATION:11", "#EXT-X-MEDIA-SEQUENCE:0",
              "#EXT-X-PLAYLIST-TYPE:VOD", "#EXT-X-INDEPENDENT-SEGMENTS", f'#EXT-X-MAP:URI="/seg",BYTERANGE="{init}@0"']
     for i in range(count):
-        ref, dur, _ = struct.unpack(">III", d[pos + 32 + i * 12:pos + 44 + i * 12])
+        ref, dur, _ = struct.unpack(">III", d[table + 4 + i * 12:table + 16 + i * 12])
         lines += [f"#EXTINF:{dur / ts:.5f},", f"#EXT-X-BYTERANGE:{ref & 0x7fffffff}@{off}", "/seg"]
         off += ref & 0x7fffffff
     return "\n".join(lines + ["#EXT-X-ENDLIST", ""]).encode()
@@ -146,7 +151,7 @@ class H(BaseHTTPRequestHandler):
     def do_POST(self):
         body = self.rfile.read(int(self.headers.get("Content-Length") or 0))
         if urlparse(self.path).path == "/api/bglog":
-            print("BGLOG", time.strftime("%H:%M:%S"), body[:220].decode("utf-8", "replace"), flush=True)
+            print("BGLOG", f"{time.time():.3f}", body[:220].decode("utf-8", "replace"), flush=True)
         if urlparse(self.path).path == "/api/stream-url":
             return self.send(json.dumps({"ok": True, "url": "/audio.wav", "hls": "/hls.m3u8", "source": "youtube",
                                          "duration": 60}).encode())

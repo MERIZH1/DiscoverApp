@@ -2,6 +2,11 @@ name: Simulator-Test
 
 on:
   workflow_dispatch:
+    inputs:
+      nur:
+        description: 'Nur diesen Test, z.B. testWiedergabe. Leer = alle.'
+        required: false
+        default: ''
   push:
     branches: [ main, master ]
     paths:
@@ -43,15 +48,25 @@ jobs:
           UDID=$(python3 ci/pick_simulator.py)
           echo "UDID=$UDID" >> "$GITHUB_ENV"
           xcrun simctl list devices available | grep "$UDID"
+          # Vorab starten: Sonst laeuft der Start in die Test-Frist ("Failed to launch")
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b > /dev/null
 
       - name: Hauptwege testen
+        env:
+          NUR: ${{ inputs.nur }}
         run: |
           set -o pipefail
+          ONLY=()
+          [ -n "$NUR" ] && ONLY=(-only-testing:"DiscoverUITests/DiscoverSmokeTests/$NUR")
           xcodebuild test \
             -project DiscoverApp.xcodeproj \
             -scheme DiscoverApp \
             -destination "platform=iOS Simulator,id=$UDID" \
-            CODE_SIGNING_ALLOWED=NO \
+            -parallel-testing-enabled NO \
+            -retry-tests-on-failure -test-iterations 2 \
+            "${ONLY[@]}" \
+            CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES COMPILER_INDEX_STORE_ENABLE=NO \
             | tail -60
 
       - name: Ergebnis sichern

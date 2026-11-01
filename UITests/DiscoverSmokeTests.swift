@@ -60,23 +60,34 @@ final class DiscoverSmokeTests: XCTestCase {
                 shot("08-minispieler")
                 app.staticTexts["Song 2"].firstMatch.tap()
                 shot("09-player")
-                let mix = app.buttons["player.shuffle"].firstMatch
-                if mix.waitForExistence(timeout: 5) {
-                    mix.tap()
-                    shot("09a-shuffle-an")
-                    mix.tap()
-                }
-                let wdh = app.buttons["player.repeat"].firstMatch
-                if wdh.waitForExistence(timeout: 5) {
-                    for (i, soll) in ["Weiter abspielen", "Song wiederholen", "Wiederholen aus"].enumerated() {
-                        wdh.tap()
-                        sleep(1)
-                        XCTAssertEqual(wdh.value as? String, soll)
-                        let png = XCUIScreen.main.screenshot().pngRepresentation
-                        try? png.write(to: shots.appendingPathComponent("09b-wiederholen-\(i + 1).png"))
-                    }
-                }
             }
+        }
+    }
+
+    /// Der schnelle Lauf: nur Song starten und die Modus-Knoepfe pruefen.
+    func testWiedergabe() {
+        tab("Bibliothek")
+        let liste = app.staticTexts["Playlist 2"].firstMatch
+        XCTAssertTrue(liste.waitForExistence(timeout: 20))
+        liste.tap()
+        let song = app.staticTexts["Song 2"].firstMatch
+        XCTAssertTrue(song.waitForExistence(timeout: 10))
+        song.tap()
+        shot("20-spielt")
+        app.staticTexts["Song 2"].firstMatch.tap()
+        shot("21-player")
+        let mix = app.buttons["player.shuffle"].firstMatch
+        XCTAssertTrue(mix.waitForExistence(timeout: 5))
+        mix.tap()
+        shot("22-shuffle-an")
+        mix.tap()
+        let wdh = app.buttons["player.repeat"].firstMatch
+        for (i, soll) in ["Weiter abspielen", "Song wiederholen", "Wiederholen aus"].enumerated() {
+            wdh.tap()
+            sleep(1)
+            XCTAssertEqual(wdh.value as? String, soll)
+            let png = XCUIScreen.main.screenshot().pngRepresentation
+            try? png.write(to: shots.appendingPathComponent("23-wiederholen-\(i + 1).png"))
         }
     }
 
