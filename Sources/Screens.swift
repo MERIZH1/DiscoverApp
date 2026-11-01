@@ -603,7 +603,7 @@ struct YTMatchSheet: View {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass").foregroundStyle(Theme.sub)
                     TextField("YouTube durchsuchen…", text: $query)
-                        .foregroundStyle(Theme.text).autocorrectionDisabled()
+                        .foregroundStyle(Theme.text)
                         .onChange(of: query) { _ in scheduleSearch() }
                 }.padding(10).background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8)).padding(.horizontal)
 
@@ -1477,7 +1477,7 @@ struct SearchView: View {
                     Image(systemName: "magnifyingglass").foregroundStyle(glass ? Theme.text : .black).font(.system(size: 18, weight: .semibold))
                     TextField("", text: $query, prompt: Text("Songs, Künstler suchen…").foregroundColor(glass ? Theme.sub : Color.black.opacity(0.55)))
                         .foregroundStyle(glass ? Theme.text : .black).tint(glass ? Theme.accent : .black)
-                        .autocorrectionDisabled().textInputAutocapitalization(.never)
+                        .textInputAutocapitalization(.never)
                         .submitLabel(.search)
                         .focused($searchFocused)
                         .onSubmit { dismissSearchKeyboard(); runSearch(); saveRecent() }
@@ -1947,7 +1947,6 @@ struct AddToPlaylistSheet: View {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass").foregroundStyle(Theme.mute)
                     TextField("Playlist suchen…", text: $filter).foregroundStyle(Theme.text)
-                        .autocorrectionDisabled()
                 }.padding(10).background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8)).padding(.horizontal)
                 Button { newName = ""; showNew = true } label: {
                     HStack(spacing: 14) {
@@ -2327,7 +2326,7 @@ struct RadioSearchSheet: View {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass").foregroundStyle(Theme.sub)
                     TextField("Sender suchen (z.B. SWR3, 1Live)", text: $query)
-                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
                         .foregroundStyle(Theme.text)
                         .onSubmit { Task { await run() } }
                     if !query.isEmpty {
@@ -3245,7 +3244,8 @@ struct NumberedTrackRow: View {
                     .font(.system(size: 22)).foregroundStyle(selected ? Theme.accent : Theme.mute).frame(width: 24)
             } else {
                 Text("\(n)").font(.system(size: 14).monospacedDigit()).foregroundStyle(playing ? Theme.accent : Theme.sub)
-                    .frame(width: 24, alignment: .trailing)
+                    .lineLimit(1)
+                    .frame(width: n >= 1000 ? 42 : (n >= 100 ? 33 : 24), alignment: .trailing)
             }
             if showCover { Artwork(url: track.image, size: 50, corner: 4) }
             VStack(alignment: .leading, spacing: 2) {

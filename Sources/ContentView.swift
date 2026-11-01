@@ -33,6 +33,7 @@ struct ContentView: View {
             }
             if booting { SplashView().transition(.opacity).zIndex(10) }
         }
+        .scrollDismissesKeyboard(.interactively)
         .environmentObject(app)
         .environmentObject(app.player)
         .environmentObject(app.downloads)
