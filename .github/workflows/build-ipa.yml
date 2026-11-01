@@ -10,12 +10,12 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-26
+    runs-on: xcode-27
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Neuestes Xcode waehlen (iOS-26-SDK fuer Liquid Glass)
+      - name: Neuestes Xcode waehlen (iOS-27-SDK, Mindestziel bleibt iOS 26)
         run: |
           LATEST=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)
           if [ -n "$LATEST" ]; then echo "Waehle $LATEST"; sudo xcode-select -s "$LATEST/Contents/Developer"; fi

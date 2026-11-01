@@ -129,6 +129,8 @@ final class PlayerController: ObservableObject {
     @Published var shuffle = false
     @Published var repeatMode: RepeatMode = .off
     @Published private(set) var isRadio = false
+    private var radioStation: RadioStation?
+    private var radioRetries = 0
     @Published private(set) var source = ""   // "youtube" | "navidrome"
     @Published private(set) var streamCache = ""   // "file" = spielt aus lokaler Datei
     private var radioTitle = ""
@@ -1188,8 +1190,10 @@ final class PlayerController: ObservableObject {
     }
 
     // MARK: - Radio
-    func playRadio(_ s: RadioStation) {
+    func playRadio(_ s: RadioStation, isRetry: Bool = false) {
         guard let url = URL(string: s.url) else { return }
+        radioStation = s
+        if !isRetry { radioRetries = 0 }
         if crossfading { abortCrossfade() }
         isRadio = true; primedNotLoaded = false   // sonst leitet resume() faelschlich in loadCurrent um
         stopAutoplay()
@@ -1216,6 +1220,23 @@ final class PlayerController: ObservableObject {
         resume(); loading = false
     }
 
+    /// Stream abgerissen: bis zu 5x mit wachsendem Abstand neu verbinden, dann anhalten.
+    private func reconnectRadio() {
+        guard isRadio else { return }
+        guard wantPlay, let s = radioStation, radioRetries < 5 else {
+            loading = false
+            pause()
+            return
+        }
+        radioRetries += 1
+        let wait = UInt64(radioRetries) * 2_000_000_000
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: wait)
+            guard let self, self.isRadio, self.wantPlay, self.radioStation == s else { return }
+            self.playRadio(s, isRetry: true)
+        }
+    }
+
     // MARK: - Beobachter
     private func attachItemObservers(_ item: AVPlayerItem) {
         statusObs?.invalidate()
@@ -1224,6 +1245,7 @@ final class PlayerController: ObservableObject {
             Task { @MainActor in
                 guard self.player.currentItem === it else { return }
                 if it.status == .readyToPlay {
+                    self.radioRetries = 0
                     let raw = CMTimeGetSeconds(it.duration)
                     self.diag("play_ready", "\(self.trackDiag(self.current)) raw=\(raw.isFinite ? Int(raw) : -1) serverDur=\(Int(self.metaDur))")
                     self.applyDuration(for: it, serverDur: self.metaDur)
@@ -1249,7 +1271,9 @@ final class PlayerController: ObservableObject {
                         self.isPlaying = true; self.updateRate()
                     }
                 } else if it.status == .failed {
-                    if self.source == "offline", let t = self.current {
+                    if self.isRadio {
+                        self.reconnectRadio()
+                    } else if self.source == "offline", let t = self.current {
                         // Offline-Datei spielt gerade nicht -> NUR diese Session streamen.
                         // Datei NICHT loeschen (bleibt in der Offline-Bibliothek).
                         self.failedOffline.insert(t.uri)
@@ -1282,10 +1306,7 @@ final class PlayerController: ObservableObject {
             Task { @MainActor in
                 guard let self, let item, self.player.currentItem === item else { return }
                 if self.isRadio {
-                    self.player.seek(to: .zero)
-                    self.player.play()
-                    self.isPlaying = true
-                    self.updateRate()
+                    self.reconnectRadio()
                     return
                 }
                 self.next(auto: true)

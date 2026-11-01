@@ -1,5 +1,5 @@
 """Kuenstlicher Discover-Server fuer die Simulator-Tests. Alle Daten sind erfunden."""
-import json, re, struct, zlib
+import functools, json, re, struct, zlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -7,6 +7,7 @@ PORT = 8765
 BASE = f"http://127.0.0.1:{PORT}"
 
 
+@functools.lru_cache(maxsize=None)
 def png(seed):
     size = 300
     r, g, b = (seed * 53) % 200 + 40, (seed * 97) % 200 + 40, (seed * 151) % 200 + 40
