@@ -121,6 +121,12 @@ struct Track: Codable, Identifiable, Hashable {
 
     var durationSec: Double { Double(duration_ms ?? 0) / 1000.0 }
     var isLocal: Bool { uri.hasPrefix("navidrome:") || (navidromeId?.isEmpty == false) }
+    /// Song aus einem Live-Konzert: "ytlive:<videoId>:<startSek>:<endSek>"
+    var liveRange: (vid: String, start: Double, end: Double)? {
+        let p = uri.split(separator: ":")
+        guard p.count == 4, p[0] == "ytlive", let s = Double(p[2]), let e = Double(p[3]) else { return nil }
+        return (String(p[1]), s, e)
+    }
 
     enum CodingKeys: String, CodingKey {
         case uri, name, artist, artists, album, album_uri, image, duration_ms, downloaded, deezer_link, navidromeId
@@ -300,7 +306,21 @@ struct StreamURLResponse: Codable {
     let navidromeId: String?
     let stream_cache: String?    // "file" = lokal gespeichert, "url" = Stream-URL gecacht, "none"
     let duration: Int?           // echte Track-Dauer (Sek.) vom Server -> Fallback gegen iOS-Doppel-Dauer
+    let live: LiveInfo?          // Konzert: Songgrenzen innerhalb der Audiodatei
+    let live_tracks: [Track]?    // ganzes Konzert -> seine einzelnen Songs fuer die Queue
     let error: String?
+}
+struct LiveChapter: Codable, Hashable {
+    let start: Int
+    let end: Int
+    let title: String
+}
+struct LiveInfo: Codable, Hashable {
+    let vid: String
+    let start: Int
+    let end: Int
+    let total: Int
+    let chapters: [LiveChapter]
 }
 struct SmartCache: Codable {
     var enabled: Bool?

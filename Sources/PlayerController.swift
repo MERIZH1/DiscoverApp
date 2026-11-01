@@ -6,7 +6,7 @@ import UIKit
 enum RepeatMode { case off, all, one }
 
 /// Gesamter Player-Zustand fuer Session-Persistenz (ganze Queue + Position).
-struct PlayerSnapshot: Codable { let tracks: [Track]; let index: Int; let original: [Track]? }
+struct PlayerSnapshot: Codable { let tracks: [Track]; let index: Int; let original: [Track]?; var autoplaySeed: String? = nil }
 
 /// Hochfrequente Wiedergabe-Position. Bewusst SEPARAT vom PlayerController,
 /// damit die Sekunden-Ticks NICHT alle Views (Listen, offene Menues) neu
@@ -254,6 +254,7 @@ final class PlayerController: ObservableObject {
     // MARK: - Tracks
     func play(tracks: [Track], startAt i: Int = 0, contextName: String = "", contextURI: String = "") {
         guard !tracks.isEmpty else { return }
+        stopAutoplay()
         isRadio = false; radioNowPlaying = ""
         ctxName = contextName; ctxURI = contextURI
         original = tracks
@@ -269,8 +270,163 @@ final class PlayerController: ObservableObject {
         loadCurrent(autoplay: true)
     }
 
+    // MARK: - Live-Konzerte
+    // Ein Konzert ist eine Audiodatei, jeder Song darin ein eigener Queue-Eintrag
+    // (Track.liveRange). Liegen mehrere Songs desselben Konzerts in der Queue, zeigt
+    // die Timeline das ganze Konzert mit Marken. Ein einzelner Song in einer Playlist
+    // verhaelt sich dagegen wie ein normaler Titel.
+    @Published private(set) var liveMarks: [Double] = []     // Songanfaenge in Sekunden
+    private var live: LiveInfo?
+    private var liveStart = 0.0
+    private var liveEnd = 0.0
+    private var liveConcert = false
+    private var liveSeeks = 0                                // laufende Spruenge: Position ist dann kein Songende
+    private var liveOffset: Double { liveConcert ? 0 : liveStart }
+    private var liveDuration: Double { liveConcert ? Double(live?.total ?? 0) : liveEnd - liveStart }
+
+    private func clearLive() {
+        live = nil; liveStart = 0; liveEnd = 0; liveConcert = false
+        if !liveMarks.isEmpty { liveMarks = [] }
+    }
+    private func liveCount(_ vid: String) -> Int { queue.filter { $0.liveRange?.vid == vid }.count }
+    /// Nach der Stream-Antwort: Konzert-Zustand setzen; ein ganzes Konzert aus den
+    /// Funden wird dabei in der Queue durch seine einzelnen Songs ersetzt.
+    private func applyLive(_ info: LiveInfo?, tracks: [Track]?) {
+        guard let info else { clearLive(); return }
+        if let tracks, !tracks.isEmpty, queue.indices.contains(index) {
+            queue.replaceSubrange(index...index, with: tracks)
+            original = queue
+        }
+        live = info
+        liveStart = Double(info.start); liveEnd = Double(info.end)
+        liveConcert = liveCount(info.vid) > 1
+        liveMarks = liveConcert ? info.chapters.dropFirst().map { Double($0.start) } : []
+        metaDur = liveDuration
+        duration = liveDuration
+        if liveStart > 0 { pendingSeek = liveStart }
+        if let c = current {
+            updateNowPlaying(title: c.name, artist: c.artist, album: c.album, dur: duration, art: c.image, live: false)
+        }
+    }
+    private func setLiveWindow(_ r: (vid: String, start: Double, end: Double)) {
+        liveStart = r.start; liveEnd = r.end
+        liveConcert = liveCount(r.vid) > 1
+        duration = liveDuration
+        if let c = current {
+            updateNowPlaying(title: c.name, artist: c.artist, album: c.album, dur: duration, art: c.image, live: false)
+        }
+        persistSnapshot()
+    }
+    /// Naechster Song im selben Konzert: nur springen, die Datei laeuft weiter.
+    private func jumpInConcert(_ r: (vid: String, start: Double, end: Double), autoplay: Bool) {
+        setLiveWindow(r)
+        let pos = CMTimeGetSeconds(player.currentTime())
+        if !pos.isFinite || abs(pos - r.start) > 1.5 { seekFile(r.start) }
+        if autoplay { wantPlay = true; player.play(); isPlaying = true; updateRate() }
+        prefetchUpcoming()
+    }
+    /// Songende: weiter oder - bei "In Reihe spielen" - denselben Song wiederholen.
+    private func checkLiveWindow(_ pos: Double) {
+        guard live != nil, !loading, isPlaying, liveSeeks == 0 else { return }
+        if repeatMode == .one {
+            if pos >= liveEnd - 0.4 || pos < liveStart - 1 { seekFile(liveStart) }
+            return
+        }
+        if pos >= liveEnd - 0.4 { next(auto: true) }
+    }
+    /// Auf der Timeline in einen anderen Song gezogen: Titel und Songgrenzen nachziehen.
+    private func syncLiveToPosition(_ pos: Double) {
+        guard liveConcert, let vid = live?.vid, pos < liveStart || pos >= liveEnd else { return }
+        let hit = queue.firstIndex {
+            guard let r = $0.liveRange, r.vid == vid else { return false }
+            return pos >= r.start && pos < r.end
+        }
+        guard let i = hit, let r = queue[i].liveRange else { return }
+        index = i
+        setLiveWindow(r)
+        prefetchUpcoming()
+    }
+
+    // MARK: - Suche + Shuffle: Spotifys eigene Folge
+    // Der gewaehlte Song startet sofort, dahinter kommt Spotifys Station in der
+    // gelieferten Reihenfolge. Nur noch 10 Songs uebrig -> naechste Liste holen.
+    private static let autoplayRefillAt = 10
+    private static let autoplayHistoryMax = 350   // wie am Server, siehe /api/autoplay/next
+    private var autoplaySeed: String?
+    private var autoplayFallback: [Track] = []
+    private var autoplayRetryAt = Date.distantPast
+    private var autoplayTask: Task<Void, Never>?
+    private var autoplayGen = 0
+    private var autoplayWaiting = false
+
+    func playFromSearch(_ t: Track, in list: [Track], at i: Int, context: String) {
+        guard shuffle, !t.isLocal, t.uri.hasPrefix("spotify:track:") else {
+            play(tracks: list, startAt: i, contextName: context, contextURI: "")
+            return
+        }
+        play(tracks: [t], contextName: context, contextURI: "")
+        autoplaySeed = t.uri
+        autoplayFallback = list
+        _ = startAutoplayFill()
+    }
+    private func stopAutoplay() {
+        autoplaySeed = nil
+        autoplayFallback = []
+        autoplayRetryAt = .distantPast
+        autoplayTask = nil
+        autoplayGen += 1
+        autoplayWaiting = false
+    }
+    /// Laufendes Nachladen oder neu gestartetes; nil in der Wartezeit nach einem Fehlschlag.
+    private func startAutoplayFill() -> Task<Void, Never>? {
+        if let running = autoplayTask { return running }
+        guard autoplaySeed != nil, Date() >= autoplayRetryAt else { return nil }
+        let t = Task { await fillAutoplay() }
+        autoplayTask = t
+        return t
+    }
+    private func fillAutoplay() async {
+        guard let seed = autoplaySeed else { return }
+        let gen = autoplayGen
+        let known = queue.suffix(Self.autoplayHistoryMax).map { $0.uri }
+        let got = await api.autoplayNext(seed: seed, played: known)
+        guard gen == autoplayGen else { return }
+        autoplayTask = nil
+        let seen = Set(known)
+        let fresh = (got ?? []).filter { !$0.uri.isEmpty && !seen.contains($0.uri) }
+        guard !fresh.isEmpty else {
+            autoplayRetryAt = Date().addingTimeInterval(30)
+            if queue.count == 1 { fallBackToSearchShuffle() }
+            return
+        }
+        queue.append(contentsOf: fresh)
+        original = queue
+        persistSnapshot()
+        prefetchUpcoming()
+        Task {
+            // bulk-lookup nimmt 30 Songs je Aufruf, Spotify liefert bis zu 50.
+            var i = 0
+            while i < fresh.count {
+                await api.prewarmPlaylist(Array(fresh[i..<min(i + 30, fresh.count)]))
+                i += 30
+            }
+        }
+    }
+    /// Spotify liefert gar nichts: wie bisher mit den gemischten Suchtreffern weiter.
+    private func fallBackToSearchShuffle() {
+        let list = autoplayFallback
+        autoplaySeed = nil
+        guard let cur = current, list.count > 1 else { return }
+        original = list
+        queue = fisherYates(list, anchor: cur)
+        index = 0
+        persistSnapshot()
+        prefetchUpcoming()
+    }
+
     func replaceQueueKeepingCurrent(with tracks: [Track], contextName: String = "", contextURI: String = "") {
         guard !tracks.isEmpty, !isRadio, let cur = current else { return }
+        stopAutoplay()
         ctxName = contextName; ctxURI = contextURI
         let rest = tracks.filter { $0.uri != cur.uri }
         original = [cur] + rest
@@ -306,6 +462,7 @@ final class PlayerController: ObservableObject {
         original = snap.original ?? snap.tracks
         manualQueue = []
         index = min(max(0, snap.index), snap.tracks.count - 1)
+        autoplaySeed = snap.autoplaySeed
         let t = queue[index]
         currentTime = 0; duration = t.durationSec; source = ""; isPlaying = false
         primedNotLoaded = true
@@ -314,7 +471,7 @@ final class PlayerController: ObservableObject {
     }
     private func persistSnapshot() {
         guard !isRadio, !queue.isEmpty else { return }
-        if let d = try? JSONEncoder().encode(PlayerSnapshot(tracks: queue, index: index, original: original)) {
+        if let d = try? JSONEncoder().encode(PlayerSnapshot(tracks: queue, index: index, original: original, autoplaySeed: autoplaySeed)) {
             UserDefaults.standard.set(d, forKey: "playerSnap_\(profileScope)")
         }
     }
@@ -350,7 +507,7 @@ final class PlayerController: ObservableObject {
     /// Time-Observer aufgerufen, laeuft so auch bei gesperrtem Bildschirm.
     /// Laeuft VOR checkSleep -> der Sleep-Fade behaelt im Zweifel die Oberhand.
     private func applyFade() {
-        guard crossfadeSeconds > 0, !isRadio else { return }
+        guard crossfadeSeconds > 0, !isRadio, live == nil else { return }
         let cf = Double(crossfadeSeconds)
         if crossfading {
             // Ueberblende laeuft: Lautstaerken aus der Restzeit des AUSGEHENDEN
@@ -368,7 +525,7 @@ final class PlayerController: ObservableObject {
         // Queue oder naechster Queue-Track; am Playlist-Ende normaler Schnitt).
         guard isPlaying, duration > 0 else { return }
         let remaining = duration - currentTime
-        if remaining <= cf, remaining > 0.4, repeatMode != .one, let nt = peekNext() {
+        if remaining <= cf, remaining > 0.4, repeatMode != .one, let nt = peekNext(), nt.liveRange == nil {
             beginCrossfade(to: nt)
         }
     }
@@ -449,6 +606,7 @@ final class PlayerController: ObservableObject {
     }
     private func prefetchUpcoming() {
         guard !isRadio else { return }
+        if autoplaySeed != nil, queue.count - 1 - index <= Self.autoplayRefillAt { _ = startAutoplayFill() }
         let warmCount = max(prebufferCount, 2)
         let upcomingForWarmup = Array(upNext.prefix(warmCount)).filter { !$0.uri.isEmpty }
         warmupServer(upcomingForWarmup, current: current)
@@ -456,7 +614,7 @@ final class PlayerController: ObservableObject {
             cancelPrebuffers(except: current.map { Set([$0.uri]) } ?? [])
             return
         }
-        let upcoming = Array(upNext.prefix(prebufferCount)).filter { !$0.uri.isEmpty }
+        let upcoming = Array(upNext.prefix(prebufferCount)).filter { !$0.uri.isEmpty && $0.liveRange == nil }
         var keep = Set(upcoming.map { $0.uri })
         if let cur = current?.uri { keep.insert(cur) }      // laufende Datei nicht loeschen
         cancelPrebuffers(except: keep)
@@ -608,6 +766,10 @@ final class PlayerController: ObservableObject {
     /// bekannte Dauer hinauslaeuft, die Linie nach (statt am Ende zu kleben).
     private func syncDuration() {
         guard !isRadio, !loading else { return }
+        if live != nil {
+            if abs(duration - liveDuration) > 0.75 { duration = liveDuration }
+            return
+        }
         let meta = knownDuration(for: current)
         if meta > 0 {
             if let item = player.currentItem {
@@ -640,7 +802,7 @@ final class PlayerController: ObservableObject {
     }
 
     private func checkEndStall() {
-        guard isPlaying, !loading, !isRadio, !crossfading, duration > 1 else { endStallTicks = 0; return }
+        guard isPlaying, !loading, !isRadio, !crossfading, live == nil, duration > 1 else { endStallTicks = 0; return }
         let meta = knownDuration(for: current)
         if meta > 0, currentTime > meta + 1.0 {
             let raw = player.currentItem.map { CMTimeGetSeconds($0.duration) } ?? 0
@@ -711,7 +873,7 @@ final class PlayerController: ObservableObject {
         }
         if auto && sleepAtEnd { sleepAtEnd = false; pause(); return }
         if isRadio { return }
-        if auto && repeatMode == .one { seek(0); resume(); return }
+        if auto && repeatMode == .one { seek(liveConcert ? liveStart : 0); resume(); return }
         // 1) Manuelle Queue (Play-Next/Add-to-Queue) zuerst
         if !manualQueue.isEmpty {
             let inj = manualQueue.removeFirst()
@@ -723,6 +885,20 @@ final class PlayerController: ObservableObject {
         }
         guard !queue.isEmpty else { return }
         // 2) Ende der Queue
+        if index >= queue.count - 1, autoplaySeed != nil, let fill = startAutoplayFill() {
+            // Weiter gedrueckt, bevor der Nachschub da ist: kurz warten, statt
+            // die bisherigen Songs neu zu mischen.
+            guard !autoplayWaiting else { return }
+            autoplayWaiting = true
+            let gen = autoplayGen
+            Task {
+                await fill.value
+                guard gen == autoplayGen else { return }
+                autoplayWaiting = false
+                next()
+            }
+            return
+        }
         if index >= queue.count - 1 {
             if shuffle && queue.count > 1 {        // neu mischen, von vorne (wie PWA)
                 queue = fisherYates(queue, anchor: nil); index = 0
@@ -740,8 +916,14 @@ final class PlayerController: ObservableObject {
     func prev() {
         flushPlayStats(completed: false)
         if isRadio { return }
-        if currentTime > 10 || queue.isEmpty { seek(0); return }   // >10s -> Anfang (wie PWA)
-        index = (index - 1 + queue.count) % queue.count
+        let songStart = liveConcert ? liveStart : 0
+        if currentTime - songStart > 10 || queue.isEmpty { seek(songStart); return }   // >10s -> Anfang (wie PWA)
+        var target = (index - 1 + queue.count) % queue.count
+        // Zurueck aus einem fremden Song in ein Konzert: wieder bei 0:00 anfangen.
+        if let vid = queue[target].liveRange?.vid, queue[index].liveRange?.vid != vid {
+            while target > 0, queue[target - 1].liveRange?.vid == vid { target -= 1 }
+        }
+        index = target
         loadCurrent(autoplay: true)
     }
     func playAt(_ i: Int) {
@@ -777,15 +959,23 @@ final class PlayerController: ObservableObject {
     }
 
     func seek(_ t: Double) {
-        if crossfading { abortCrossfade() }
         var target = max(0, t)
         if duration > 0 { target = min(target, duration) }
+        seekFile(target + liveOffset)
+    }
+    /// Position in der Audiodatei (bei einem einzelnen Konzert-Song != Anzeige).
+    private func seekFile(_ target: Double) {
+        if crossfading { abortCrossfade() }
+        liveSeeks += 1
         let cm = CMTime(seconds: target, preferredTimescale: 1000)
         player.seek(to: cm, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
             Task { @MainActor in
                 guard let self else { return }
+                self.liveSeeks -= 1
                 let actual = CMTimeGetSeconds(self.player.currentTime())
-                self.currentTime = actual.isFinite ? actual : target
+                let pos = actual.isFinite ? actual : target
+                self.currentTime = max(0, pos - self.liveOffset)
+                self.syncLiveToPosition(pos)
                 self.updateElapsed()
                 self.diag("play_seek", "\(self.trackDiag(self.current)) target=\(Int(target)) actual=\(Int(self.currentTime)) finished=\(finished)")
             }
@@ -795,7 +985,8 @@ final class PlayerController: ObservableObject {
         let wasOff = !shuffle
         shuffle.toggle()
         saveMode()
-        guard queue.count > 1 else { return }
+        // Spotify graut Shuffle in diesem Modus aus: die Folge bleibt, wie sie ist.
+        guard queue.count > 1, autoplaySeed == nil else { return }
         let cur = current
         if wasOff {
             if original.isEmpty || original.count != queue.count { original = queue }  // pre-Shuffle-Reihenfolge sichern
@@ -861,6 +1052,11 @@ final class PlayerController: ObservableObject {
     private func loadCurrent(autoplay: Bool) {
         guard let track = current else { return }
         if crossfading { abortCrossfade() }
+        if let r = track.liveRange, live?.vid == r.vid, player.currentItem != nil, !primedNotLoaded {
+            jumpInConcert(r, autoplay: autoplay)
+            return
+        }
+        clearLive()
         primedNotLoaded = false
         endStallTicks = 0; lastStallTime = -1.0      // Stall-Erkennung fuer neuen Track zuruecksetzen
         durationDiagLogged.remove(track.uri)
@@ -878,7 +1074,7 @@ final class PlayerController: ObservableObject {
                          dur: metaDur, art: track.image, live: false)
         cancelPrebuffers()
         // Offline vorhanden (und diese Session nicht als fehlerhaft markiert)? -> lokal abspielen
-        if let local = downloads?.localURL(for: track.uri), !failedOffline.contains(track.uri) {
+        if track.liveRange == nil, let local = downloads?.localURL(for: track.uri), !failedOffline.contains(track.uri) {
             source = "offline"
             let item = AVPlayerItem(url: local)
             attachItemObservers(item)
@@ -927,6 +1123,7 @@ final class PlayerController: ObservableObject {
                 statSent = false
                 metaDur = Double(r.duration ?? 0)
                 if metaDur > 0 { streamDurations[track.uri] = metaDur }
+                applyLive(r.live, tracks: r.live_tracks)
                 let ms = Int(Date().timeIntervalSince(started) * 1000)
                 diag("play_stream_ok", "\(trackDiag(track)) ms=\(ms) respDur=\(r.duration ?? 0) video=\(r.videoId ?? "") cache=\(streamCache)")
                 UserDefaults.standard.set(source, forKey: "lastSource_\(profileScope)")
@@ -980,6 +1177,7 @@ final class PlayerController: ObservableObject {
         guard let url = URL(string: s.url) else { return }
         if crossfading { abortCrossfade() }
         isRadio = true; primedNotLoaded = false   // sonst leitet resume() faelschlich in loadCurrent um
+        stopAutoplay()
         queue = []; index = 0; manualQueue = []; original = []
         radioTitle = s.name; radioFavicon = s.favicon; radioNowPlaying = ""
         currentTime = 0; duration = 0; loading = true
@@ -1016,7 +1214,11 @@ final class PlayerController: ObservableObject {
                     self.applyDuration(for: it, serverDur: self.metaDur)
                     if let t = self.current { self.streamRetried.remove(t.uri) }
                     // Podcast an der gemerkten Stelle fortsetzen
-                    if self.pendingSeek > 15 {
+                    if self.live != nil, self.pendingSeek > 0 {
+                        let target = self.pendingSeek
+                        self.pendingSeek = 0
+                        self.seekFile(target)
+                    } else if self.pendingSeek > 15 {
                         let target = self.pendingSeek
                         self.pendingSeek = 0
                         self.player.seek(to: CMTime(seconds: target, preferredTimescale: 600),
@@ -1081,7 +1283,11 @@ final class PlayerController: ObservableObject {
             guard let self else { return }
             Task { @MainActor in
                 let c = CMTimeGetSeconds(t)
-                if c.isFinite { self.currentTime = c; self.updateElapsed() }
+                if c.isFinite {
+                    self.currentTime = max(0, c - self.liveOffset)
+                    self.updateElapsed()
+                    self.checkLiveWindow(c)
+                }
                 self.savePodcastProgress()
                 self.syncDuration()
                 self.applyFade()
@@ -1098,6 +1304,7 @@ final class PlayerController: ObservableObject {
     /// Server-Dauer; sonst echte Audiospur-Dauer (gegen das verdoppelte Gesamt-Asset bei
     /// m4a mit Cover-/Video-Spur). Datei selbst ist korrekt, nur Apples Decoder verzaehlt sich.
     private func applyDuration(for item: AVPlayerItem, serverDur: Double) {
+        if live != nil { duration = liveDuration; return }
         let meta = max(knownDuration(for: current), serverDur)
         if meta > 0 {
             self.duration = meta

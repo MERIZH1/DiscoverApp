@@ -568,6 +568,7 @@ final class APIClient: ObservableObject {
             "name": track.name,
             "artist": track.artist,
             "album": track.album ?? "",
+            "image": track.image ?? "",
             "duration": Int(track.durationSec),
         ]
         if let nid = track.navidromeId, !nid.isEmpty { body["navidromeId"] = nid }   // lokal -> direkt Navidrome
@@ -761,6 +762,14 @@ final class APIClient: ObservableObject {
         let body: [String: Any] = ["type": "playlist", "uri": uri, "name": name]
         guard let d = try? await data("/api/radio", method: "POST", json: body) else { return nil }
         return try? JSONDecoder().decode(RadioResponse.self, from: d)
+    }
+
+    /// Suche + Shuffle: naechste Songs aus Spotifys Station. nil bei Fehler.
+    func autoplayNext(seed: String, played: [String]) async -> [Track]? {
+        let body: [String: Any] = ["seed": seed, "played": played]
+        guard let d = try? await data("/api/autoplay/next", method: "POST", json: body),
+              let r = try? JSONDecoder().decode(RadioResponse.self, from: d), r.ok else { return nil }
+        return r.tracks ?? []
     }
 
     /// Song-Radio: erstellt serverseitig eine Radio-Playlist (30 Songs) und gibt deren URI zurueck.

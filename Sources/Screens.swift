@@ -1632,7 +1632,11 @@ struct SearchView: View {
         if selecting { toggleSel(t.uri); return }
         dismissSearchKeyboard()
         pushRecentItem(RecentSearchItem(uri: t.uri, name: t.name, image: t.image ?? "", sub: t.artist))
-        player.play(tracks: list, startAt: i, contextName: context, contextURI: "")
+        if context == "Suche" {
+            player.playFromSearch(t, in: list, at: i, context: context)
+        } else {
+            player.play(tracks: list, startAt: i, contextName: context, contextURI: "")
+        }
     }
     private func dismissSearchKeyboard() {
         searchFocused = false
@@ -1734,7 +1738,8 @@ struct TopHitCard: View {
             if hit.type == "track" {
                 Button {
                     UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                    player.play(tracks: [Track(uri: hit.realURI, name: hit.name ?? "", artist: hit.artist ?? "", image: hit.image)])
+                    let t = Track(uri: hit.realURI, name: hit.name ?? "", artist: hit.artist ?? "", image: hit.image)
+                    player.playFromSearch(t, in: [t], at: 0, context: "")
                 } label: { card }.buttonStyle(.plain)
             } else {
                 NavigationLink(value: Card(uri: hit.realURI, name: hit.name ?? "", image: hit.image, artist: hit.artist, owner: nil, desc: nil)) {
@@ -2004,6 +2009,8 @@ struct AddToPlaylistSheet: View {
         Task {
             guard let uri = await app.api.createPlaylist(name: n) else { status = "Fehler beim Erstellen"; return }
             await doAdd(uri, n)
+            await app.loadPlaylists()
+            NotificationCenter.default.post(name: .init("discoverPlaylistsChanged"), object: nil)
         }
     }
 }
@@ -3612,10 +3619,12 @@ struct PlayerView: View {
                     }
                     Spacer(minLength: 8)
                     if let t = p.current {
-                        Button { downloads.toggle(t); Haptics.tap() } label: {
-                            Image(systemName: downloads.isDownloaded(t.uri) ? "arrow.down.circle.fill" : "arrow.down.circle")
-                                .font(.system(size: 24))
-                                .foregroundStyle(downloads.isDownloaded(t.uri) ? Theme.accent : Theme.text)
+                        if t.liveRange == nil {
+                            Button { downloads.toggle(t); Haptics.tap() } label: {
+                                Image(systemName: downloads.isDownloaded(t.uri) ? "arrow.down.circle.fill" : "arrow.down.circle")
+                                    .font(.system(size: 24))
+                                    .foregroundStyle(downloads.isDownloaded(t.uri) ? Theme.accent : Theme.text)
+                            }
                         }
                         Button { player.addToQueue(t); Haptics.tap() } label: {
                             Image(systemName: "plus.circle").font(.system(size: 26)).foregroundStyle(Theme.text)
@@ -3630,6 +3639,20 @@ struct PlayerView: View {
                         Slider(value: $scrub, in: 0...max(clock.duration, 1),
                                onEditingChanged: { e in scrubbing = e; if !e { p.seek(scrub) } })
                             .tint(Theme.accent)
+                            .overlay {
+                                // Live-Konzert: Marken an den Songanfaengen
+                                if !p.liveMarks.isEmpty {
+                                    GeometryReader { g in
+                                        ForEach(p.liveMarks, id: \.self) { m in
+                                            Rectangle().fill(Color.white.opacity(0.75))
+                                                .frame(width: 2, height: 10)
+                                                .position(x: g.size.width * CGFloat(m / max(clock.duration, 1)),
+                                                          y: g.size.height / 2)
+                                        }
+                                    }
+                                    .allowsHitTesting(false)
+                                }
+                            }
                             .onAppear { scrub = clock.time }
                             .onChange(of: clock.time) { _, t in if !scrubbing { scrub = t } }
                         HStack {
