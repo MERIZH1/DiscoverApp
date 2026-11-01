@@ -3,6 +3,11 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.2 — Songs starten sofort
+- **Verbessert:** Neue YouTube-Songs starten über HLS statt über die Rohdatei, die iOS sekundenlang abtastet. Die doppelte Songlänge fällt damit weg.
+- **Verbessert:** Der Player wartet nicht mehr auf Vorrat, bevor er losspielt.
+- **Verbessert:** Shuffle und Wiederholen zeigen ihren Zustand mit Punkt, getöntem Glas, Hinweis und Haptik.
+
 ## v1.1.0 — Flüssiger und näher an Spotify
 - **Neu:** Gebaut für iOS 27, läuft weiter ab iOS 26.
 - **Neu:** Künstler-Streifen über der Tastatur in der Suche.

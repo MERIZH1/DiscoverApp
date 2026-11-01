@@ -167,6 +167,8 @@ final class PlayerController: ObservableObject {
     private var primedNotLoaded = false   // letzter Song wiederhergestellt, aber noch nicht gestreamt
     private var failedOffline: Set<String> = []   // Offline-Dateien, die diese Session nicht liefen -> streamen
     private var streamRetried: Set<String> = []   // gestreamte Tracks, die nach Fehler schon 1x frisch geladen wurden
+    private var hlsFallback: (uri: String, url: URL)?
+    private var hlsWatchdog: Task<Void, Never>?
     private var streamDurations: [String: Double] = [:] // echte Dauer aus /api/stream-url, auch fuer Prebuffer
     private var durationDiagLogged = Set<String>()
     private var wantPlay = false                   // Absicht zu spielen -> beim readyToPlay durchsetzen (gegen 2x-play)
@@ -488,9 +490,13 @@ final class PlayerController: ObservableObject {
     func resume() {
         if primedNotLoaded && !isRadio { loadCurrent(autoplay: true); return }
         wantPlay = true
-        player.play()
-        if !isRadio && playbackRate != 1.0 { player.rate = Float(playbackRate) }
+        startOutput()
         isPlaying = true; updateRate()
+    }
+    /// Spielt los, ohne erst Vorrat anzusammeln. Reisst der Vorrat ab, puffert AVPlayer von selbst.
+    /// Radio braucht diesen Vorrat, dort bleibt es beim normalen play().
+    private func startOutput() {
+        if isRadio { player.play() } else { player.playImmediately(atRate: Float(playbackRate)) }
     }
     func pause() { wantPlay = false; player.pause(); isPlaying = false; updateRate() }
 
@@ -1177,10 +1183,19 @@ final class PlayerController: ObservableObject {
                 UserDefaults.standard.set(source, forKey: "lastSource_\(profileScope)")
                 let played = track
                 Task { await api.postHistory(played, contextName: ctxName, contextURI: ctxURI) }
-                let item = AVPlayerItem(url: url)
+                // Die rohe YouTube-Datei tastet AVPlayer sekundenlang ab, HLS startet sofort.
+                // Der EQ-Tap laeuft nur auf der Datei.
+                var first = url
+                hlsFallback = nil
+                if let h = r.hls, eqPreset.isFlat, let hu = api.absoluteURL(h) {
+                    first = hu
+                    hlsFallback = (track.uri, url)
+                }
+                let item = AVPlayerItem(url: first)
                 attachItemObservers(item)
                 player.replaceCurrentItem(with: item)
                 applyEQ(to: item, thenResume: autoplay)
+                if hlsFallback != nil { watchHLS(item) }
                 loading = false
                 streamFailStreak = 0
                 prefetchUpcoming()
@@ -1191,6 +1206,31 @@ final class PlayerController: ObservableObject {
                 skipAfterStreamFailure()
             }
         }
+    }
+
+    /// Kommt HLS nicht in Gang, uebernimmt die Direktdatei.
+    private func watchHLS(_ item: AVPlayerItem) {
+        hlsWatchdog?.cancel()
+        hlsWatchdog = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            guard let self, !Task.isCancelled, self.player.currentItem === item,
+                  item.status != .readyToPlay else { return }
+            self.diag("play_hls_slow", self.trackDiag(self.current))
+            self.fallBackFromHLS()
+        }
+    }
+
+    @discardableResult
+    private func fallBackFromHLS() -> Bool {
+        guard let f = hlsFallback, f.uri == current?.uri else { return false }
+        hlsFallback = nil
+        hlsWatchdog?.cancel()
+        pendingSeek = currentTime
+        let item = AVPlayerItem(url: f.url)
+        attachItemObservers(item)
+        player.replaceCurrentItem(with: item)
+        applyEQ(to: item, thenResume: wantPlay)
+        return true
     }
 
     /// Robustheits-Netz: ein einzelner Song ohne Stream-URL darf die Wiedergabe
@@ -1276,6 +1316,7 @@ final class PlayerController: ObservableObject {
             Task { @MainActor in
                 guard self.player.currentItem === it else { return }
                 if it.status == .readyToPlay {
+                    self.hlsWatchdog?.cancel()
                     self.radioRetries = 0
                     let raw = CMTimeGetSeconds(it.duration)
                     self.diag("play_ready", "\(self.trackDiag(self.current)) raw=\(raw.isFinite ? Int(raw) : -1) serverDur=\(Int(self.metaDur))")
@@ -1297,13 +1338,14 @@ final class PlayerController: ObservableObject {
                     }
                     // Wiedergabe durchsetzen, falls play() vor readyToPlay kam (sonst 2x play noetig)
                     if self.wantPlay {
-                        self.player.play()
-                        if !self.isRadio && self.playbackRate != 1.0 { self.player.rate = Float(self.playbackRate) }
+                        self.startOutput()
                         self.isPlaying = true; self.updateRate()
                     }
                 } else if it.status == .failed {
                     if self.isRadio {
                         self.reconnectRadio()
+                    } else if self.fallBackFromHLS() {
+                        self.diag("play_hls_failed", self.trackDiag(self.current))
                     } else if self.source == "offline", let t = self.current {
                         // Offline-Datei spielt gerade nicht -> NUR diese Session streamen.
                         // Datei NICHT loeschen (bleibt in der Offline-Bibliothek).

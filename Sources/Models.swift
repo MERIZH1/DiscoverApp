@@ -301,6 +301,7 @@ struct Lyrics: Codable {
 struct StreamURLResponse: Codable {
     let ok: Bool
     let url: String?
+    let hls: String?             // Song noch nicht lokal: startet sofort, url bleibt der Rueckfall
     let source: String?
     let videoId: String?
     let navidromeId: String?

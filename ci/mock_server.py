@@ -1,9 +1,10 @@
 """Kuenstlicher Discover-Server fuer die Simulator-Tests. Alle Daten sind erfunden."""
-import functools, json, re, struct, zlib
+import functools, json, os, re, struct, time, zlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
 PORT = 8765
+FIXTURE = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixture.m4a"), "rb").read()
 BASE = f"http://127.0.0.1:{PORT}"
 
 
@@ -29,6 +30,30 @@ def wav(secs=180, rate=8000):
 
 
 AUDIO = wav()
+
+
+def hls():
+    """Playlist fuer ci/fixture.m4a (Sinuston), aufgebaut wie Discovers /api/yt/hls."""
+    d = FIXTURE
+    pos = init = 0
+    while True:
+        size, kind = struct.unpack(">I4s", d[pos:pos + 8])
+        if kind == b"moov":
+            init = pos + size
+        if kind == b"sidx":
+            break
+        pos += size
+    ts = struct.unpack(">I", d[pos + 16:pos + 20])[0]
+    first = struct.unpack(">I", d[pos + 24:pos + 28])[0]
+    count = struct.unpack(">H", d[pos + 30:pos + 32])[0]
+    off = pos + size + first
+    lines = ["#EXTM3U", "#EXT-X-VERSION:7", "#EXT-X-TARGETDURATION:11", "#EXT-X-MEDIA-SEQUENCE:0",
+             "#EXT-X-PLAYLIST-TYPE:VOD", "#EXT-X-INDEPENDENT-SEGMENTS", f'#EXT-X-MAP:URI="/seg",BYTERANGE="{init}@0"']
+    for i in range(count):
+        ref, dur, _ = struct.unpack(">III", d[pos + 32 + i * 12:pos + 44 + i * 12])
+        lines += [f"#EXTINF:{dur / ts:.5f},", f"#EXT-X-BYTERANGE:{ref & 0x7fffffff}@{off}", "/seg"]
+        off += ref & 0x7fffffff
+    return "\n".join(lines + ["#EXT-X-ENDLIST", ""]).encode()
 
 
 def track(i):
@@ -99,6 +124,13 @@ class H(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/cover/(\d+)\.png", u.path)
         if m:
             return self.send(png(int(m.group(1))), "image/png", extra={"Cache-Control": "max-age=86400"})
+        if u.path == "/hls.m3u8":
+            return self.send(hls(), "application/vnd.apple.mpegurl")
+        if u.path == "/seg":
+            r = re.fullmatch(r"bytes=(\d+)-(\d+)", self.headers.get("Range", ""))
+            a, b = int(r.group(1)), int(r.group(2))
+            return self.send(FIXTURE[a:b + 1], "audio/mp4", 206, {
+                "Accept-Ranges": "bytes", "Content-Range": f"bytes {a}-{b}/{len(FIXTURE)}"})
         if u.path == "/audio.wav":
             r = re.fullmatch(r"bytes=(\d+)-(\d*)", self.headers.get("Range", ""))
             if r:
@@ -112,9 +144,12 @@ class H(BaseHTTPRequestHandler):
     do_HEAD = do_GET
 
     def do_POST(self):
-        self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        body = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        if urlparse(self.path).path == "/api/bglog":
+            print("BGLOG", time.strftime("%H:%M:%S"), body[:220].decode("utf-8", "replace"), flush=True)
         if urlparse(self.path).path == "/api/stream-url":
-            return self.send(json.dumps({"ok": True, "url": "/audio.wav", "source": "navidrome", "duration": 180}).encode())
+            return self.send(json.dumps({"ok": True, "url": "/audio.wav", "hls": "/hls.m3u8", "source": "youtube",
+                                         "duration": 60}).encode())
         self.send(b"{}")
 
 

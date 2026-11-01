@@ -37,9 +37,9 @@ extension View {
 
     /// Interaktiver Button (Tint-Glas), wenn `on` und iOS 26 — sonst solide Farbe.
     @ViewBuilder
-    func glassButton(_ on: Bool, shape: some Shape, fallback: Color) -> some View {
+    func glassButton(_ on: Bool, shape: some Shape, fallback: Color, tint: Color? = nil) -> some View {
         if on, #available(iOS 26.0, *) {
-            self.glassEffect(.regular.interactive(), in: shape)
+            self.glassEffect(.regular.tint(tint).interactive(), in: shape)
         } else {
             self.background(fallback, in: shape)
         }

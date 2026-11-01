@@ -68,9 +68,12 @@ final class DiscoverSmokeTests: XCTestCase {
                 }
                 let wdh = app.buttons["player.repeat"].firstMatch
                 if wdh.waitForExistence(timeout: 5) {
-                    for i in 1...3 {
+                    for (i, soll) in ["Weiter abspielen", "Song wiederholen", "Wiederholen aus"].enumerated() {
                         wdh.tap()
-                        shot("09b-wiederholen-\(i)")
+                        sleep(1)
+                        XCTAssertEqual(wdh.value as? String, soll)
+                        let png = XCUIScreen.main.screenshot().pngRepresentation
+                        try? png.write(to: shots.appendingPathComponent("09b-wiederholen-\(i + 1).png"))
                     }
                 }
             }

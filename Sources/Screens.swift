@@ -100,7 +100,12 @@ struct GlassSymbolButton: View {
                 .font(.system(size: symbolSize, weight: .semibold))
                 .foregroundStyle(active ? Theme.accent : Theme.text)
                 .frame(width: size, height: size)
-                .glassButton(glass, shape: Circle(), fallback: Theme.input.opacity(0.92))
+                .overlay(alignment: .bottom) {
+                    // Wie bei Spotify: Der Punkt zeigt auch auf hellem Cover, dass der Modus an ist
+                    if active { Circle().fill(Theme.accent).frame(width: 5, height: 5).padding(.bottom, 5) }
+                }
+                .glassButton(glass, shape: Circle(), fallback: Theme.input.opacity(0.92),
+                             tint: active ? Theme.accent.opacity(0.22) : nil)
                 .contentShape(Circle())
         }
         .buttonStyle(.pressable)
@@ -3665,6 +3670,20 @@ struct MiniQueueSheet: View {
 
 // MARK: - Vollbild-Player
 struct PlayerView: View {
+    @State private var modeHint = ""
+    @State private var modeHintTask: Task<Void, Never>?
+    private func repeatLabel(_ m: RepeatMode) -> String {
+        m == .off ? "Wiederholen aus" : (m == .all ? "Weiter abspielen" : "Song wiederholen")
+    }
+    /// Sagt, was der Knopf gerade geschaltet hat. Die drei Stufen sind am Symbol allein schwer zu lesen.
+    private func showModeHint(_ text: String) {
+        withAnimation(.easeOut(duration: 0.15)) { modeHint = text }
+        modeHintTask?.cancel()
+        modeHintTask = Task {
+            try? await Task.sleep(nanoseconds: 1_600_000_000)
+            if !Task.isCancelled { withAnimation(.easeIn(duration: 0.2)) { modeHint = "" } }
+        }
+    }
     @EnvironmentObject var player: PlayerController
     @EnvironmentObject var downloads: DownloadManager
     @EnvironmentObject var clock: PlaybackClock   // Live-Position (haengt nur hier, nicht an Listen)
@@ -3846,7 +3865,11 @@ struct PlayerView: View {
                     } else {
                         GlassCluster(on: glass, spacing: 12) {
                         HStack(spacing: 0) {
-                            GlassSymbolButton(systemName: "shuffle", active: p.shuffle, size: 48, symbolSize: 19) { p.toggleShuffle() }
+                            GlassSymbolButton(systemName: "shuffle", active: p.shuffle, size: 48, symbolSize: 19) {
+                                Haptics.tap()
+                                p.toggleShuffle()
+                                showModeHint(p.shuffle ? "Zufallswiedergabe an" : "Zufallswiedergabe aus")
+                            }
                                 .accessibilityIdentifier("player.shuffle")
                                 .frame(maxWidth: .infinity)
                             GlassSymbolButton(systemName: "backward.fill", size: 52, symbolSize: 24) { p.prev() }
@@ -3862,10 +3885,27 @@ struct PlayerView: View {
                             .frame(maxWidth: .infinity)
                             GlassSymbolButton(systemName: "forward.fill", size: 52, symbolSize: 24) { p.next() }
                                 .frame(maxWidth: .infinity)
-                            GlassSymbolButton(systemName: p.repeatMode == .one ? "repeat.1" : "repeat", active: p.repeatMode != .off, size: 48, symbolSize: 19) { p.cycleRepeat() }
+                            GlassSymbolButton(systemName: p.repeatMode == .one ? "repeat.1" : "repeat", active: p.repeatMode != .off, size: 48, symbolSize: 19) {
+                                Haptics.tap()
+                                p.cycleRepeat()
+                                showModeHint(repeatLabel(p.repeatMode))
+                            }
                                 .accessibilityIdentifier("player.repeat")
+                                .accessibilityValue(repeatLabel(p.repeatMode))
                                 .frame(maxWidth: .infinity)
                         }.foregroundStyle(Theme.text).padding(.horizontal, 2)
+                        }
+                        .overlay(alignment: .top) {
+                            if !modeHint.isEmpty {
+                                Text(modeHint)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(.black)
+                                    .padding(.horizontal, 12).padding(.vertical, 5)
+                                    .background(Theme.accent, in: Capsule())
+                                    .offset(y: -30)
+                                    .transition(.opacity)
+                                    .allowsHitTesting(false)
+                            }
                         }
                     }
                     HStack(spacing: 0) {
