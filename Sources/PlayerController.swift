@@ -1192,6 +1192,8 @@ final class PlayerController: ObservableObject {
                     hlsFallback = (track.uri, url)
                 }
                 let item = AVPlayerItem(url: first)
+                // Zum Start reicht ein Abschnitt, nach readyToPlay gilt wieder die normale Pufferung.
+                if hlsFallback != nil { item.preferredForwardBufferDuration = 12 }
                 attachItemObservers(item)
                 player.replaceCurrentItem(with: item)
                 applyEQ(to: item, thenResume: autoplay)
@@ -1317,6 +1319,7 @@ final class PlayerController: ObservableObject {
                 guard self.player.currentItem === it else { return }
                 if it.status == .readyToPlay {
                     self.hlsWatchdog?.cancel()
+                    it.preferredForwardBufferDuration = 0
                     self.radioRetries = 0
                     let raw = CMTimeGetSeconds(it.duration)
                     self.diag("play_ready", "\(self.trackDiag(self.current)) raw=\(raw.isFinite ? Int(raw) : -1) serverDur=\(Int(self.metaDur))")
