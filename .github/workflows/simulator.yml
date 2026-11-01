@@ -1,0 +1,65 @@
+name: Simulator-Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'Sources/**'
+      - 'UITests/**'
+      - 'ci/**'
+      - 'project.yml'
+      - '.github/workflows/simulator.yml'
+
+jobs:
+  test:
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Neuestes Xcode waehlen
+        run: |
+          LATEST=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$LATEST/Contents/Developer"
+          xcodebuild -version
+          ls -d /Applications/Xcode_*.app
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Testserver starten
+        run: |
+          nohup python3 ci/mock_server.py > mock.log 2>&1 &
+          sleep 2
+          curl -sf http://127.0.0.1:8765/api/ping
+
+      - name: iPhone-Simulator waehlen
+        run: |
+          UDID=$(python3 ci/pick_simulator.py)
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl list devices available | grep "$UDID"
+
+      - name: Hauptwege testen
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project DiscoverApp.xcodeproj \
+            -scheme DiscoverApp \
+            -destination "platform=iOS Simulator,id=$UDID" \
+            CODE_SIGNING_ALLOWED=NO \
+            | tail -60
+
+      - name: Ergebnis sichern
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulator-fotos
+          if-no-files-found: warn
+          path: |
+            /tmp/discover-shots
+            mock.log
