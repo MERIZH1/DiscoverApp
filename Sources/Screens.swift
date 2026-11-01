@@ -2501,7 +2501,7 @@ struct ArtistView: View {
                         Text("\(f.formatted()) Hörer*innen monatlich").font(.system(size: 13)).foregroundStyle(Theme.sub)
                     }
                     Button {
-                        if !top.isEmpty { player.shuffle = false; player.play(tracks: top, startAt: 0, contextName: resp?.name ?? name, contextURI: uri) }
+                        if !top.isEmpty { player.play(tracks: top, startAt: 0, contextName: resp?.name ?? name, contextURI: uri) }
                     } label: {
                         Image(systemName: "play.fill").font(.system(size: 22)).foregroundStyle(.black)
                             .frame(width: 56, height: 56).background(Theme.accent).clipShape(Circle())
@@ -2514,7 +2514,7 @@ struct ArtistView: View {
                     LazyVStack(spacing: 0) {
                         ForEach(Array(top.prefix(10).enumerated()), id: \.offset) { i, t in
                             NumberedTrackRow(n: i + 1, track: t, playing: player.current?.id == t.id) {
-                                player.shuffle = false; player.play(tracks: top, startAt: i, contextName: resp?.name ?? name, contextURI: uri)
+                                player.play(tracks: top, startAt: i, contextName: resp?.name ?? name, contextURI: uri)
                             }
                         }
                     }.padding(.top, 4)
@@ -2761,7 +2761,7 @@ struct TrackListView: View {
                                 player.play(tracks: tracks.shuffled(), contextName: title, contextURI: uri)
                             }
                         }
-                        Button { if !tracks.isEmpty { player.shuffle = false; player.play(tracks: tracks, startAt: 0, contextName: title, contextURI: uri) } } label: {
+                        Button { if !tracks.isEmpty { player.play(tracks: tracks, startAt: 0, contextName: title, contextURI: uri) } } label: {
                             Image(systemName: "play.fill").font(.system(size: 22, weight: .bold)).foregroundStyle(.black)
                                 .frame(width: 58, height: 58)
                                 .background(Theme.accent, in: Circle())
@@ -2779,7 +2779,7 @@ struct TrackListView: View {
                                          onRemoveFromPlaylist: canRemoveTracks ? { removeTrack(t) } : nil,
                                          selecting: selecting, selected: selected.contains(t.uri)) {
                             if selecting { toggleSel(t.uri) }
-                            else { player.shuffle = false; player.play(tracks: tracks, startAt: idx, contextName: title, contextURI: uri) }
+                            else { player.play(tracks: tracks, startAt: idx, contextName: title, contextURI: uri) }
                         }
                     }
                 }.padding(.top, 6)
@@ -2818,7 +2818,7 @@ struct TrackListView: View {
                             RecRow(track: t, playing: player.current?.id == t.id,
                                    added: addedRecs.contains(t.uri),
                                    add: { addRec(t) },
-                                   play: { player.shuffle = false; player.play(tracks: recs, startAt: i, contextName: "Empfehlungen", contextURI: uri) },
+                                   play: { player.play(tracks: recs, startAt: i, contextName: "Empfehlungen", contextURI: uri) },
                                    selecting: selecting, selected: selected.contains(t.uri),
                                    selectTap: { toggleSel(t.uri) })
                         }
@@ -3324,7 +3324,7 @@ struct OfflineCollectionView: View {
                     Text("\(items.count) \(unit) · offline").font(.system(size: 13)).foregroundStyle(Theme.sub)
                     HStack(spacing: 12) {
                         Button {
-                            if !items.isEmpty { player.shuffle = false; player.play(tracks: items, startAt: 0, contextName: collection.name, contextURI: collection.id) }
+                            if !items.isEmpty { player.play(tracks: items, startAt: 0, contextName: collection.name, contextURI: collection.id) }
                         } label: {
                             Label("Abspielen", systemImage: "play.fill")
                                 .font(.system(size: 14, weight: .semibold)).foregroundStyle(.black)

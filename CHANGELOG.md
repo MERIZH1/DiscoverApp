@@ -3,6 +3,15 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.0 — Flüssiger und näher an Spotify
+- **Neu:** Gebaut für iOS 27, läuft weiter ab iOS 26.
+- **Neu:** Künstler-Streifen über der Tastatur in der Suche.
+- **Verbessert:** Cover werden im Hintergrund vorbereitet, Listen scrollen deutlich flüssiger.
+- **Verbessert:** Zeilen reagieren beim Antippen, Platzhalter ersetzen den Lade-Kreisel, Ladefehler bieten einen neuen Versuch.
+- **Bugfix:** Zurück zu einer Playlist behält Liste und Scrollstand.
+- **Bugfix:** Shuffle bleibt an, wenn ein Song oder Play angetippt wird.
+- **Bugfix:** Abgerissene Sender verbinden sich neu, Songnummern ab 100 brechen nicht mehr um.
+
 ## v2.36 — Profilfarbe wählbar (wie auf der Webseite)
 - **Neu:** In den Einstellungen unter „Profil" lässt sich jetzt die Profilfarbe wählen (Hellblau/Orange/Rot/Gelb) — dieselben Farben wie in der Web-App, gespeichert auf dem Server.
 - **Verbessert:** Das Account-Avatar nutzt jetzt überall die Profilfarbe als Verlauf (vorher fest goldfarben), inklusive Profilauswahl und Konto-Menü — passend zur Web-Oberfläche.

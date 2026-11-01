@@ -29,7 +29,7 @@ jobs:
 
       - name: Set version
         run: |
-          VER="1.0.${{ github.run_number }}"
+          VER="1.1.$(( ${{ github.run_number }} - 267 ))"
           plutil -replace CFBundleShortVersionString -string "$VER" Sources/Info.plist
           plutil -replace CFBundleVersion -string "${{ github.run_number }}" Sources/Info.plist
           echo "VER=$VER" >> "$GITHUB_ENV"
