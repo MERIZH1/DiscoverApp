@@ -1578,6 +1578,7 @@ struct SearchView: View {
                 .scrollContentBackground(.hidden)
                 .scrollDismissesKeyboard(.interactively)
                 .simultaneousGesture(TapGesture().onEnded { dismissSearchKeyboard() })
+                .safeAreaInset(edge: .bottom) { artistStrip }
             }
             .padding(.top, 6)
             .background(Theme.bg)
@@ -1691,6 +1692,33 @@ struct SearchView: View {
     private func label(_ s: String) -> String {
         ["all":"Alle","tracks":"Songs","playlists":"Playlists","albums":"Alben","artists":"Künstler","shows":"Podcasts","lokal":"Lokal"][s] ?? s
     }
+    /// Kuenstler der laufenden Suche direkt ueber der Tastatur. Die iPhone-Tastatur kennt Namen
+    /// wie Colbie Caillat nicht, ein Tipp erspart das Korrigieren.
+    @ViewBuilder private var artistStrip: some View {
+        let artists = Array((res?.artists ?? []).prefix(6))
+        if searchFocused, !query.isEmpty, !artists.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(artists) { a in
+                        Button {
+                            Haptics.tap()
+                            query = a.name
+                            dismissSearchKeyboard(); runSearch(); saveRecent()
+                        } label: {
+                            HStack(spacing: 6) {
+                                Artwork(url: a.image, size: 24, corner: 12)
+                                Text(a.name).font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(Theme.text).lineLimit(1)
+                            }
+                            .padding(.leading, 4).padding(.trailing, 12).padding(.vertical, 4)
+                            .glassSurface(glass, shape: Capsule(), fallback: Theme.input)
+                        }.buttonStyle(.pressable)
+                    }
+                }.padding(.horizontal).padding(.vertical, 6)
+            }
+        }
+    }
+
     private func runSearch() {
         let q = query.trimmingCharacters(in: .whitespaces)
         guard !q.isEmpty else { return }

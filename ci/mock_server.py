@@ -70,6 +70,8 @@ def route(path, q):
         return {"name": "Playlist", "tracks": [track(i) for i in range(1, 101)]}
     if path == "/api/search":
         return {"tracks": [track(i) for i in range(1, 11)],
+                "artists": [{"uri": f"spotify:artist:test{i}", "name": f"Kuenstler {i}",
+                             "image": f"/cover/{i}.png"} for i in range(1, 6)],
                 "playlists": [dict(playlist(i), artist=None, owner="Test", desc="") for i in range(1, 7)]}
     if path == "/api/radio-livestream/favorites":
         return {"items": stations()}

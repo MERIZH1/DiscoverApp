@@ -37,7 +37,10 @@ final class DiscoverSmokeTests: XCTestCase {
         let feld = app.searchFields.firstMatch.exists ? app.searchFields.firstMatch : app.textFields.firstMatch
         if feld.waitForExistence(timeout: 5) {
             feld.tap()
-            feld.typeText("Song"); app.keyboards.buttons["search"].firstMatch.tap()
+            feld.typeText("Song")
+            sleep(2)
+            shot("03b-kuenstler-streifen")
+            app.keyboards.buttons["search"].firstMatch.tap()
             shot("04-suche-ergebnis")
         }
 
