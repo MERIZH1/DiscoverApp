@@ -21,7 +21,7 @@ jobs:
 
       - name: Neuestes Xcode waehlen
         run: |
-          LATEST=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          LATEST=$(ls -d /Applications/Xcode_*.app | grep -viE "release_candidate|beta" | sort -V | tail -1)
           sudo xcode-select -s "$LATEST/Contents/Developer"
           xcodebuild -version
           ls -d /Applications/Xcode_*.app

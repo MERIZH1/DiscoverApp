@@ -17,7 +17,7 @@ jobs:
 
       - name: Neuestes Xcode waehlen (iOS-27-SDK, Mindestziel bleibt iOS 26)
         run: |
-          LATEST=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)
+          LATEST=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -viE "release_candidate|beta" | sort -V | tail -1)
           if [ -n "$LATEST" ]; then echo "Waehle $LATEST"; sudo xcode-select -s "$LATEST/Contents/Developer"; fi
           xcodebuild -version
 
