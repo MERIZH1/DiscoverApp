@@ -360,14 +360,29 @@ final class PlayerController: ObservableObject {
     private var autoplayWaiting = false
 
     func playFromSearch(_ t: Track, in list: [Track], at i: Int, context: String) {
-        guard shuffle, !t.isLocal, t.uri.hasPrefix("spotify:track:") else {
+        guard shuffle, t.isLocal || t.uri.hasPrefix("spotify:track:") else {
             play(tracks: list, startAt: i, contextName: context, contextURI: "")
             return
         }
         play(tracks: [t], contextName: context, contextURI: "")
-        autoplaySeed = t.uri
         autoplayFallback = list
-        _ = startAutoplayFill()
+        guard t.isLocal else {
+            autoplaySeed = t.uri
+            _ = startAutoplayFill()
+            return
+        }
+        // Der Server-Song laeuft, die Folge kommt vom passenden Spotify-Song.
+        let gen = autoplayGen
+        Task {
+            let seed = await api.autoplaySeed(name: t.name, artist: t.artist)
+            guard gen == autoplayGen else { return }
+            if let seed {
+                autoplaySeed = seed
+                _ = startAutoplayFill()
+            } else {
+                fallBackToSearchShuffle()
+            }
+        }
     }
     private func stopAutoplay() {
         autoplaySeed = nil

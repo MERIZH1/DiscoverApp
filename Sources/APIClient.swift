@@ -764,6 +764,14 @@ final class APIClient: ObservableObject {
         return try? JSONDecoder().decode(RadioResponse.self, from: d)
     }
 
+    /// Suche + Shuffle bei lokalem Treffer: passender Spotify-Song. nil, wenn es keinen gibt.
+    func autoplaySeed(name: String, artist: String) async -> String? {
+        guard let d = try? await data("/api/autoplay/seed", method: "POST", json: ["name": name, "artist": artist]),
+              let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
+              (obj["ok"] as? Bool) == true else { return nil }
+        return obj["seed"] as? String
+    }
+
     /// Suche + Shuffle: naechste Songs aus Spotifys Station. nil bei Fehler.
     func autoplayNext(seed: String, played: [String]) async -> [Track]? {
         let body: [String: Any] = ["seed": seed, "played": played]

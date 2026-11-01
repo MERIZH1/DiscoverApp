@@ -1632,7 +1632,7 @@ struct SearchView: View {
         if selecting { toggleSel(t.uri); return }
         dismissSearchKeyboard()
         pushRecentItem(RecentSearchItem(uri: t.uri, name: t.name, image: t.image ?? "", sub: t.artist))
-        if context == "Suche" {
+        if context == "Suche" || context == "Server" {
             player.playFromSearch(t, in: list, at: i, context: context)
         } else {
             player.play(tracks: list, startAt: i, contextName: context, contextURI: "")
@@ -2201,7 +2201,12 @@ struct LibraryRow: View {
                 }
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(pl.name).font(.system(size: 15, weight: .medium)).foregroundStyle(Theme.text).lineLimit(1)
+                HStack(spacing: 5) {
+                    if subscribed {
+                        Image(systemName: "pin.fill").font(.system(size: 11)).foregroundStyle(Theme.accent)
+                    }
+                    Text(pl.name).font(.system(size: 15, weight: .medium)).foregroundStyle(Theme.text).lineLimit(1)
+                }
                 HStack(spacing: 4) {
                     Text(subscribed ? "Abo" : "Playlist").font(.system(size: 13))
                         .foregroundStyle(subscribed ? Theme.accent : Theme.sub)
