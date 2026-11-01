@@ -27,6 +27,7 @@ final class DiscoverSmokeTests: XCTestCase {
 
     func testHauptwege() {
         tab("Home")
+        sleep(5)   // Testserver rechnet die Cover langsam
         shot("01-home")
         app.swipeUp()
         shot("02-home-gescrollt")
@@ -36,7 +37,7 @@ final class DiscoverSmokeTests: XCTestCase {
         let feld = app.searchFields.firstMatch.exists ? app.searchFields.firstMatch : app.textFields.firstMatch
         if feld.waitForExistence(timeout: 5) {
             feld.tap()
-            feld.typeText("Song")
+            feld.typeText("Song"); app.keyboards.buttons["search"].firstMatch.tap()
             shot("04-suche-ergebnis")
         }
 
