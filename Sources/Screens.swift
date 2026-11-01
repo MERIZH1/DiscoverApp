@@ -277,6 +277,21 @@ struct SkeletonRows: View {
     }
 }
 
+/// Statt einer leeren Seite: sagen, was los ist, und einen neuen Versuch anbieten.
+struct LoadFailedView: View {
+    var text = "Konnte nicht geladen werden"
+    let retry: () -> Void
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "wifi.exclamationmark").font(.system(size: 26)).foregroundStyle(Theme.mute)
+            Text(text).font(.system(size: 14)).foregroundStyle(Theme.sub)
+            Button("Erneut versuchen", action: retry)
+                .font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.accent)
+        }
+        .frame(maxWidth: .infinity).padding(.vertical, 40)
+    }
+}
+
 struct LoadingView: View {
     var text = "Lädt"
     @State private var dots = 0
@@ -1452,6 +1467,7 @@ struct SearchView: View {
     @State private var res: SearchResponse?
     @State private var scope = "all"
     @State private var busy = false
+    @State private var searchFailed = false
     @State private var debounce: Task<Void, Never>?
     @AppStorage("recentSearches") private var recentRaw = ""
     @AppStorage("recentSearchItems") private var recentItemsRaw = ""
@@ -1544,9 +1560,12 @@ struct SearchView: View {
                 }
 
                 ScrollView {
-                    if busy { LoadingView().padding(.top, 40) }
-                    else if let r = res {
+                    if let r = res {
                         searchResults(r)
+                    } else if busy {
+                        SkeletonRows()
+                    } else if searchFailed {
+                        LoadFailedView(text: "Suche gerade nicht erreichbar") { runSearch() }
                     } else if !recentItems.isEmpty {
                         LazyVStack(alignment: .leading, spacing: 0) {
                             HStack {
@@ -1728,7 +1747,11 @@ struct SearchView: View {
         if isYouTubeURL(q) { addYTFind(q); return }
         if isSpotifyURL(q) { handleSpotifyLink(q); return }
         busy = true
-        Task { res = try? await app.api.search(q); busy = false }
+        Task {
+            let r = try? await app.api.search(q)
+            if let r { res = r }
+            searchFailed = r == nil; busy = false
+        }
     }
     private func isYouTubeURL(_ s: String) -> Bool {
         let l = s.lowercased()
@@ -1791,7 +1814,7 @@ struct SearchView: View {
     private func debounceSearch() {
         debounce?.cancel()
         let q = query.trimmingCharacters(in: .whitespaces)
-        if q.isEmpty { res = nil; busy = false; return }
+        if q.isEmpty { res = nil; busy = false; searchFailed = false; return }
         if isPlaylistLink(q) { return }   // Import nur bei explizitem Absenden (Enter)
         if isYouTubeURL(q) { addYTFind(q); return }
         if isSpotifyURL(q) { handleSpotifyLink(q); return }
@@ -1801,7 +1824,8 @@ struct SearchView: View {
             busy = true
             let r = try? await app.api.search(q)
             if Task.isCancelled { return }
-            res = r; busy = false
+            if let r { res = r }
+            searchFailed = r == nil; busy = false
         }
     }
 }
@@ -2459,6 +2483,7 @@ struct ArtistView: View {
     @Environment(\.dismiss) private var dismiss
     let uri: String; let name: String; let image: String?
     @State private var resp: ArtistResponse?
+    @State private var retry = 0
     @State private var loading = true
     @State private var hero: Color = Theme.elev
 
@@ -2529,12 +2554,16 @@ struct ArtistView: View {
         .toolbar { ToolbarItem(placement: .topBarLeading) {
             Button { dismiss() } label: { Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold)).foregroundStyle(hero.isLight ? .black : Theme.text) }
         } }
-        .overlay { if loading { LoadingView() } }
-        .task {
+        .overlay {
+            if loading { LoadingView() } else if resp == nil { LoadFailedView { retry += 1 } }
+        }
+        .task(id: retry) {
+            if resp != nil { return }   // zurueck von einer Unterseite: Seite bleibt stehen
             loading = true
             let absImg = image.flatMap { app.api.absoluteURL($0)?.absoluteString } ?? image
             if let c = await averageColor(absImg) { hero = c }
             resp = try? await app.api.artist(uri)
+            if Task.isCancelled { return }
             loading = false
         }
     }
@@ -2553,6 +2582,9 @@ struct TrackListView: View {
     @State private var loading = true
     @State private var hero: Color = Theme.elev
     @State private var reload = 0
+    @State private var loadedReload: Int?
+    @State private var recsReload: Int?
+    @State private var loadFailed = false
     @State private var moreLoading = false
     @State private var isSubscribed = false
     @State private var addedRecs: Set<String> = []
@@ -2740,6 +2772,7 @@ struct TrackListView: View {
                 .padding(.bottom, 16)
                 // Tracks (nummeriert)
                 if loading && tracks.isEmpty { SkeletonRows() }
+                if loadFailed && tracks.isEmpty { LoadFailedView { reload += 1 } }
                 LazyVStack(spacing: 0) {
                     ForEach(Array(tracks.enumerated()), id: \.element.id) { idx, t in
                         NumberedTrackRow(n: idx + 1, track: t, showCover: !isAlbum, playing: player.current?.id == t.id,
@@ -2864,27 +2897,42 @@ struct TrackListView: View {
             Button("Abbrechen", role: .cancel) {}
         } message: { Text("„\(title)“ wird aus deiner Bibliothek entfernt.") }
         .task(id: reload) {
-            loading = true; tracks = []
-            if !isAlbum { isSubscribed = (try? await app.api.subscriptions())?.contains { $0.uri == uri } ?? false }
-            let absImg = image.flatMap { app.api.absoluteURL($0)?.absoluteString } ?? image
-            if let c = await averageColor(absImg) { hero = c }
-            var t = (isAlbum ? try? await app.api.albumTracks(uri) : try? await app.api.playlistTracks(uri, check: true))?.tracks ?? []
+            // Zurueck von einer Unterseite: Liste und Scrollstand bleiben stehen
+            guard loadedReload != reload else { return }
+            loading = true; tracks = []; loadFailed = false
+            // Kopf nebenher laden, die Songs warten nicht darauf
+            Task {
+                if !isAlbum { isSubscribed = (try? await app.api.subscriptions())?.contains { $0.uri == uri } ?? false }
+            }
+            Task {
+                let absImg = image.flatMap { app.api.absoluteURL($0)?.absoluteString } ?? image
+                if let c = await averageColor(absImg) { hero = c }
+            }
+            let first = isAlbum ? try? await app.api.albumTracks(uri) : try? await app.api.playlistTracks(uri, check: true)
+            var answered = first != nil
+            var t = first?.tracks ?? []
             // Fallback: History-Items sind manchmal falsch klassifiziert (Album<->Playlist)
             if t.isEmpty {
                 let alt = isAlbum ? try? await app.api.playlistTracks(uri, check: true) : try? await app.api.albumTracks(uri)
+                if alt != nil { answered = true }
                 if let alt = alt?.tracks, !alt.isEmpty { t = alt }
             }
+            if Task.isCancelled { return }
             tracks = t; loading = false
+            loadFailed = !answered
+            if answered { loadedReload = reload }
             let warm = t
             Task { await app.api.prewarmPlaylist(warm) }   // Server-Vorladen wie PWA
         }
         .task(id: reload) {
+            guard recsReload != reload else { return }
             // Cache-first: sofort die letzten Empfehlungen zeigen, dann im Hintergrund auffrischen
             let ckey = "recs_\(uri)"
             if recs.isEmpty, let cached = app.cacheGet(ckey, [Track].self) { recs = cached }
             if let fresh = try? await app.api.recommendations(uri), !fresh.isEmpty {
                 recs = fresh
                 app.cacheSet(ckey, fresh)
+                recsReload = reload
             }
         }
     }
@@ -3053,6 +3101,7 @@ struct PodcastView: View {
     @Environment(\.dismiss) private var dismiss
     let uri: String; let title: String; let image: String?
     @State private var resp: PodcastResponse?
+    @State private var retry = 0
     @State private var loading = true
     @State private var hero: Color = Theme.elev
 
@@ -3124,12 +3173,16 @@ struct PodcastView: View {
         .toolbar { ToolbarItem(placement: .topBarLeading) {
             Button { dismiss() } label: { Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold)).foregroundStyle(hero.isLight ? .black : Theme.text) }
         } }
-        .overlay { if loading { LoadingView() } }
-        .task {
+        .overlay {
+            if loading { LoadingView() } else if resp == nil { LoadFailedView { retry += 1 } }
+        }
+        .task(id: retry) {
+            if resp != nil { return }
             loading = true
             let absImg = image.flatMap { app.api.absoluteURL($0)?.absoluteString } ?? image
             if let c = await averageColor(absImg) { hero = c }
             resp = try? await app.api.podcast(uri)
+            if Task.isCancelled { return }
             loading = false
         }
     }
