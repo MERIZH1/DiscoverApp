@@ -1716,6 +1716,8 @@ struct SearchView: View {
                     }
                 }.padding(.horizontal).padding(.vertical, 6)
             }
+            .padding(.trailing, 60)   // rechts sitzt der Knopf zum Einklappen der Tastatur
+            .background(Theme.bg.opacity(0.94))
         }
     }
 
