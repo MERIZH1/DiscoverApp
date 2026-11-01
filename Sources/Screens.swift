@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 import UIKit
+import ImageIO
 import AVKit
 import CoreSpotlight
 import UniformTypeIdentifiers
@@ -4009,17 +4010,46 @@ struct SourceBadge: View {
 }
 
 // MARK: - Cover
-/// In-Memory-Cache fuer dekodierte Bilder -> fluessiges Scrollen, kein Re-Download.
+/// Bilder fertig dekodiert und auf Anzeigegroesse verkleinert im Hintergrund vorbereiten.
+/// Sonst dekodiert iOS das volle 640px-Cover beim ersten Zeichnen im Main-Thread, und das
+/// Scrollen stockt. Die Dateien liegen zusaetzlich im Plattencache (kein Neuladen nach Start).
 final class ImageLoader {
     static let shared = ImageLoader()
-    private let cache = NSCache<NSURL, UIImage>()
-    init() { cache.countLimit = 400 }   // NSCache ist thread-safe
-    func cached(_ url: URL) -> UIImage? { cache.object(forKey: url as NSURL) }
-    func load(_ url: URL) async -> UIImage? {
-        if let c = cached(url) { return c }
-        guard let (d, _) = try? await URLSession.shared.data(from: url), let img = UIImage(data: d) else { return nil }
-        cache.setObject(img, forKey: url as NSURL)
+    private let cache = NSCache<NSString, UIImage>()
+    private let session: URLSession
+    init() {
+        cache.countLimit = 600
+        cache.totalCostLimit = 150 * 1024 * 1024
+        let cfg = URLSessionConfiguration.default
+        cfg.urlCache = URLCache(memoryCapacity: 8 * 1024 * 1024,
+                                diskCapacity: 250 * 1024 * 1024,
+                                diskPath: "covers")
+        session = URLSession(configuration: cfg)
+    }
+    private func key(_ url: URL, _ pixels: Int) -> NSString { "\(pixels)|\(url.absoluteString)" as NSString }
+    func cached(_ url: URL, pixels: Int) -> UIImage? { cache.object(forKey: key(url, pixels)) }
+    func load(_ url: URL, pixels: Int) async -> UIImage? {
+        if let c = cached(url, pixels: pixels) { return c }
+        guard let (d, _) = try? await session.data(from: url) else { return nil }
+        let img = await Task.detached(priority: .userInitiated) {
+            ImageLoader.decode(d, pixels: pixels)
+        }.value
+        guard let img, let cg = img.cgImage else { return nil }
+        cache.setObject(img, forKey: key(url, pixels), cost: cg.bytesPerRow * cg.height)
         return img
+    }
+    private static func decode(_ data: Data, pixels: Int) -> UIImage? {
+        guard let src = CGImageSourceCreateWithData(data as CFData,
+                                                    [kCGImageSourceShouldCache: false] as CFDictionary)
+        else { return nil }
+        let opts: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: pixels,
+        ]
+        guard let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) else { return nil }
+        return UIImage(cgImage: cg)
     }
 }
 
@@ -4027,16 +4057,24 @@ struct Artwork: View {
     let url: String?
     var size: CGFloat = 48
     var corner: CGFloat = 6
+    @Environment(\.displayScale) private var displayScale
     @State private var image: UIImage?
     private var resolved: URL? {
         guard let s = url, !s.isEmpty else { return nil }
-        if s.hasPrefix("http") { return URL(string: s) }
+        if s.hasPrefix("http") {
+            // Spotify liefert 64, 300 und 640 Pixel: Listen brauchen die grosse Fassung nicht
+            let thumb = size <= 100 ? s.replacingOccurrences(of: "ab67616d0000b273", with: "ab67616d00001e02") : s
+            return URL(string: thumb)
+        }
         return URL(string: ImageBase.url + (s.hasPrefix("/") ? s : "/" + s))
     }
+    private var pixels: Int { Int((size * displayScale).rounded(.up)) }
     var body: some View {
+        // Aus dem Cache schon im ersten Durchlauf zeigen: sonst blitzt beim Scrollen der Platzhalter
+        let shown = image ?? resolved.flatMap { ImageLoader.shared.cached($0, pixels: pixels) }
         Group {
-            if let image {
-                Image(uiImage: image).resizable().scaledToFill()
+            if let shown {
+                Image(uiImage: shown).resizable().scaledToFill().transition(.opacity)
             } else {
                 RoundedRectangle(cornerRadius: corner).fill(Theme.card)
                     .overlay(Image(systemName: "music.note").foregroundStyle(Theme.mute))
@@ -4045,9 +4083,12 @@ struct Artwork: View {
         .frame(width: size, height: size).clipShape(RoundedRectangle(cornerRadius: corner))
         .task(id: resolved) {
             guard let u = resolved else { image = nil; return }
-            if let c = ImageLoader.shared.cached(u) { image = c; return }   // sofort aus Cache
+            if let c = ImageLoader.shared.cached(u, pixels: pixels) { image = c; return }
             image = nil
-            if let img = await ImageLoader.shared.load(u), u == resolved { image = img }
+            let px = pixels
+            if let img = await ImageLoader.shared.load(u, pixels: px), u == resolved {
+                withAnimation(.easeOut(duration: 0.18)) { image = img }
+            }
         }
     }
 }
