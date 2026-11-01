@@ -60,6 +60,19 @@ final class DiscoverSmokeTests: XCTestCase {
                 shot("08-minispieler")
                 app.staticTexts["Song 2"].firstMatch.tap()
                 shot("09-player")
+                let mix = app.buttons["player.shuffle"].firstMatch
+                if mix.waitForExistence(timeout: 5) {
+                    mix.tap()
+                    shot("09a-shuffle-an")
+                    mix.tap()
+                }
+                let wdh = app.buttons["player.repeat"].firstMatch
+                if wdh.waitForExistence(timeout: 5) {
+                    for i in 1...3 {
+                        wdh.tap()
+                        shot("09b-wiederholen-\(i)")
+                    }
+                }
             }
         }
     }

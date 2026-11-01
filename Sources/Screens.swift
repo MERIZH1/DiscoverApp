@@ -3847,6 +3847,7 @@ struct PlayerView: View {
                         GlassCluster(on: glass, spacing: 12) {
                         HStack(spacing: 0) {
                             GlassSymbolButton(systemName: "shuffle", active: p.shuffle, size: 48, symbolSize: 19) { p.toggleShuffle() }
+                                .accessibilityIdentifier("player.shuffle")
                                 .frame(maxWidth: .infinity)
                             GlassSymbolButton(systemName: "backward.fill", size: 52, symbolSize: 24) { p.prev() }
                                 .frame(maxWidth: .infinity)
@@ -3862,6 +3863,7 @@ struct PlayerView: View {
                             GlassSymbolButton(systemName: "forward.fill", size: 52, symbolSize: 24) { p.next() }
                                 .frame(maxWidth: .infinity)
                             GlassSymbolButton(systemName: p.repeatMode == .one ? "repeat.1" : "repeat", active: p.repeatMode != .off, size: 48, symbolSize: 19) { p.cycleRepeat() }
+                                .accessibilityIdentifier("player.repeat")
                                 .frame(maxWidth: .infinity)
                         }.foregroundStyle(Theme.text).padding(.horizontal, 2)
                         }
