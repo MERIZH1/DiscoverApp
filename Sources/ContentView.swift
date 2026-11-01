@@ -36,6 +36,8 @@ struct ContentView: View {
         .scrollDismissesKeyboard(.interactively)
         .environmentObject(app)
         .environmentObject(app.player)
+        .environmentObject(app.player.nowState)
+        .environment(\.playerRef, app.player)
         .environmentObject(app.downloads)
         .environmentObject(app.player.clock)
         .environmentObject(app.sync)

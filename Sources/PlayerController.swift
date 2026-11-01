@@ -1,3 +1,4 @@
+import SwiftUI
 import Foundation
 import AVFoundation
 import MediaPlayer
@@ -98,13 +99,16 @@ enum PodcastProgress {
 /// iOS die Aktivierung manchmal (eine andere App haelt noch die Session) -> ohne
 /// Retry laeuft die Timeline dann STUMM weiter ("kein Ton, Balken laeuft").
 enum AudioSessionManager {
-    static func activate() {
+    private static let queue = DispatchQueue(label: "discover.audiosession", qos: .userInitiated)
+    /// setActive kann den aufrufenden Thread spuerbar blockieren, also nie im Main-Thread.
+    static func activate() { queue.async { activateNow() } }
+    private static func activateNow() {
         let s = AVAudioSession.sharedInstance()
         do {
             try s.setCategory(.playback, mode: .default, options: [])
             try s.setActive(true)
         } catch {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            queue.asyncAfter(deadline: .now() + 0.35) {
                 try? s.setCategory(.playback, mode: .default, options: [])
                 try? s.setActive(true)
             }
@@ -112,10 +116,33 @@ enum AudioSessionManager {
     }
 }
 
+/// Nur das, was Listen wissen muessen: Welcher Song laeuft, ist der Player sichtbar.
+/// Listen beobachten dies statt des ganzen Players. Sonst rechnet jeder Knopfdruck
+/// Bibliothek, Suche und Playlists im Hintergrund komplett neu.
+@MainActor
+final class NowPlayingState: ObservableObject {
+    @Published var track: Track?
+    @Published var hasContent = false
+}
+
+/// Player fuer Aktionen, ohne seine Aenderungen zu beobachten.
+private struct PlayerRefKey: EnvironmentKey { static let defaultValue: PlayerController? = nil }
+extension EnvironmentValues {
+    var playerRef: PlayerController? {
+        get { self[PlayerRefKey.self] }
+        set { self[PlayerRefKey.self] = newValue }
+    }
+}
+
 @MainActor
 final class PlayerController: ObservableObject {
-    @Published private(set) var queue: [Track] = []          // physische Playback-Queue (ggf. geshuffelt)
-    @Published private(set) var index: Int = 0
+    let nowState = NowPlayingState()
+    private func syncNowState() {
+        if nowState.track?.id != current?.id { nowState.track = current }
+        if nowState.hasContent != hasContent { nowState.hasContent = hasContent }
+    }
+    @Published private(set) var queue: [Track] = [] { didSet { syncNowState() } }   // physische Playback-Queue (ggf. geshuffelt)
+    @Published private(set) var index: Int = 0 { didSet { syncNowState() } }
     private var original: [Track] = []                       // Anzeige-Reihenfolge (zum Entshufflen)
     @Published private(set) var manualQueue: [Track] = []    // Play-Next / Add-to-Queue (wird zuerst gespielt)
     @Published private(set) var isPlaying = false {
@@ -128,7 +155,7 @@ final class PlayerController: ObservableObject {
     @Published private(set) var loading = false
     @Published var shuffle = false
     @Published var repeatMode: RepeatMode = .off
-    @Published private(set) var isRadio = false
+    @Published private(set) var isRadio = false { didSet { syncNowState() } }
     private var radioStation: RadioStation?
     private var radioRetries = 0
     @Published private(set) var source = ""   // "youtube" | "navidrome"
@@ -486,10 +513,14 @@ final class PlayerController: ObservableObject {
         updateNowPlaying(title: t.name, artist: t.artist, album: t.album, dur: t.durationSec, art: t.image, live: false)
         source = UserDefaults.standard.string(forKey: "lastSource_\(profileScope)") ?? ""
     }
+    private static let snapshotQueue = DispatchQueue(label: "discover.snapshot", qos: .utility)
     private func persistSnapshot() {
         guard !isRadio, !queue.isEmpty else { return }
-        if let d = try? JSONEncoder().encode(PlayerSnapshot(tracks: queue, index: index, original: original, autoplaySeed: autoplaySeed)) {
-            UserDefaults.standard.set(d, forKey: "playerSnap_\(profileScope)")
+        // Grosse Warteschlangen zu kodieren kostet Zeit: nicht beim Knopfdruck im Main-Thread
+        let snap = PlayerSnapshot(tracks: queue, index: index, original: original, autoplaySeed: autoplaySeed)
+        let key = "playerSnap_\(profileScope)"
+        Self.snapshotQueue.async {
+            if let d = try? JSONEncoder().encode(snap) { UserDefaults.standard.set(d, forKey: key) }
         }
     }
     // Play-Modi (Shuffle/Repeat) serverseitig sichern/laden — wie PWA

@@ -42,8 +42,12 @@ extension UINavigationController: UIGestureRecognizerDelegate {
 
 // MARK: - Haptik
 enum Haptics {
-    static func tap(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .light) {
-        UIImpactFeedbackGenerator(style: style).impactOccurred()
+    private static let light = UIImpactFeedbackGenerator(style: .light)
+    private static let medium = UIImpactFeedbackGenerator(style: .medium)
+    @MainActor static func tap(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .light) {
+        let g = style == .medium ? medium : light
+        g.impactOccurred()
+        g.prepare()
     }
 }
 
@@ -120,7 +124,9 @@ func averageColor(_ urlStr: String?) async -> Color? {
 
 // MARK: - Main
 struct MainView: View {
-    @EnvironmentObject var player: PlayerController
+    @Environment(\.playerRef) private var playerRef
+    private var player: PlayerController { playerRef! }
+    @EnvironmentObject var now: NowPlayingState
     @EnvironmentObject var sync: SyncManager
     @EnvironmentObject var app: AppState
     @State private var showPlayer = false
@@ -138,7 +144,7 @@ struct MainView: View {
             .tint(Theme.text)
             VStack(spacing: 8) {
                 // EIN Player — zeigt lokal ODER das Remote-Geraet (kein doppelter Banner mehr)
-                if (player.hasContent || sync.remote?.track != nil) && !keyboardVisible {
+                if (now.hasContent || sync.remote?.track != nil) && !keyboardVisible {
                     NowPlayingBar(showPlayer: $showPlayer)
                 }
             }
@@ -1462,7 +1468,9 @@ struct RecentSearchItem: Codable, Identifiable {
 
 struct SearchView: View {
     @EnvironmentObject var app: AppState
-    @EnvironmentObject var player: PlayerController
+    @Environment(\.playerRef) private var playerRef
+    private var player: PlayerController { playerRef! }
+    @EnvironmentObject var now: NowPlayingState
     @State private var query = ""
     @State private var res: SearchResponse?
     @State private var scope = "all"
@@ -1686,7 +1694,7 @@ struct SearchView: View {
     }
     @ViewBuilder private func songRows(_ list: [Track], context: String, limit: Int) -> some View {
         ForEach(Array(list.prefix(limit).enumerated()), id: \.offset) { i, t in
-            TrackRow(track: t, playing: player.current?.id == t.id,
+            TrackRow(track: t, playing: now.track?.id == t.id,
                      selecting: selecting, selected: selected.contains(t.uri)) {
                 tapTrack(t, in: list, at: i, context: context)
             }
@@ -1826,12 +1834,18 @@ struct SearchView: View {
             if Task.isCancelled { return }
             if let r { res = r }
             searchFailed = r == nil; busy = false
+            // Tippen beendet: oberste Treffer vorbereiten, der erste Start kostet sonst ~4 s
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            if Task.isCancelled { return }
+            if let t = r?.tracks, !t.isEmpty { await app.api.prewarmPlaylist(Array(t.prefix(3))) }
         }
     }
 }
 
 struct TopHitCard: View {
-    @EnvironmentObject var player: PlayerController
+    @Environment(\.playerRef) private var playerRef
+    private var player: PlayerController { playerRef! }
+    @EnvironmentObject var now: NowPlayingState
     let hit: TopHit
     var body: some View {
         Group {
@@ -2117,7 +2131,9 @@ struct AddToPlaylistSheet: View {
 // MARK: - Bibliothek
 struct LibraryView: View {
     @EnvironmentObject var app: AppState
-    @EnvironmentObject var player: PlayerController
+    @Environment(\.playerRef) private var playerRef
+    private var player: PlayerController { playerRef! }
+    @EnvironmentObject var now: NowPlayingState
     @EnvironmentObject var downloads: DownloadManager
     @Environment(\.liquidGlass) private var glass
     @State private var playlists: [Playlist] = []
@@ -2196,7 +2212,7 @@ struct LibraryView: View {
                                 }.buttonStyle(.pressable)
                             } else {
                                 ForEach(Array(g.tracks.enumerated()), id: \.offset) { i, t in
-                                    TrackRow(track: t, playing: player.current?.id == t.id) {
+                                    TrackRow(track: t, playing: now.track?.id == t.id) {
                                         player.play(tracks: g.tracks, startAt: i, contextName: "Offline", contextURI: "")
                                     }
                                 }
@@ -2365,7 +2381,9 @@ struct RadioRow: View {
 // MARK: - Radio
 struct RadioView: View {
     @EnvironmentObject var app: AppState
-    @EnvironmentObject var player: PlayerController
+    @Environment(\.playerRef) private var playerRef
+    private var player: PlayerController { playerRef! }
+    @EnvironmentObject var now: NowPlayingState
     @State private var stations: [RadioStation] = []
     @State private var loaded = false
     @State private var showSearch = false
@@ -2479,7 +2497,9 @@ struct RadioSearchSheet: View {
 // MARK: - Artist-Seite
 struct ArtistView: View {
     @EnvironmentObject var app: AppState
-    @EnvironmentObject var player: PlayerController
+    @Environment(\.playerRef) private var playerRef
+    private var player: PlayerController { playerRef! }
+    @EnvironmentObject var now: NowPlayingState
     @Environment(\.dismiss) private var dismiss
     let uri: String; let name: String; let image: String?
     @State private var resp: ArtistResponse?
@@ -2513,7 +2533,7 @@ struct ArtistView: View {
                     SectionHeader("Beliebt")
                     LazyVStack(spacing: 0) {
                         ForEach(Array(top.prefix(10).enumerated()), id: \.offset) { i, t in
-                            NumberedTrackRow(n: i + 1, track: t, playing: player.current?.id == t.id) {
+                            NumberedTrackRow(n: i + 1, track: t, playing: now.track?.id == t.id) {
                                 player.play(tracks: top, startAt: i, contextName: resp?.name ?? name, contextURI: uri)
                             }
                         }
@@ -2572,7 +2592,9 @@ struct ArtistView: View {
 // MARK: - Track-Liste (Playlist/Album-Detail)
 struct TrackListView: View {
     @EnvironmentObject var app: AppState
-    @EnvironmentObject var player: PlayerController
+    @Environment(\.playerRef) private var playerRef
+    private var player: PlayerController { playerRef! }
+    @EnvironmentObject var now: NowPlayingState
     @EnvironmentObject var downloads: DownloadManager
     @Environment(\.liquidGlass) private var glass
     @Environment(\.dismiss) private var dismiss
@@ -2775,7 +2797,7 @@ struct TrackListView: View {
                 if loadFailed && tracks.isEmpty { LoadFailedView { reload += 1 } }
                 LazyVStack(spacing: 0) {
                     ForEach(Array(tracks.enumerated()), id: \.element.id) { idx, t in
-                        NumberedTrackRow(n: idx + 1, track: t, showCover: !isAlbum, playing: player.current?.id == t.id,
+                        NumberedTrackRow(n: idx + 1, track: t, showCover: !isAlbum, playing: now.track?.id == t.id,
                                          onRemoveFromPlaylist: canRemoveTracks ? { removeTrack(t) } : nil,
                                          selecting: selecting, selected: selected.contains(t.uri)) {
                             if selecting { toggleSel(t.uri) }
@@ -2815,7 +2837,7 @@ struct TrackListView: View {
                             .font(.system(size: 13)).foregroundStyle(Theme.sub)
                             .padding(.horizontal).padding(.bottom, 4)
                         ForEach(Array(recs.enumerated()), id: \.offset) { i, t in
-                            RecRow(track: t, playing: player.current?.id == t.id,
+                            RecRow(track: t, playing: now.track?.id == t.id,
                                    added: addedRecs.contains(t.uri),
                                    add: { addRec(t) },
                                    play: { player.play(tracks: recs, startAt: i, contextName: "Empfehlungen", contextURI: uri) },
@@ -3096,7 +3118,9 @@ struct YouTubePlaylistExportSheet: View {
 // MARK: - Podcast
 struct PodcastView: View {
     @EnvironmentObject var app: AppState
-    @EnvironmentObject var player: PlayerController
+    @Environment(\.playerRef) private var playerRef
+    private var player: PlayerController { playerRef! }
+    @EnvironmentObject var now: NowPlayingState
     @EnvironmentObject var downloads: DownloadManager
     @Environment(\.dismiss) private var dismiss
     let uri: String; let title: String; let image: String?
@@ -3148,7 +3172,7 @@ struct PodcastView: View {
                     ForEach(Array((resp?.episodes ?? []).enumerated()), id: \.element.id) { i, ep in
                         EpisodeRow(ep: ep, track: ep.track(podcast: showName, fallbackImage: showImage),
                                    collection: podcastColl, order: i,
-                                   playing: player.current?.uri == ep.uri) {
+                                   playing: now.track?.uri == ep.uri) {
                             let q = (resp?.episodes ?? []).map { $0.track(podcast: showName, fallbackImage: showImage) }
                             player.play(tracks: q, startAt: i, contextName: showName, contextURI: uri)
                         }
@@ -3307,7 +3331,9 @@ struct OfflineFolderRow: View {
 /// Inhalt eines Offline-Ordners — die heruntergeladenen Folgen/Songs einer Sammlung.
 /// Auch ohne Verbindung verfuegbar (alles aus dem lokalen Download-Index).
 struct OfflineCollectionView: View {
-    @EnvironmentObject var player: PlayerController
+    @Environment(\.playerRef) private var playerRef
+    private var player: PlayerController { playerRef! }
+    @EnvironmentObject var now: NowPlayingState
     @EnvironmentObject var downloads: DownloadManager
     let collection: OfflineCollection
     private var items: [Track] { downloads.collectionTracks(collection.id) }
@@ -3341,7 +3367,7 @@ struct OfflineCollectionView: View {
 
                 LazyVStack(spacing: 2) {
                     ForEach(Array(items.enumerated()), id: \.offset) { i, t in
-                        TrackRow(track: t, playing: player.current?.id == t.id) {
+                        TrackRow(track: t, playing: now.track?.id == t.id) {
                             player.play(tracks: items, startAt: i, contextName: collection.name, contextURI: collection.id)
                         }
                     }
