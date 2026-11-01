@@ -99,7 +99,7 @@ struct GlassSymbolButton: View {
                 .glassButton(glass, shape: Circle(), fallback: Theme.input.opacity(0.92))
                 .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.pressable)
     }
 }
 
@@ -227,11 +227,56 @@ struct Pill: View {
             .padding(.horizontal, 14).padding(.vertical, 7)
             .glassSurface(active ? false : glass, shape: Capsule(), fallback: active ? activeBg : Theme.input)
             .clipShape(Capsule())
-        }.buttonStyle(.plain)
+        }.buttonStyle(.pressable)
     }
 }
 
 // MARK: - Lade-Anzeige (Spinner + "Lädt" mit animierten Punkten, wie PWA)
+/// Antippen sichtbar machen: Zeile und Karte geben unter dem Finger leicht nach.
+struct PressableStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .opacity(configuration.isPressed ? 0.8 : 1)
+            .animation(.snappy(duration: 0.12), value: configuration.isPressed)
+    }
+}
+extension ButtonStyle where Self == PressableStyle {
+    static var pressable: PressableStyle { PressableStyle() }
+}
+
+/// Platzhalter-Zeilen statt Lade-Kreisel: Die Seite steht sofort und fuellt sich dann.
+struct SkeletonRows: View {
+    var rows = 9
+    @State private var dim = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var body: some View {
+        VStack(spacing: 14) {
+            ForEach(0..<rows, id: \.self) { i in
+                HStack(spacing: 12) {
+                    RoundedRectangle(cornerRadius: 4).fill(Theme.card).frame(width: 50, height: 50)
+                    VStack(alignment: .leading, spacing: 8) {
+                        RoundedRectangle(cornerRadius: 3).fill(Theme.card)
+                            .frame(width: CGFloat(150 + (i * 47) % 90), height: 12)
+                        RoundedRectangle(cornerRadius: 3).fill(Theme.card)
+                            .frame(width: CGFloat(90 + (i * 31) % 60), height: 10)
+                    }
+                    Spacer()
+                }
+            }
+        }
+        .padding(.horizontal).padding(.top, 12)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .opacity(dim ? 0.45 : 1)
+        .allowsHitTesting(false)
+        .accessibilityLabel("Lädt")
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) { dim = true }
+        }
+    }
+}
+
 struct LoadingView: View {
     var text = "Lädt"
     @State private var dots = 0
@@ -615,7 +660,7 @@ struct YTMatchSheet: View {
                     ScrollView {
                         VStack(spacing: 0) {
                             ForEach(cands) { c in
-                                Button { setMatch(c) } label: { row(c) }.buttonStyle(.plain)
+                                Button { setMatch(c) } label: { row(c) }.buttonStyle(.pressable)
                                 Divider().background(Theme.input)
                             }
                         }
@@ -752,7 +797,7 @@ struct HomeView: View {
                         Spacer(minLength: 8)
                         Button { showAccount = true } label: {
                             AvatarCircle(name: app.profile?.name ?? "?", color: app.profile?.color)
-                        }.buttonStyle(.plain)
+                        }.buttonStyle(.pressable)
                     }.padding(.horizontal).padding(.top, 8)
 
                     // Filter-Pills
@@ -766,7 +811,7 @@ struct HomeView: View {
 
                     // Quick-Grid (4x2)
                     if home == nil {
-                        LoadingView().padding(.top, 60)
+                        SkeletonRows(rows: 8)
                     } else {
                         LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                             ForEach(quick) { item in
@@ -780,7 +825,7 @@ struct HomeView: View {
                                     }
                                     .frame(maxWidth: .infinity, minHeight: 56, maxHeight: 56, alignment: .leading)
                                     .background(Color.white.opacity(0.07)).clipShape(RoundedRectangle(cornerRadius: 6))
-                                }.buttonStyle(.plain)
+                                }.buttonStyle(.pressable)
                             }
                         }.padding(.horizontal)
                     }
@@ -874,7 +919,7 @@ struct HomeRow: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 14) {
                     ForEach(items) { it in
-                        NavigationLink(value: it) { BigCard(item: it) }.buttonStyle(.plain)
+                        NavigationLink(value: it) { BigCard(item: it) }.buttonStyle(.pressable)
                     }
                 }.padding(.horizontal)
             }
@@ -921,7 +966,7 @@ struct AppUpdateCard: View {
                         Spacer()
                     }.foregroundStyle(.black).padding(.vertical, 11).padding(.horizontal, 14)
                         .background(Theme.accent).clipShape(RoundedRectangle(cornerRadius: 10))
-                }.buttonStyle(.plain).padding(.horizontal)
+                }.buttonStyle(.pressable).padding(.horizontal)
             } else if updater.loaded {
                 Text("Du bist auf dem neuesten Stand.").font(.caption2).foregroundStyle(Theme.mute).padding(.horizontal)
             }
@@ -936,7 +981,7 @@ struct AppUpdateCard: View {
                                 Text("installieren").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.accent)
                             }.padding(.vertical, 9).padding(.horizontal, 12)
                                 .background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 9))
-                        }.buttonStyle(.plain).padding(.horizontal)
+                        }.buttonStyle(.pressable).padding(.horizontal)
                     }
                 }
             }
@@ -984,7 +1029,7 @@ struct AccountSheet: View {
                                         Image(systemName: "checkmark").foregroundStyle(Theme.accent)
                                     }
                                 }.padding(.vertical, 8).padding(.horizontal).contentShape(Rectangle())
-                            }.buttonStyle(.plain)
+                            }.buttonStyle(.pressable)
                         }
                     }
 
@@ -1008,7 +1053,7 @@ struct AccountSheet: View {
                                 Spacer()
                                 if s == app.serverURL { Image(systemName: "checkmark").foregroundStyle(Theme.accent) }
                             }.padding(.vertical, 8).padding(.horizontal).contentShape(Rectangle())
-                        }.buttonStyle(.plain)
+                        }.buttonStyle(.pressable)
                     }
                     AccountAction(icon: "plus.circle", label: "Server hinzufügen / ändern") { app.changeServer(); dismiss() }
 
@@ -1390,7 +1435,7 @@ struct AccountAction: View {
                 Text(label).font(.system(size: 16)).foregroundStyle(Theme.text)
                 Spacer()
             }.padding(.vertical, 10).padding(.horizontal).contentShape(Rectangle())
-        }.buttonStyle(.plain)
+        }.buttonStyle(.pressable)
     }
 }
 
@@ -1454,7 +1499,7 @@ struct SearchView: View {
                     Text(g.0).font(.system(size: 16, weight: .bold)).foregroundStyle(.white)
                         .frame(maxWidth: .infinity, minHeight: 76, alignment: .topLeading)
                         .padding(14).background(Color(hex6: g.2)).clipShape(RoundedRectangle(cornerRadius: 12))
-                }.buttonStyle(.plain)
+                }.buttonStyle(.pressable)
             }
         }.padding(.horizontal).padding(.top, 6)
     }
@@ -1522,7 +1567,7 @@ struct SearchView: View {
                                         Spacer()
                                         Image(systemName: "arrow.up.backward").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.mute).frame(width: 30, height: 30)
                                     }.padding(.vertical, 6).padding(.horizontal).contentShape(Rectangle())
-                                }.buttonStyle(.plain)
+                                }.buttonStyle(.pressable)
                             }
                             genreTiles
                         }.padding(.top, 6)
@@ -1741,11 +1786,11 @@ struct TopHitCard: View {
                     UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                     let t = Track(uri: hit.realURI, name: hit.name ?? "", artist: hit.artist ?? "", image: hit.image)
                     player.playFromSearch(t, in: [t], at: 0, context: "")
-                } label: { card }.buttonStyle(.plain)
+                } label: { card }.buttonStyle(.pressable)
             } else {
                 NavigationLink(value: Card(uri: hit.realURI, name: hit.name ?? "", image: hit.image, artist: hit.artist, owner: nil, desc: nil)) {
                     card
-                }.buttonStyle(.plain)
+                }.buttonStyle(.pressable)
             }
         }
     }
@@ -1777,7 +1822,7 @@ struct CardRows: View {
                     }
                     Spacer()
                 }.padding(.horizontal).contentShape(Rectangle())
-            }.buttonStyle(.plain)
+            }.buttonStyle(.pressable)
         }
     }
 }
@@ -1868,7 +1913,7 @@ struct SendToUserSheet: View {
                                         Image(systemName: "paperplane").foregroundStyle(Theme.sub)
                                     }
                                 }.padding(.horizontal).padding(.vertical, 8).contentShape(Rectangle())
-                            }.buttonStyle(.plain).disabled(sendingTo != nil)
+                            }.buttonStyle(.pressable).disabled(sendingTo != nil)
                         }
                     }.padding(.top, 4)
                 }
@@ -1956,7 +2001,7 @@ struct AddToPlaylistSheet: View {
                         Text("Neue Playlist").font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
                         Spacer()
                     }.padding(.horizontal).padding(.vertical, 8).contentShape(Rectangle())
-                }.buttonStyle(.plain)
+                }.buttonStyle(.pressable)
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(shown) { pl in
@@ -1969,7 +2014,7 @@ struct AddToPlaylistSheet: View {
                                     }
                                     Spacer()
                                 }.padding(.horizontal).padding(.vertical, 6).contentShape(Rectangle())
-                            }.buttonStyle(.plain)
+                            }.buttonStyle(.pressable)
                         }
                     }.padding(.top, 4)
                 }
@@ -2079,7 +2124,7 @@ struct LibraryView: View {
                         ForEach(radioPlaylists) { pl in
                             NavigationLink(value: pl) {
                                 LibraryRow(pl: pl, subscribed: false, sync: nil)
-                            }.buttonStyle(.plain)
+                            }.buttonStyle(.pressable)
                             .contextMenu { PlaylistMenu(uri: pl.uri, name: pl.name, onDeleted: { Task { await load() } }).equatable() }
                         }
                     } else if tab == "offline" {
@@ -2094,7 +2139,7 @@ struct LibraryView: View {
                             if let c = g.collection {
                                 NavigationLink(value: c) {
                                     OfflineFolderRow(collection: c, count: g.tracks.count, cover: g.tracks.first?.image)
-                                }.buttonStyle(.plain)
+                                }.buttonStyle(.pressable)
                             } else {
                                 ForEach(Array(g.tracks.enumerated()), id: \.offset) { i, t in
                                     TrackRow(track: t, playing: player.current?.id == t.id) {
@@ -2109,25 +2154,25 @@ struct LibraryView: View {
                                 Button {
                                     player.play(tracks: [Track(uri: e.uri, name: e.name, artist: e.artist ?? "", image: e.image)],
                                                 contextName: e.context_name ?? "", contextURI: e.context_uri ?? "")
-                                } label: { HistoryEntryRow(entry: e) }.buttonStyle(.plain)
+                                } label: { HistoryEntryRow(entry: e) }.buttonStyle(.pressable)
                             } else {
                                 NavigationLink(value: HomeItem(uri: e.uri, name: e.name, image: e.image, sub: e.context_name, type: e.kind)) {
                                     HistoryEntryRow(entry: e)
-                                }.buttonStyle(.plain)
+                                }.buttonStyle(.pressable)
                             }
                         }
                     } else {
                         ForEach(shown) { pl in
                             NavigationLink(value: pl) {
                                 LibraryRow(pl: pl, subscribed: subs.contains(pl.uri), sync: subSync[pl.uri])
-                            }.buttonStyle(.plain)
+                            }.buttonStyle(.pressable)
                             .contextMenu { PlaylistMenu(uri: pl.uri, name: pl.name).equatable() }
                         }
                     }
                 }.padding(.top, 10).padding(.bottom, 130)
             }
             .scrollContentBackground(.hidden).background(Theme.bg)
-            .overlay { if !loaded && playlists.isEmpty && tab != "offline" { LoadingView() } }   // Offline-Tab nie blockieren
+            .overlay { if !loaded && playlists.isEmpty && tab != "offline" { SkeletonRows() } }   // Offline-Tab nie blockieren
             .navigationTitle("").navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: Playlist.self) { pl in
                 TrackListView(uri: pl.uri, title: pl.name, image: pl.image, isAlbum: false)
@@ -2278,7 +2323,7 @@ struct RadioView: View {
                     .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal).padding(.top, 6)
                 LazyVStack(spacing: 4) {
                     ForEach(stations) { st in
-                        Button { player.playRadio(st) } label: { RadioRow(station: st) }.buttonStyle(.plain)
+                        Button { player.playRadio(st) } label: { RadioRow(station: st) }.buttonStyle(.pressable)
                     }
                 }.padding(.top, 10).padding(.bottom, 130)
                 if loaded && stations.isEmpty {
@@ -2357,7 +2402,7 @@ struct RadioSearchSheet: View {
                             } label: {
                                 Image(systemName: added.contains(st.id) ? "checkmark.circle.fill" : "plus.circle")
                                     .font(.system(size: 24)).foregroundStyle(added.contains(st.id) ? Theme.accent : Theme.text)
-                            }.buttonStyle(.plain).disabled(added.contains(st.id))
+                            }.buttonStyle(.pressable).disabled(added.contains(st.id))
                         }.listRowBackground(Color.clear)
                     }
                 }
@@ -2430,7 +2475,7 @@ struct ArtistView: View {
                                         Text(c.name).font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.text)
                                             .lineLimit(1).frame(width: 150, alignment: .leading)
                                     }
-                                }.buttonStyle(.plain)
+                                }.buttonStyle(.pressable)
                             }
                         }.padding(.horizontal)
                     }
@@ -2646,7 +2691,7 @@ struct TrackListView: View {
                                 .frame(width: 44, height: 44)
                                 .glassButton(glass, shape: Circle(), fallback: Theme.input.opacity(0.92))
                                 .contentShape(Circle())
-                        }.buttonStyle(.plain)
+                        }.buttonStyle(.pressable)
                         Spacer()
                         GlassSymbolButton(systemName: "shuffle", size: 44, symbolSize: 20) {
                             if !tracks.isEmpty {
@@ -2659,11 +2704,12 @@ struct TrackListView: View {
                                 .frame(width: 58, height: 58)
                                 .background(Theme.accent, in: Circle())
                                 .shadow(color: Theme.accent.opacity(0.34), radius: 12, y: 3)
-                        }.buttonStyle(.plain)
+                        }.buttonStyle(.pressable)
                     }.padding(.horizontal).padding(.top, 8)
                 }
                 .padding(.bottom, 16)
                 // Tracks (nummeriert)
+                if loading && tracks.isEmpty { SkeletonRows() }
                 LazyVStack(spacing: 0) {
                     ForEach(Array(tracks.enumerated()), id: \.element.id) { idx, t in
                         NumberedTrackRow(n: idx + 1, track: t, showCover: !isAlbum, playing: player.current?.id == t.id,
@@ -2776,7 +2822,6 @@ struct TrackListView: View {
         .sheet(isPresented: $showYouTubeShare) {
             YouTubePlaylistExportSheet(uri: uri, name: title).environmentObject(app)
         }
-        .overlay { if loading { LoadingView() } }
         .overlay(alignment: .bottom) {
             if !copyMsg.isEmpty {
                 Text(copyMsg).font(.system(size: 14, weight: .semibold)).foregroundStyle(.black)
@@ -3138,7 +3183,7 @@ struct EpisodeRow: View {
                         Image(systemName: downloads.isDownloaded(track.uri) ? "checkmark.circle.fill" : "arrow.down.circle")
                             .font(.system(size: 22))
                             .foregroundStyle(downloads.isDownloaded(track.uri) ? Theme.accent : Theme.sub)
-                    }.buttonStyle(.plain).frame(width: 44, height: 44).contentShape(Rectangle())
+                    }.buttonStyle(.pressable).frame(width: 44, height: 44).contentShape(Rectangle())
                 }
             }
         }.padding(.vertical, 12).padding(.horizontal)
@@ -3263,7 +3308,7 @@ struct NumberedTrackRow: View {
                 } label: {
                     Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
                         .frame(width: 46, height: 46).contentShape(Rectangle())
-                }.buttonStyle(.plain)
+                }.buttonStyle(.pressable)
             }
         }.padding(.vertical, 9).padding(.horizontal)
             .background(playing ? Theme.accent.opacity(0.08) : .clear)
@@ -3296,7 +3341,7 @@ struct RecRow: View {
                     Image(systemName: added ? "checkmark.circle.fill" : "plus.circle")
                         .font(.system(size: 24)).foregroundStyle(added ? Theme.accent : Theme.text)
                         .frame(width: 42, height: 42).contentShape(Rectangle())
-                }.buttonStyle(.plain).disabled(added)
+                }.buttonStyle(.pressable).disabled(added)
             }
         }
         .padding(.vertical, 8).padding(.horizontal).contentShape(Rectangle())
@@ -3348,7 +3393,7 @@ struct TrackRow: View {
                 } label: {
                     Image(systemName: "ellipsis").font(.system(size: 16)).foregroundStyle(Theme.mute)
                         .frame(width: 46, height: 46).contentShape(Rectangle())
-                }.buttonStyle(.plain)
+                }.buttonStyle(.pressable)
             }
         }.padding(.vertical, 9).padding(.horizontal)
             .contentShape(Rectangle())
@@ -3444,7 +3489,7 @@ struct NowPlayingBar: View {
                                 .glassButton(glass, shape: Circle(), fallback: .white)
                                 .contentShape(Circle())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.pressable)
                     }
                 }
             }
@@ -3599,7 +3644,7 @@ struct PlayerView: View {
                         } label: {
                             Image(systemName: "ellipsis").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
                                 .glassIconCircle(glass)
-                        }.buttonStyle(.plain).disabled(p.current == nil)
+                        }.buttonStyle(.pressable).disabled(p.current == nil)
                       }
                     }
                 }.padding(.horizontal, 4).padding(.top, 8)
@@ -3681,7 +3726,7 @@ struct PlayerView: View {
                                     .frame(width: 78, height: 78)
                                     .glassButton(glass, shape: Circle(), fallback: Theme.accent.opacity(0.95))
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.pressable)
                             .frame(maxWidth: .infinity)
                             GlassSymbolButton(systemName: "forward.fill", size: 48, symbolSize: 20) { p.next() }
                                 .frame(maxWidth: .infinity)
@@ -3703,7 +3748,7 @@ struct PlayerView: View {
                                     .frame(width: 82, height: 82)
                                     .glassButton(glass, shape: Circle(), fallback: Theme.accent)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.pressable)
                             .frame(maxWidth: .infinity)
                             GlassSymbolButton(systemName: "forward.fill", size: 52, symbolSize: 24) { p.next() }
                                 .frame(maxWidth: .infinity)
