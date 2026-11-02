@@ -4384,19 +4384,29 @@ final class ImageLoader {
         cfg.urlCache = URLCache(memoryCapacity: 8 * 1024 * 1024,
                                 diskCapacity: 250 * 1024 * 1024,
                                 diskPath: "covers")
+        // Spotifys Bildserver bleiben bei vielen Anfragen ab und zu 5 bis 20 s haengen.
+        // Mit dem Standard von 60 s blieben solche Cover lange leer.
+        cfg.timeoutIntervalForRequest = 10
         session = URLSession(configuration: cfg)
     }
     private func key(_ url: URL, _ pixels: Int) -> NSString { "\(pixels)|\(url.absoluteString)" as NSString }
     func cached(_ url: URL, pixels: Int) -> UIImage? { cache.object(forKey: key(url, pixels)) }
+    /// Drei Versuche mit kurzer Pause. Ein 4xx kommt nicht wieder, da hilft kein zweiter Versuch.
     func load(_ url: URL, pixels: Int) async -> UIImage? {
         if let c = cached(url, pixels: pixels) { return c }
-        guard let (d, _) = try? await session.data(from: url) else { return nil }
-        let img = await Task.detached(priority: .userInitiated) {
-            ImageLoader.decode(d, pixels: pixels)
-        }.value
-        guard let img, let cg = img.cgImage else { return nil }
-        cache.setObject(img, forKey: key(url, pixels), cost: cg.bytesPerRow * cg.height)
-        return img
+        for attempt in 0..<3 {
+            if Task.isCancelled { return nil }
+            if attempt > 0 { try? await Task.sleep(nanoseconds: UInt64(attempt) * 1_200_000_000) }
+            guard let (d, resp) = try? await session.data(from: url) else { continue }
+            if let code = (resp as? HTTPURLResponse)?.statusCode, (400..<500).contains(code) { return nil }
+            let img = await Task.detached(priority: .userInitiated) {
+                ImageLoader.decode(d, pixels: pixels)
+            }.value
+            guard let img, let cg = img.cgImage else { continue }
+            cache.setObject(img, forKey: key(url, pixels), cost: cg.bytesPerRow * cg.height)
+            return img
+        }
+        return nil
     }
     private static func decode(_ data: Data, pixels: Int) -> UIImage? {
         guard let src = CGImageSourceCreateWithData(data as CFData,
@@ -4448,12 +4458,7 @@ struct Artwork: View {
             guard let u = resolved else { image = nil; return }
             if let c = ImageLoader.shared.cached(u, pixels: pixels) { image = c; return }
             // Das alte Bild bleibt stehen, bis das neue da ist. So blendet der Player von Cover zu Cover.
-            let px = pixels
-            var img = await ImageLoader.shared.load(u, pixels: px)
-            if img == nil, !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 1_500_000_000)
-                img = await ImageLoader.shared.load(u, pixels: px)
-            }
+            let img = await ImageLoader.shared.load(u, pixels: pixels)
             guard !Task.isCancelled, u == resolved else { return }
             withAnimation(.easeOut(duration: 0.22)) { image = img }
         }

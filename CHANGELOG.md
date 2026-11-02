@@ -3,6 +3,11 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.8 — Cover, die zuverlässig laden
+- **Bugfix:** Cover in Listen bleiben nicht mehr leer, wenn Spotifys Bildserver kurz hängt. Jedes Bild bekommt drei Versuche mit 10 s Zeitlimit statt eines Versuchs mit 60 s.
+- **Verbessert (Server):** „Zuletzt“ zeigt wieder Künstlerbilder, die Lieblingssongs sind wieder gefüllt.
+- **Verbessert (Server):** Die Suche stellt exakte Treffer nach oben und Karaoke- oder Tribute-Fassungen nach unten. Fehlt das Original bei Spotify, kommt es von YouTube Music.
+
 ## v1.1.7 — Immer nur ein Gerät spielt
 - **Bugfix:** Startet ein Song am iPhone, stoppt der PC, und umgekehrt.
 - **Verbessert:** Play am iPhone setzt die Wiedergabe hier fort, wenn das andere Gerät steht.
