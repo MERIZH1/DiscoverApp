@@ -3,6 +3,11 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.10 — Ruhigere Oberfläche
+- **Verbessert:** Bibliotheks-Reiter, Songtexte und Hinweise ohne Emojis, schlicht wie der Rest der App.
+- **Verbessert (Server):** Die Startseite erscheint sofort, auch nach längerer Pause. Neue Inhalte lädt der Server im Hintergrund.
+- **Bugfix (Server):** Songs, die nur mit Namen in einer Playlist landeten, bekommen ihr Cover und Album nachgetragen.
+
 ## v1.1.9 — Künstler und Alben als echte Seiten
 - **Verbessert:** „Gehe zu Künstler/Album“ öffnet eine richtige Seite im aktuellen Tab. Die Tab-Leiste bleibt sichtbar, Zurück führt zur vorigen Seite. Aus dem großen Player heraus schließt der sich vorher.
 - **Verbessert:** Der Knopf für neue Empfehlungen steht genau über den Plus-Knöpfen.

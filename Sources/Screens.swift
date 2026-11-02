@@ -2342,7 +2342,7 @@ struct LibraryView: View {
     @State private var loaded = false
     private let tabs: [(String, String)] = [
         ("all", "Alle"), ("subs", "Abos"), ("alpha", "A–Z"),
-        ("radios", "📻 Radios"), ("history", "📜 Verlauf"), ("offline", "⬇️ Offline"),
+        ("radios", "Radios"), ("history", "Verlauf"), ("offline", "Offline"),
     ]
 
     private var shown: [Playlist] {
@@ -4371,7 +4371,7 @@ struct LyricsView: View {
             if parsed.count > 2 { lines = parsed; hasSynced = true; return }
         }
         plain = (ly.lyrics?.isEmpty == false) ? ly.lyrics! :
-                (ly.instrumental == true ? "🎵 Instrumental" : "Kein Songtext gefunden")
+                (ly.instrumental == true ? "Instrumental" : "Kein Songtext gefunden")
     }
 
     /// LRC parsen: [mm:ss.xx] Text  (mehrere Stamps pro Zeile moeglich).
@@ -4413,7 +4413,7 @@ struct LyricsSheet: View {
             guard let t = player.current else { text = "Kein Song"; return }
             if let ly = try? await app.api.lyrics(title: t.name, artist: t.artist, duration: Int(t.durationSec)) {
                 text = (ly.lyrics?.isEmpty == false) ? (ly.lyrics ?? "") :
-                       (ly.instrumental == true ? "🎵 Instrumental" : "Kein Songtext gefunden")
+                       (ly.instrumental == true ? "Instrumental" : "Kein Songtext gefunden")
             } else { text = "Kein Songtext gefunden" }
         }
     }

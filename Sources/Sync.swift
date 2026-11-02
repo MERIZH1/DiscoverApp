@@ -173,7 +173,7 @@ final class SyncManager: ObservableObject {
             case "queue_inject":
                 if let t = c["value"] as? [String: Any], let uri = t["uri"] as? String, let name = t["name"] as? String {
                     p.playNext(Track(uri: uri, name: name, artist: t["artist"] as? String ?? "", image: t["image"] as? String))
-                    injectToast = "📥 \(name) erhalten"
+                    injectToast = "\(name) erhalten"
                     Task { try? await Task.sleep(nanoseconds: 2_500_000_000); injectToast = "" }
                 }
             case "take_over":
