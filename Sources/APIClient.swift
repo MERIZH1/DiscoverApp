@@ -287,6 +287,11 @@ final class APIClient: ObservableObject {
         return cmds
     }
 
+    /// Gerät umbenennen. Leerer Name = Standardname.
+    func syncRenameDevice(_ id: String, name: String) async {
+        _ = try? await data("/api/sync/device-name", method: "POST", json: ["device_id": id, "name": name])
+    }
+
     /// Aktive Geraete des Profils (fuer "Wiedergabe-Gerät wechseln").
     func syncDevices() async -> [SyncDevice] {
         guard let d = try? await data("/api/sync/devices"),

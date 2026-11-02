@@ -177,6 +177,28 @@ struct YTSearchResponse: Codable { let results: [YTCandidate]? }
 struct PlaylistTracksResponse: Codable {
     let name: String?
     let tracks: [Track]
+    // Nur bei Alben
+    var release_date: String? = nil
+    var release_precision: String? = nil
+    var year: String? = nil
+    var album_type: String? = nil
+    var copyright: [String]? = nil
+    var artists: [ArtistRef]? = nil
+
+    /// „16. September 2013“, bei ungenauen Daten nur Monat oder Jahr.
+    var releaseText: String? {
+        guard let iso = release_date, !iso.isEmpty else { return nil }
+        let p = (release_precision ?? "").uppercased()
+        if p == "YEAR" || iso.count == 4 { return String(iso.prefix(4)) }
+        let parse = DateFormatter()
+        parse.locale = Locale(identifier: "en_US_POSIX")
+        parse.dateFormat = iso.count == 7 ? "yyyy-MM" : "yyyy-MM-dd"
+        guard let d = parse.date(from: iso) else { return iso }
+        let out = DateFormatter()
+        out.locale = Locale(identifier: "de_DE")
+        if p == "MONTH" || iso.count == 7 { out.dateFormat = "LLLL yyyy" } else { out.dateStyle = .long }
+        return out.string(from: d)
+    }
 }
 
 
@@ -265,7 +287,46 @@ struct ArtistResponse: Codable {
     let image: String?
     let followers: Int?
     let top_tracks: [Track]?
-    let albums: [Card]?
+    let albums: [ArtistRelease]?
+    // Künstlerseite wie bei Spotify (Server seit 02.11.2026)
+    var avatar: String? = nil
+    var header_image: String? = nil
+    var monthly_listeners: Int? = nil
+    var bio: String? = nil
+    var about_image: String? = nil
+    var color: String? = nil
+    var related: [RelatedArtist]? = nil
+    var discog_popular: [ArtistRelease]? = nil
+    var discog_albums: [ArtistRelease]? = nil
+    var discog_singles: [ArtistRelease]? = nil
+}
+
+/// Album, Single oder EP auf der Künstlerseite.
+struct ArtistRelease: Codable, Identifiable, Hashable {
+    var id: String { uri }
+    let uri: String
+    let name: String
+    let image: String?
+    var year: String? = nil
+    var type: String? = nil
+    /// „2013 · Album“
+    var subtitle: String {
+        let kind: String
+        switch (type ?? "").lowercased() {
+        case "single": kind = "Single"
+        case "ep": kind = "EP"
+        case "compilation": kind = "Compilation"
+        default: kind = "Album"
+        }
+        return [year ?? "", kind].filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+}
+
+struct RelatedArtist: Codable, Identifiable, Hashable {
+    var id: String { uri }
+    let uri: String
+    let name: String
+    let image: String?
 }
 
 // MARK: - Radio

@@ -146,7 +146,12 @@ final class PlayerController: ObservableObject {
     private var original: [Track] = []                       // Anzeige-Reihenfolge (zum Entshufflen)
     @Published private(set) var manualQueue: [Track] = []    // Play-Next / Add-to-Queue (wird zuerst gespielt)
     @Published private(set) var isPlaying = false {
-        didSet { if isPlaying != oldValue { NoiseEngine.shared.musicPlaying = isPlaying } }
+        didSet {
+            if isPlaying != oldValue {
+                NoiseEngine.shared.musicPlaying = isPlaying
+                ConnectKeepAlive.shared.playerChanged(playing: isPlaying)
+            }
+        }
     }
     // currentTime/duration leben in der separaten Uhr (kein Listen-Rerender pro Tick)
     let clock = PlaybackClock()

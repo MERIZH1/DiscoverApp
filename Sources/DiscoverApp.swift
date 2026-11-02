@@ -43,8 +43,12 @@ struct DiscoverApp: App {
         }
         .onChange(of: scenePhase) { phase in
             switch phase {
-            case .active:     AudioSessionManager.activate(); HealthMonitor.shared.startForeground()
-            case .background: HealthMonitor.shared.stopForeground(); HealthMonitor.shared.scheduleBG()
+            case .active:
+                AudioSessionManager.activate(); HealthMonitor.shared.startForeground()
+                ConnectKeepAlive.shared.enteredForeground()
+            case .background:
+                HealthMonitor.shared.stopForeground(); HealthMonitor.shared.scheduleBG()
+                ConnectKeepAlive.shared.enteredBackground()
             default:          break
             }
         }

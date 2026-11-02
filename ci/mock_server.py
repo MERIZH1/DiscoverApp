@@ -96,7 +96,12 @@ def route(path, q):
                 "quick": [item(i) for i in range(1, 7)],
                 "sections": [{"title": f"Rubrik {s}", "subtitle": None, "uri": None,
                               "items": [item(s * 20 + i) for i in range(12)]} for s in range(1, 7)]}
-    if path.startswith("/api/playlist/") or path.startswith("/api/album/"):
+    if path.startswith("/api/album/"):
+        return {"name": "Album", "tracks": [track(i) for i in range(1, 13)], "release_date": "2013-09-16",
+                "release_precision": "DAY", "year": "2013", "album_type": "album",
+                "artists": [{"name": "Kuenstler 2", "uri": "spotify:artist:test2"}],
+                "copyright": ["(C) 2013 Testlabel", "(P) 2013 Testlabel"]}
+    if path.startswith("/api/playlist/"):
         return {"name": "Playlist", "tracks": [track(i) for i in range(1, 101)]}
     if path == "/api/search":
         if q.get("q", [""])[0].startswith("Buch"):
@@ -119,8 +124,15 @@ def route(path, q):
     if path.startswith("/api/podcast/"):
         return {"show": {"name": "Podcast"}, "episodes": []}
     if path.startswith("/api/artist/"):
+        rel = [{"uri": "spotify:artist:test%d" % i, "name": "Kuenstler %d" % i, "image": "/cover/%d.png" % (i + 10)}
+               for i in range(3, 9)]
+        rels = [{"uri": "spotify:album:test%d" % i, "name": "Album %d" % i, "image": "/cover/%d.png" % (i + 20),
+                 "year": str(2010 + i), "type": "album" if i < 4 else "single"} for i in range(1, 7)]
         return {"uri": "spotify:artist:test2", "name": "Kuenstler 2", "image": "/cover/2.png", "followers": 1000,
-                "top_tracks": [track(i) for i in range(1, 6)], "albums": []}
+                "avatar": "/cover/2.png", "header_image": "/cover/1.png", "monthly_listeners": 1234567,
+                "color": "#3d5474", "bio": "Erfundene Bio fuer den Test. " * 8, "about_image": "/cover/2.png",
+                "related": rel, "discog_popular": rels[:4], "discog_albums": rels[:3], "discog_singles": rels[3:],
+                "top_tracks": [track(i) for i in range(1, 8)], "albums": rels}
     if path == "/api/radio-livestream/favorites":
         return {"items": stations()}
     return {}

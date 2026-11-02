@@ -1268,6 +1268,7 @@ struct SettingsView: View {
     @EnvironmentObject var player: PlayerController
     @Environment(\.dismiss) private var dismiss
     @AppStorage("syncDeviceName") private var syncDeviceName = ""
+    @AppStorage(ConnectKeepAlive.minutesKey) private var keepAliveMin = 30
     @State private var name = ""
     @State private var country = ""
     @State private var hideForeign = false
@@ -1360,6 +1361,23 @@ struct SettingsView: View {
                             TextField(UIDevice.current.name, text: $syncDeviceName)
                                 .foregroundStyle(Theme.text).padding(10)
                                 .background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Nach Pause erreichbar").font(.system(size: 15)).foregroundStyle(Theme.text)
+                            Text("So lange lässt sich die Wiedergabe vom PC aufs gesperrte iPhone holen. Kostet etwas Akku.")
+                                .font(.caption2).foregroundStyle(Theme.mute)
+                            Menu {
+                                ForEach([(0, "Aus"), (15, "15 Minuten"), (30, "30 Minuten"), (60, "1 Stunde"), (120, "2 Stunden")], id: \.0) { opt in
+                                    Button(opt.1) { keepAliveMin = opt.0 }
+                                }
+                            } label: {
+                                HStack {
+                                    Text(keepAliveMin == 0 ? "Aus" : (keepAliveMin >= 60 ? "\(keepAliveMin / 60) \(keepAliveMin == 60 ? "Stunde" : "Stunden")" : "\(keepAliveMin) Minuten"))
+                                        .foregroundStyle(Theme.text)
+                                    Spacer()
+                                    Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(Theme.sub)
+                                }.padding(10).background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
                         }
                     }
                     // Wiedergabe
@@ -2688,102 +2706,6 @@ struct RadioSearchSheet: View {
 }
 
 // MARK: - Artist-Seite
-struct ArtistView: View {
-    @EnvironmentObject var app: AppState
-    @Environment(\.playerRef) private var playerRef
-    private var player: PlayerController { playerRef! }
-    @EnvironmentObject var now: NowPlayingState
-    @Environment(\.dismiss) private var dismiss
-    let uri: String; let name: String; let image: String?
-    @State private var resp: ArtistResponse?
-    @State private var retry = 0
-    @State private var loading = true
-    @State private var hero: Color = Theme.elev
-
-    private var top: [Track] { resp?.top_tracks ?? [] }
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                VStack(spacing: 12) {
-                    Artwork(url: resp?.image ?? image, size: 170, corner: 85)
-                        .shadow(color: .black.opacity(0.5), radius: 24, y: 8).padding(.top, 24)
-                    Text(resp?.name ?? name).font(.system(size: 26, weight: .black))
-                        .foregroundStyle(Theme.text).multilineTextAlignment(.center).padding(.horizontal)
-                    if let f = resp?.followers, f > 0 {
-                        Text("\(f.formatted()) Hörer*innen monatlich").font(.system(size: 13)).foregroundStyle(Theme.sub)
-                    }
-                    Button {
-                        if !top.isEmpty { player.play(tracks: top, startAt: 0, contextName: resp?.name ?? name, contextURI: uri) }
-                    } label: {
-                        Image(systemName: "play.fill").font(.system(size: 22)).foregroundStyle(.black)
-                            .frame(width: 56, height: 56).background(Theme.accent).clipShape(Circle())
-                            .shadow(color: Theme.accent.opacity(0.4), radius: 10)
-                    }.padding(.top, 4)
-                }.frame(maxWidth: .infinity).padding(.bottom, 16)
-
-                if !top.isEmpty {
-                    SectionHeader("Beliebt")
-                    LazyVStack(spacing: 0) {
-                        ForEach(Array(top.prefix(10).enumerated()), id: \.offset) { i, t in
-                            NumberedTrackRow(n: i + 1, track: t, playing: now.track?.id == t.id) {
-                                player.play(tracks: top, startAt: i, contextName: resp?.name ?? name, contextURI: uri)
-                            }
-                        }
-                    }.padding(.top, 4)
-                }
-                if let albums = resp?.albums, !albums.isEmpty {
-                    SectionHeader("Alben")
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(alignment: .top, spacing: 14) {
-                            ForEach(albums) { c in
-                                NavigationLink { TrackListView(uri: c.uri, title: c.name, image: c.image, isAlbum: true) } label: {
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        Artwork(url: c.image, size: 150, corner: 6)
-                                        Text(c.name).font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.text)
-                                            .lineLimit(1).frame(width: 150, alignment: .leading)
-                                    }
-                                }.buttonStyle(.pressable)
-                            }
-                        }.padding(.horizontal)
-                    }
-                }
-                Color.clear.frame(height: 130)
-            }
-        }
-        .scrollContentBackground(.hidden)
-        .background(
-            LinearGradient(stops: [
-                .init(color: hero, location: 0),
-                .init(color: hero, location: 0.16),
-                .init(color: hero.opacity(0.32), location: 0.34),
-                .init(color: Theme.bg, location: 0.52)],
-                startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
-        )
-        .navigationTitle("").navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .toolbarBackground(.hidden, for: .navigationBar)
-        .toolbar { ToolbarItem(placement: .topBarLeading) {
-            Button { dismiss() } label: { Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold)).foregroundStyle(hero.isLight ? .black : Theme.text) }
-                .accessibilityLabel("Zurück")
-        } }
-        .overlay {
-            if loading { LoadingView() } else if resp == nil { LoadFailedView { retry += 1 } }
-        }
-        .animation(.easeOut(duration: 0.25), value: loading)
-        .task(id: retry) {
-            if resp != nil { return }   // zurueck von einer Unterseite: Seite bleibt stehen
-            loading = true
-            let absImg = image.flatMap { app.api.absoluteURL($0)?.absoluteString } ?? image
-            if let c = await averageColor(absImg) { hero = c }
-            resp = try? await app.api.artist(uri)
-            if Task.isCancelled { return }
-            loading = false
-        }
-    }
-}
-
 // MARK: - Track-Liste (Playlist/Album-Detail)
 struct TrackListView: View {
     @EnvironmentObject var app: AppState
@@ -2811,6 +2733,7 @@ struct TrackListView: View {
     @State private var selected: Set<String> = []
     @State private var showMultiAdd = false
     @State private var showYouTubeShare = false
+    @State private var albumInfo: PlaylistTracksResponse?
     private var selectedTracks: [Track] { (tracks + recs).filter { selected.contains($0.uri) } }
     private func toggleSel(_ uri: String) {
         if selected.contains(uri) { selected.remove(uri) } else { selected.insert(uri) }
@@ -2870,13 +2793,24 @@ struct TrackListView: View {
     }
 
     private var metaText: String {
-        if isAlbum { return "Album · \(tracks.count) Songs" }
         let total = tracks.reduce(0) { $0 + Int($1.durationSec) }
-        var s = "Playlist · \(tracks.count) Songs"
-        if total > 0 {
-            let h = total / 3600, m = (total % 3600) / 60
-            s += " · " + (h > 0 ? "\(h)h \(m)min" : "\(m)min")
+        let h = total / 3600, m = (total % 3600) / 60
+        let dur = total > 0 ? (h > 0 ? "\(h) Std. \(m) Min." : "\(m) Min.") : ""
+        if isAlbum {
+            // Wie bei Spotify: „Album · Avicii · 2013 · 10 Songs, 47 Min.“
+            let kind: String
+            switch (albumInfo?.album_type ?? "").lowercased() {
+            case "single": kind = "Single"
+            case "ep": kind = "EP"
+            case "compilation": kind = "Compilation"
+            default: kind = "Album"
+            }
+            let artists = (albumInfo?.artists ?? []).map(\.name).joined(separator: ", ")
+            let songs = tracks.isEmpty ? "" : "\(tracks.count) \(tracks.count == 1 ? "Song" : "Songs")" + (dur.isEmpty ? "" : ", \(dur)")
+            return [kind, artists, albumInfo?.year ?? "", songs].filter { !$0.isEmpty }.joined(separator: " · ")
         }
+        var s = "Playlist · \(tracks.count) Songs"
+        if !dur.isEmpty { s += " · " + dur }
         return s
     }
 
@@ -2939,7 +2873,7 @@ struct TrackListView: View {
                     HStack(spacing: 5) {
                         Text(metaText).font(.system(size: 13)).foregroundStyle(Theme.sub)
                         if isSubscribed && !isAlbum {
-                            Text("· 🔔 Abo").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.accent)
+                            Text("· Abo").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.accent)
                         }
                     }
                     // Aktions-Reihe
@@ -3000,6 +2934,19 @@ struct TrackListView: View {
                         }
                     }
                 }.padding(.top, 6)
+
+                if isAlbum, !tracks.isEmpty, let info = albumInfo, info.releaseText != nil || !(info.copyright ?? []).isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        if let d = info.releaseText {
+                            Text(d).font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.text)
+                        }
+                        ForEach(info.copyright ?? [], id: \.self) { c in
+                            Text(c).font(.system(size: 11)).foregroundStyle(Theme.sub)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal).padding(.top, 18)
+                }
 
                 // Leer/Fehler -> erneut versuchen
                 if tracks.isEmpty && !loading {
@@ -3129,6 +3076,7 @@ struct TrackListView: View {
                 if let c = await averageColor(absImg) { hero = c }
             }
             let first = isAlbum ? try? await app.api.albumTracks(uri) : try? await app.api.playlistTracks(uri, check: true)
+            if isAlbum { albumInfo = first }
             var answered = first != nil
             var t = first?.tracks ?? []
             // Fallback: History-Items sind manchmal falsch klassifiziert (Album<->Playlist)

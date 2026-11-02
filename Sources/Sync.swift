@@ -33,6 +33,8 @@ struct SyncDevice: Codable, Identifiable {
     let device_id: String
     let name: String
     let is_owner: Bool
+    /// iOS hat die App eingefroren. Ein Befehl wartet 2 Minuten, bis sie wieder läuft.
+    var asleep: Bool? = nil
     var id: String { device_id }
 }
 struct SyncDevicesResponse: Codable { let devices: [SyncDevice] }
@@ -205,15 +207,18 @@ final class SyncManager: ObservableObject {
 
     // MARK: - Wiedergabe-Geraet wechseln (Connect-Style)
     func devices() async -> [SyncDevice] { await api.syncDevices() }
+    func renameDevice(_ id: String, name: String) async { await api.syncRenameDevice(id, name: name) }
 
     /// Verschiebt die laufende Wiedergabe auf ein anderes Geraet.
-    func switchPlaybackTo(_ targetID: String, name: String) {
+    func switchPlaybackTo(_ targetID: String, name: String, asleep: Bool = false) {
         guard targetID != deviceID else { return }
         let ownerID = remote?.device_id ?? ((player?.isPlaying ?? false) ? deviceID : nil)
         Task {
             // Falls wir selbst Owner sind: State frisch pushen, damit das Ziel ihn holen kann.
             if remote == nil, let p = player, let snap = snapshot(p) { await api.syncPushState(snap) }
             await api.syncSendCommand("take_over", value: nil, target: targetID, fromID: deviceID)
+            // Schlafendes Ziel: hier weiterspielen, bis es übernimmt und uns selbst stoppt.
+            if asleep { return }
             if let ownerID, ownerID != targetID {
                 if ownerID == deviceID { player?.pause() }
                 else { await api.syncSendCommand("pause", value: nil, target: ownerID, fromID: deviceID) }
@@ -261,6 +266,9 @@ final class SyncManager: ObservableObject {
         } else { p.handoffPosition = 0; return }
         p.shuffle = (s.shuffle == "on")   // UI-Flag nachziehen (mischt nicht neu)
         remote = nil
+        if let src = s.device_id, src != deviceID {
+            await api.syncSendCommand("pause", value: nil, target: src, fromID: deviceID)
+        }
     }
 }
 
@@ -270,6 +278,8 @@ struct DevicePickerSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var devices: [SyncDevice] = []
     @State private var loading = true
+    @State private var renaming: SyncDevice?
+    @State private var newName = ""
     var body: some View {
         NavigationStack {
             List {
@@ -287,7 +297,7 @@ struct DevicePickerSheet: View {
                             if dev.device_id == sync.deviceID {
                                 sync.pullPlaybackHere()        // dieses Geraet holt die Wiedergabe her
                             } else {
-                                sync.switchPlaybackTo(dev.device_id, name: dev.name)
+                                sync.switchPlaybackTo(dev.device_id, name: dev.name, asleep: dev.asleep == true)
                             }
                             Haptics.tap(); dismiss()
                         } label: {
@@ -299,13 +309,20 @@ struct DevicePickerSheet: View {
                                     Text(dev.name + (dev.device_id == sync.deviceID ? " (dieses Gerät)" : ""))
                                         .font(.system(size: 15, weight: .semibold))
                                         .foregroundStyle(dev.is_owner ? Theme.accent : Theme.text)
-                                    Text(dev.is_owner ? "● spielt gerade" : "bereit")
+                                    Text(dev.is_owner ? "Spielt gerade" : (dev.asleep == true ? "Schläft · übernimmt beim Öffnen" : "Bereit"))
                                         .font(.system(size: 12)).foregroundStyle(Theme.sub)
                                 }
+                                .opacity(dev.asleep == true ? 0.6 : 1)
                                 Spacer()
                                 if dev.is_owner { Image(systemName: "speaker.wave.2.fill").foregroundStyle(Theme.accent) }
                             }.contentShape(Rectangle())
                         }.buttonStyle(.plain)
+                        .swipeActions(edge: .trailing) {
+                            Button("Umbenennen") { newName = dev.name; renaming = dev }.tint(Theme.input)
+                        }
+                        .contextMenu {
+                            Button { newName = dev.name; renaming = dev } label: { Label("Umbenennen", systemImage: "pencil") }
+                        }
                     }
                 }
             }
@@ -316,6 +333,18 @@ struct DevicePickerSheet: View {
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Fertig") { dismiss() } } }
         }
         .task { loading = true; devices = await sync.devices(); loading = false }
+        .alert("Gerät umbenennen", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+            TextField("Name", text: $newName)
+            Button("Sichern") {
+                guard let dev = renaming else { return }
+                let name = newName.trimmingCharacters(in: .whitespaces)
+                Task {
+                    await sync.renameDevice(dev.device_id, name: name)
+                    devices = await sync.devices()
+                }
+            }
+            Button("Abbrechen", role: .cancel) {}
+        } message: { Text("Der Name gilt auf allen Geräten.") }
     }
 }
 

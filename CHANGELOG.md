@@ -3,6 +3,13 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.11 — Künstlerseiten wie bei Spotify
+- **Neu:** Künstlerseiten mit großem Titelbild, monatlichen Hörer*innen, Beliebt, Veröffentlichungen, „Fans mögen auch“ und „Über“.
+- **Neu:** Alben zeigen Art, Jahr und Dauer oben und das genaue Erscheinungsdatum mit Copyright unter den Songs.
+- **Neu:** Nach einer Pause bleibt die App eine Weile erreichbar. „Auf iPhone abspielen“ vom PC kommt so auch bei gesperrtem iPhone an. Einstellbar unter Gerät (Sync), Standard 30 Minuten.
+- **Neu:** Geräte lassen sich in der Geräteliste umbenennen (nach links wischen). Der Name gilt überall.
+- **Verbessert:** Schläft ein Gerät, steht das in der Liste. Der Befehl wartet 2 Minuten, bis du Discover dort öffnest.
+
 ## v1.1.10 — Ruhigere Oberfläche
 - **Verbessert:** Bibliotheks-Reiter, Songtexte und Hinweise ohne Emojis, schlicht wie der Rest der App.
 - **Verbessert (Server):** Die Startseite erscheint sofort, auch nach längerer Pause. Neue Inhalte lädt der Server im Hintergrund.
