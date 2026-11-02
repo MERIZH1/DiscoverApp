@@ -56,6 +56,8 @@ struct ArtistView: View {
         }
         .ignoresSafeArea(edges: .top)
         .scrollContentBackground(.hidden)
+        // iOS 26 dunkelt sonst den Streifen unter der Leiste ab, quer durchs Titelbild
+        .scrollEdgeEffectHidden(!collapsed, for: .top)
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle("").navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)

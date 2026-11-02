@@ -287,6 +287,31 @@ final class APIClient: ObservableObject {
         return cmds
     }
 
+    struct SyncWaitResult {
+        let commands: [[String: Any]]
+        let state: RemoteState?
+        /// false: Der Server hatte keinen Warteplatz frei und hat sofort geantwortet.
+        let wait: Bool
+    }
+    /// Wartet bis zu 12 s auf Befehle oder einen neuen Stand eines anderen Geräts.
+    /// `since` ist updated_at des zuletzt gesehenen Stands. nil bei Netzfehler.
+    func syncWait(deviceID: String, name: String, since: Double) async -> SyncWaitResult? {
+        let path = "/api/sync/wait?device_id=\(enc(deviceID))&name=\(enc(name))&since=\(Int64(since))&timeout=12"
+        guard let url = URL(string: base + path) else { return nil }
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 25   // die Sitzung bricht sonst nach 15 s Stille ab
+        if let pid = profileId { req.setValue(pid, forHTTPHeaderField: "X-Profile-Id") }
+        guard let res = try? await session.data(for: req),
+              (res.1 as? HTTPURLResponse)?.statusCode == 200,
+              let obj = (try? JSONSerialization.jsonObject(with: res.0)) as? [String: Any] else { return nil }
+        var state: RemoteState?
+        if let raw = obj["state"] as? [String: Any], let sd = try? JSONSerialization.data(withJSONObject: raw) {
+            state = try? JSONDecoder().decode(RemoteState.self, from: sd)
+        }
+        return SyncWaitResult(commands: obj["commands"] as? [[String: Any]] ?? [],
+                              state: state, wait: obj["wait"] as? Bool ?? false)
+    }
+
     /// Gerät umbenennen. Leerer Name = Standardname.
     func syncRenameDevice(_ id: String, name: String) async {
         _ = try? await data("/api/sync/device-name", method: "POST", json: ["device_id": id, "name": name])

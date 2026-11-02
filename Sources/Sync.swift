@@ -21,9 +21,10 @@ struct RemoteState: Codable {
     let queue_len: Int?
     let queue_tracks: [SyncTrack]?
     let owner_seen_at: Double?   // vom Server gesetzt (ms) -> Frische-Check
+    var updated_at: Double? = nil   // vom Server gesetzt (ms), Merker für /api/sync/wait
     enum CodingKeys: String, CodingKey {
         case device_id, device_name, track, position, duration, playing, shuffle
-        case queue_idx, queue_len, queue_tracks, owner_seen_at
+        case queue_idx, queue_len, queue_tracks, owner_seen_at, updated_at
         case repeatMode = "repeat"
     }
 }
@@ -57,6 +58,8 @@ final class SyncManager: ObservableObject {
         return custom.isEmpty ? fallbackName : custom
     }
     private var loop: Task<Void, Never>?
+    private var waiter: Task<Void, Never>?
+    private var since: Double = 0
 
     init(api: APIClient, player: PlayerController) {
         self.api = api
@@ -79,25 +82,32 @@ final class SyncManager: ObservableObject {
                 try? await Task.sleep(nanoseconds: ns)
             }
         }
+        waiter = Task { [weak self] in
+            var fails: UInt64 = 0
+            while !Task.isCancelled {
+                guard let ok = await self?.waitOnce() else { return }
+                fails = ok ? 0 : min(fails + 1, 10)
+                if fails > 0 { try? await Task.sleep(nanoseconds: 1_500_000_000 * fails) }
+            }
+        }
     }
-    func stop() { loop?.cancel(); loop = nil }
+    func stop() {
+        loop?.cancel(); loop = nil
+        waiter?.cancel(); waiter = nil
+    }
 
     private var wasOwner = false
     private var lastPush = 0.0
-    private var lastPoll = 0.0
 
-    /// Fuehrt einen Sync-Schritt aus und gibt das naechste Poll-Intervall (ns) zurueck:
-    /// schnell (1s) wenn aktiv (spielt/Remote), sonst gemaechlich (2.5s) — schont Akku/Server.
+    /// Heartbeat: pusht den eigenen Stand, solange hier Musik läuft, und gibt das nächste
+    /// Intervall (ns) zurück. Befehle und der Stand anderer Geräte kommen über waitOnce().
     @discardableResult
     private func tick() async -> UInt64 {
         let fast: UInt64 = 1_000_000_000, slow: UInt64 = 2_500_000_000
         guard let p = player else { return slow }
         let now = Date().timeIntervalSince1970
         if p.isPlaying && p.current != nil {
-            // Commands JEDE Sekunde abarbeiten -> schnelle Reaktion auf Remote-Tasten.
-            let did = await consumeCommands(p)
-            // State sofort pushen wenn ein Command kam, sonst Heartbeat alle 2.5s.
-            if did || now - lastPush >= 2.4 {
+            if now - lastPush >= 2.4 {
                 if let snap = snapshot(p) { await api.syncPushState(snap); lastPush = now }
             }
             wasOwner = true
@@ -114,28 +124,41 @@ final class SyncManager: ObservableObject {
                 if let snap = snapshot(p) { await api.syncPushState(snap); lastPush = now }
                 wasOwner = false
             }
-            let did = await consumeCommands(p)   // play / queue_inject auch pausiert annehmen
-            if did, let snap = snapshot(p) { await api.syncPushState(snap); lastPush = now }
-            // Remote-State pollen (etwas gedrosselt)
-            if now - lastPoll >= 1.4 {
-                lastPoll = now
-                let s = await api.syncGetState()
-                let nowMs = now * 1000
-                if let s, s.device_id != deviceID, let seen = s.owner_seen_at {
-                    // Frische-Fenster: ein aktiv SPIELENDES Remote toleriert ein paar
-                    // verpasste Heartbeats (Netz-Hiccup, Heartbeat ~2.5s), ein
-                    // pausiertes/gestopptes Remote verschwindet dagegen zuegig — sonst
-                    // klebt das Banner nach dem Stoppen am PC viel zu lange (vorher 15s).
-                    let age = nowMs - seen
-                    let maxAge: Double = (s.playing == true) ? 6000 : 3000
-                    remote = (age < maxAge) ? s : nil
-                } else {
-                    remote = nil
-                }
-            }
+            // Meldet sich das andere Gerät nicht mehr, verschwindet das Banner trotzdem.
+            if let r = remote { applyRemote(r) }
         }
-        // aktiv (spielt selbst oder Remote sichtbar) -> schnell weiterpollen
         return (p.isPlaying || remote != nil) ? fast : slow
+    }
+
+    /// Push statt Abfragen (02.11.2026): Der Server antwortet erst, wenn ein Befehl für
+    /// dieses Gerät da ist, ein anderes Gerät seinen Stand ändert oder 12 s um sind.
+    /// Vorher fragte die App jede Sekunde nach Befehlen und alle 1,4 s nach dem Stand.
+    /// false bei Netzfehler, dann wartet die Schleife etwas länger.
+    private func waitOnce() async -> Bool {
+        guard let r = await api.syncWait(deviceID: deviceID, name: deviceName, since: since) else { return false }
+        if let p = player, !r.commands.isEmpty {
+            await execute(r.commands, p)
+            if let snap = snapshot(p) { await api.syncPushState(snap); lastPush = Date().timeIntervalSince1970 }
+        }
+        if let s = r.state {
+            if let u = s.updated_at { since = u }
+            applyRemote(s)
+        }
+        // Kein freier Warteplatz auf dem Server: wie früher kurz warten
+        if !r.wait { try? await Task.sleep(nanoseconds: 1_500_000_000) }
+        return true
+    }
+
+    /// Frische-Fenster: ein aktiv SPIELENDES Remote toleriert ein paar verpasste
+    /// Heartbeats (Netz-Hiccup, Heartbeat ~2.5s), ein pausiertes/gestopptes Remote
+    /// verschwindet dagegen zuegig, sonst klebt das Banner nach dem Stoppen am PC.
+    private func applyRemote(_ s: RemoteState) {
+        // Spielt es hier, kümmert sich tick() um das andere Gerät
+        if player?.isPlaying ?? false { return }
+        guard s.device_id != deviceID, let seen = s.owner_seen_at else { remote = nil; return }
+        let age = Date().timeIntervalSince1970 * 1000 - seen
+        let maxAge: Double = (s.playing == true) ? 6000 : 3000
+        remote = (age < maxAge) ? s : nil
     }
 
     private func snapshot(_ p: PlayerController) -> [String: Any]? {
@@ -154,9 +177,7 @@ final class SyncManager: ObservableObject {
         ]
     }
 
-    @discardableResult
-    private func consumeCommands(_ p: PlayerController) async -> Bool {
-        let cmds = await api.syncGetCommands(deviceID: deviceID, name: deviceName)
+    private func execute(_ cmds: [[String: Any]], _ p: PlayerController) async {
         for c in cmds {
             switch c["cmd"] as? String ?? "" {
             case "play":  p.resume()
@@ -183,7 +204,6 @@ final class SyncManager: ObservableObject {
             default: break
             }
         }
-        return !cmds.isEmpty
     }
 
     // MARK: - Remote-Steuerung (dieses Geraet ist Fernbedienung)

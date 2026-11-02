@@ -3,6 +3,10 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.13 — Geräte reagieren sofort
+- **Verbessert:** Befehle von anderen Geräten (Pause, Weiter, Hier abspielen) kommen sofort an statt nach bis zu einer Sekunde. Die App fragt den Server dafür nur noch alle 12 Sekunden statt jede Sekunde, das schont den Akku.
+- **Bugfix:** Kein dunkler Streifen mehr oben im Titelbild der Künstlerseite.
+
 ## v1.1.12 — Titelbild bis ganz oben
 - **Bugfix:** Das Titelbild auf Künstlerseiten reicht jetzt bis unter die Statusleiste, oben bleibt kein farbiger Streifen mehr.
 
