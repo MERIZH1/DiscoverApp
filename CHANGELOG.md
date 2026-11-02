@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.12 — Titelbild bis ganz oben
+- **Bugfix:** Das Titelbild auf Künstlerseiten reicht jetzt bis unter die Statusleiste, oben bleibt kein farbiger Streifen mehr.
+
 ## v1.1.11 — Künstlerseiten wie bei Spotify
 - **Neu:** Künstlerseiten mit großem Titelbild, monatlichen Hörer*innen, Beliebt, Veröffentlichungen, „Fans mögen auch“ und „Über“.
 - **Neu:** Alben zeigen Art, Jahr und Dauer oben und das genaue Erscheinungsdatum mit Copyright unter den Songs.

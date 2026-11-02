@@ -20,6 +20,11 @@ struct ArtistView: View {
     @State private var showAllTop = false
     @State private var bioOpen = false
     @State private var scrollY: CGFloat = 0
+    /// Höhe von Statusleiste und Navigationsleiste. Die ScrollView rückt ihren Inhalt um
+    /// diesen Wert ein, das Titelbild soll aber bis ganz nach oben reichen.
+    @State private var insetScroll: CGFloat = 0
+    @State private var insetSafe: CGFloat = 0
+    private var topInset: CGFloat { max(insetScroll, insetSafe) }
 
     private let heroH: CGFloat = 380
     private var top: [Track] { resp?.top_tracks ?? [] }
@@ -42,6 +47,12 @@ struct ArtistView: View {
         }
         .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { _, y in
             scrollY = y
+        }
+        .onScrollGeometryChange(for: CGFloat.self) { $0.contentInsets.top } action: { _, v in
+            insetScroll = v
+        }
+        .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { v in
+            insetSafe = v
         }
         .ignoresSafeArea(edges: .top)
         .scrollContentBackground(.hidden)
@@ -88,8 +99,9 @@ struct ArtistView: View {
     // MARK: Titelbild
     private var hero: some View {
         GeometryReader { g in
-            let minY = g.frame(in: .scrollView).minY
-            let stretch = max(0, minY)
+            // scrollY ist 0 in Ruhe und negativ beim Herunterziehen. Das Bild reicht immer bis
+            // unter die Statusleiste (topInset) und wächst beim Ziehen mit.
+            let stretch = topInset + max(0, -scrollY)
             ZStack(alignment: .bottomLeading) {
                 HeroFill(url: heroURL, width: g.size.width, height: heroH + stretch)
                 LinearGradient(stops: [
@@ -103,7 +115,7 @@ struct ArtistView: View {
                     .lineLimit(2).minimumScaleFactor(0.5)
                     .shadow(color: .black.opacity(0.35), radius: 12, y: 2)
                     .padding(.horizontal, 16).padding(.bottom, 14)
-                    .opacity(max(0, 1 - Double(max(0, -minY)) / 220))
+                    .opacity(max(0, 1 - Double(max(0, scrollY)) / 220))
             }
             .frame(width: g.size.width, height: heroH + stretch)
             .offset(y: -stretch)
