@@ -3685,6 +3685,7 @@ struct PlayerView: View {
         }
     }
     @EnvironmentObject var player: PlayerController
+    @EnvironmentObject var sync: SyncManager
     @EnvironmentObject var downloads: DownloadManager
     @EnvironmentObject var clock: PlaybackClock   // Live-Position (haengt nur hier, nicht an Listen)
     @Environment(\.liquidGlass) private var glass
@@ -3868,6 +3869,7 @@ struct PlayerView: View {
                             GlassSymbolButton(systemName: "shuffle", active: p.shuffle, size: 48, symbolSize: 19) {
                                 Haptics.tap()
                                 p.toggleShuffle()
+                                sync.forwardModes(p)
                                 showModeHint(p.shuffle ? "Zufallswiedergabe an" : "Zufallswiedergabe aus")
                             }
                                 .accessibilityIdentifier("player.shuffle")
@@ -3888,6 +3890,7 @@ struct PlayerView: View {
                             GlassSymbolButton(systemName: p.repeatMode == .one ? "repeat.1" : "repeat", active: p.repeatMode != .off, size: 48, symbolSize: 19) {
                                 Haptics.tap()
                                 p.cycleRepeat()
+                                sync.forwardModes(p)
                                 showModeHint(repeatLabel(p.repeatMode))
                             }
                                 .accessibilityIdentifier("player.repeat")

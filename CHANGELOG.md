@@ -3,6 +3,10 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.3 — Modus-Knöpfe zwischen Geräten
+- **Bugfix:** Spielt ein anderes Gerät, gelten Shuffle und Wiederholen dort.
+- **Bugfix:** Per Fernbedienung gesetzte Modi bleiben nach einem Neustart erhalten.
+
 ## v1.1.2 — Songs starten sofort
 - **Verbessert:** Neue YouTube-Songs starten über HLS statt über die Rohdatei, die iOS sekundenlang abtastet. Die doppelte Songlänge fällt damit weg.
 - **Verbessert:** Der Player wartet nicht mehr auf Vorrat, bevor er losspielt.

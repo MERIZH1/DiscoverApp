@@ -1058,7 +1058,8 @@ final class PlayerController: ObservableObject {
             }
         }
     }
-    func cycleRepeat() { repeatMode = repeatMode == .off ? .all : (repeatMode == .all ? .one : .off); saveMode() }
+    func cycleRepeat() { setRepeat(repeatMode == .off ? .all : (repeatMode == .all ? .one : .off)) }
+    func setRepeat(_ m: RepeatMode) { repeatMode = m; saveMode() }
 
     /// Relativ vor/zurueck springen (Podcast ±10s).
     func skip(_ delta: Double) {

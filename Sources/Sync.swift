@@ -162,7 +162,7 @@ final class SyncManager: ObservableObject {
                 if let v = c["value"] as? String, (v != "off") != p.shuffle { p.toggleShuffle() }
             case "set_repeat":
                 if let v = c["value"] as? String {
-                    p.repeatMode = (v == "one" ? .one : (v == "all" ? .all : .off))
+                    p.setRepeat(v == "one" ? .one : (v == "all" ? .all : .off))
                 }
             case "queue_inject":
                 if let t = c["value"] as? [String: Any], let uri = t["uri"] as? String, let name = t["name"] as? String {
@@ -187,6 +187,12 @@ final class SyncManager: ObservableObject {
     func remoteNext() { send("next") }
     func remotePrev() { send("prev") }
     func remoteSeek(_ t: Double) { send("seek", value: t) }
+    /// Spielt ein anderes Geraet, gelten Shuffle und Wiederholen dort.
+    func forwardModes(_ p: PlayerController) {
+        guard remote?.playing == true else { return }
+        send("set_shuffle", value: p.shuffle ? "on" : "off")
+        send("set_repeat", value: p.repeatMode == .one ? "one" : (p.repeatMode == .all ? "all" : "off"))
+    }
 
     // MARK: - Wiedergabe-Geraet wechseln (Connect-Style)
     func devices() async -> [SyncDevice] { await api.syncDevices() }
