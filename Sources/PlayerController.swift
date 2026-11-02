@@ -153,6 +153,13 @@ final class PlayerController: ObservableObject {
     var currentTime: Double { get { clock.time } set { clock.time = newValue } }
     var duration: Double { get { clock.duration } set { clock.duration = newValue } }
     @Published private(set) var loading = false
+    /// Soll spielen, aber es kommt noch kein Ton. Die Knoepfe zeigen dann Laden statt Pause.
+    @Published private(set) var buffering = false
+    private var outputObs: [NSKeyValueObservation] = []
+    private func updateBuffering() {
+        let b = wantPlay && (player.timeControlStatus != .playing || player.currentItem?.status != .readyToPlay)
+        if b != buffering { buffering = b }
+    }
     @Published var shuffle = false
     @Published var repeatMode: RepeatMode = .off
     @Published private(set) var isRadio = false { didSet { syncNowState() } }
@@ -263,6 +270,11 @@ final class PlayerController: ObservableObject {
         AudioSessionManager.activate()
         setupRemoteCommands()
         addTimeObserver()
+        outputObs = [playerA, playerB].map { candidate in
+            candidate.observe(\.timeControlStatus) { [weak self] _, _ in
+                Task { @MainActor in self?.updateBuffering() }
+            }
+        }
     }
 
     private var ctxName = ""
@@ -498,7 +510,7 @@ final class PlayerController: ObservableObject {
     private func startOutput() {
         if isRadio { player.play() } else { player.playImmediately(atRate: Float(playbackRate)) }
     }
-    func pause() { wantPlay = false; player.pause(); isPlaying = false; updateRate() }
+    func pause() { wantPlay = false; player.pause(); isPlaying = false; updateBuffering(); updateRate() }
 
     /// Gesamten Player wiederherstellen (ganze Queue, Mini-Player sofort da).
     func restoreLast() {
@@ -1241,10 +1253,14 @@ final class PlayerController: ObservableObject {
     /// naechsten Song. Der Streak-Cap stoppt nach zu vielen Fehlern in Folge
     /// (z.B. Server komplett down) mit Pause statt einer Endlos-Skip-Schleife.
     private func skipAfterStreamFailure() {
-        guard wantPlay, !isRadio, queue.count > 1 else { return }
+        guard wantPlay, !isRadio, queue.count > 1 else {
+            // Kein naechster Song: ehrlich anhalten, sonst zeigt der Knopf Pause, obwohl nichts spielt.
+            if !isRadio { loading = false; pause() }
+            return
+        }
         if source == "youtube" {
             loading = false
-            isPlaying = false
+            pause()
             return
         }
         streamFailStreak += 1
@@ -1318,6 +1334,7 @@ final class PlayerController: ObservableObject {
             guard let self else { return }
             Task { @MainActor in
                 guard self.player.currentItem === it else { return }
+                self.updateBuffering()
                 if it.status == .readyToPlay {
                     self.hlsWatchdog?.cancel()
                     it.preferredForwardBufferDuration = 0

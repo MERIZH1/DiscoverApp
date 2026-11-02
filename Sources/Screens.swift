@@ -3572,7 +3572,7 @@ struct NowPlayingBar: View {
                         if showRemote {
                             Image(systemName: "wifi").font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.accent)
                             Text("Auf \(remote?.device_name ?? "Gerät")").font(.caption).foregroundStyle(Theme.accent).lineLimit(1)
-                        } else if player.loading && !player.isRadio {
+                        } else if (player.loading || player.buffering) && !player.isRadio {
                             ProgressView().controlSize(.mini).tint(Theme.sub)
                             Text(bufferLabel).font(.caption).foregroundStyle(Theme.sub).lineLimit(1)
                         } else {
@@ -3877,13 +3877,21 @@ struct PlayerView: View {
                             GlassSymbolButton(systemName: "backward.fill", size: 52, symbolSize: 24) { p.prev() }
                                 .frame(maxWidth: .infinity)
                             Button { p.toggle() } label: {
-                                Image(systemName: p.isPlaying ? "pause.fill" : "play.fill")
-                                    .font(.system(size: 32, weight: .bold))
-                                    .foregroundStyle(glass ? Theme.text : .black)
-                                    .frame(width: 82, height: 82)
-                                    .glassButton(glass, shape: Circle(), fallback: Theme.accent)
+                                Group {
+                                    if p.isPlaying && (p.loading || p.buffering) {
+                                        ProgressView().controlSize(.large).tint(glass ? Theme.text : .black)
+                                    } else {
+                                        Image(systemName: p.isPlaying ? "pause.fill" : "play.fill")
+                                            .font(.system(size: 32, weight: .bold))
+                                            .foregroundStyle(glass ? Theme.text : .black)
+                                    }
+                                }
+                                .frame(width: 82, height: 82)
+                                .glassButton(glass, shape: Circle(), fallback: Theme.accent)
                             }
                             .buttonStyle(.pressable)
+                            .accessibilityIdentifier("player.play")
+                            .accessibilityValue(p.isPlaying ? "spielt" : "angehalten")
                             .frame(maxWidth: .infinity)
                             GlassSymbolButton(systemName: "forward.fill", size: 52, symbolSize: 24) { p.next() }
                                 .frame(maxWidth: .infinity)

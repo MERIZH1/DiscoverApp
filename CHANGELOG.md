@@ -3,6 +3,10 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.4 — Ehrlicher Player
+- **Bugfix:** Spielt ein Song nicht, zeigt der Hauptknopf nicht mehr Pause.
+- **Verbessert:** Solange kein Ton kommt, zeigen die Knöpfe Laden.
+
 ## v1.1.3 — Modus-Knöpfe zwischen Geräten
 - **Bugfix:** Spielt ein anderes Gerät, gelten Shuffle und Wiederholen dort.
 - **Bugfix:** Per Fernbedienung gesetzte Modi bleiben nach einem Neustart erhalten.

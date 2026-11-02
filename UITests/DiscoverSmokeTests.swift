@@ -91,6 +91,26 @@ final class DiscoverSmokeTests: XCTestCase {
         }
     }
 
+    /// Song ohne Ton und ohne Nachfolger: Der Player darf nicht behaupten, er spiele.
+    func testToterSong() {
+        tab("Suchen")
+        let feld = app.searchFields.firstMatch.exists ? app.searchFields.firstMatch : app.textFields.firstMatch
+        XCTAssertTrue(feld.waitForExistence(timeout: 10))
+        feld.tap()
+        feld.typeText("Tot")
+        app.keyboards.buttons["search"].firstMatch.tap()
+        let song = app.staticTexts["Toter Song"].firstMatch
+        XCTAssertTrue(song.waitForExistence(timeout: 10))
+        song.tap()
+        sleep(8)
+        shot("30-toter-song")
+        app.staticTexts["Toter Song"].firstMatch.tap()
+        let play = app.buttons["player.play"].firstMatch
+        XCTAssertTrue(play.waitForExistence(timeout: 5))
+        XCTAssertEqual(play.value as? String, "angehalten")
+        shot("31-toter-song-player")
+    }
+
     func testRadio() {
         tab("Radio")
         shot("10-radio")

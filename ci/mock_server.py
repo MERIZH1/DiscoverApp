@@ -99,6 +99,8 @@ def route(path, q):
     if path.startswith("/api/playlist/") or path.startswith("/api/album/"):
         return {"name": "Playlist", "tracks": [track(i) for i in range(1, 101)]}
     if path == "/api/search":
+        if q.get("q", [""])[0].startswith("Tot"):
+            return {"tracks": [dict(track(1), name="Toter Song", navidromeId="")], "artists": [], "albums": [], "playlists": []}
         return {"tracks": [track(i) for i in range(1, 11)],
                 "artists": [{"uri": f"spotify:artist:test{i}", "name": f"Kuenstler {i}",
                              "image": f"/cover/{i}.png"} for i in range(1, 6)],
@@ -129,6 +131,8 @@ class H(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/cover/(\d+)\.png", u.path)
         if m:
             return self.send(png(int(m.group(1))), "image/png", extra={"Cache-Control": "max-age=86400"})
+        if u.path == "/dead.wav":
+            return self.send(b"{}", code=502)
         if u.path == "/hls.m3u8":
             return self.send(hls(), "application/vnd.apple.mpegurl")
         if u.path == "/seg":
@@ -152,6 +156,8 @@ class H(BaseHTTPRequestHandler):
         body = self.rfile.read(int(self.headers.get("Content-Length") or 0))
         if urlparse(self.path).path == "/api/bglog":
             print("BGLOG", f"{time.time():.3f}", body[:220].decode("utf-8", "replace"), flush=True)
+        if urlparse(self.path).path == "/api/stream-url" and b"Toter Song" in body:
+            return self.send(json.dumps({"ok": True, "url": "/dead.wav", "source": "youtube", "duration": 180}).encode())
         if urlparse(self.path).path == "/api/stream-url":
             return self.send(json.dumps({"ok": True, "url": "/audio.wav", "hls": "/hls.m3u8", "source": "youtube",
                                          "duration": 60}).encode())
