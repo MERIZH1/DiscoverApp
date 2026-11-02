@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Farben aus der PWA (Spotify-Style).
 enum Theme {
@@ -29,6 +30,14 @@ extension Color {
             blue:  Double(hex6 & 0xFF) / 255
         )
     }
+}
+
+/// Bewegungen wie im System: Federn statt harter Wechsel.
+/// Mit „Bewegung reduzieren“ bleibt nur ein kurzes Überblenden.
+enum Motion {
+    private static var reduced: Bool { UIAccessibility.isReduceMotionEnabled }
+    static var spring: Animation { reduced ? .easeInOut(duration: 0.2) : .spring(duration: 0.42, bounce: 0.22) }
+    static var quick: Animation { reduced ? .easeInOut(duration: 0.15) : .snappy(duration: 0.24) }
 }
 
 // Schwarzer Hintergrund, der die Safe-Area fuellt.

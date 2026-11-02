@@ -261,6 +261,7 @@ final class PlayerController: ObservableObject {
     private var metaDur: Double = 0   // echte Dauer aus der Stream-Antwort (Fallback gegen iOS-Doppel-Dauer)
     private var statusObs: NSKeyValueObservation?
     private var pendingSeek: Double = 0        // gespeicherter Podcast-Stand, gesetzt beim Laden
+    var handoffPosition: Double = 0            // Stelle beim Übernehmen von einem anderen Gerät
     private var lastPodSave = Date.distantPast
     private var endObs: NSObjectProtocol?
     private let api: APIClient
@@ -1133,7 +1134,8 @@ final class PlayerController: ObservableObject {
         loading = true; currentTime = 0; duration = track.durationSec; source = ""; streamCache = ""; metaDur = knownDuration(for: track)
         // Podcast: gespeicherten Hoerstand vormerken -> Seek passiert, sobald der
         // Player bereit ist (siehe readyToPlay-Observer).
-        pendingSeek = track.uri.hasPrefix("spotify:episode:") ? PodcastProgress.get(track.uri) : 0
+        pendingSeek = track.uri.hasPrefix("spotify:episode:") ? PodcastProgress.get(track.uri) : handoffPosition
+        handoffPosition = 0
         diag("play_load_start", "\(trackDiag(track)) prebuf=\(prebuf[track.uri] != nil) busy=\(prebufBusy.contains(track.uri))")
         player.volume = 1                                   // aktiver Track immer voll (Einblenden nur in der Ueberblende)
         AudioSessionManager.activate()                       // Kategorie+aktiv (mit Retry) -> auch nach Stunden Idle kein stummer Song
@@ -1348,7 +1350,7 @@ final class PlayerController: ObservableObject {
                         let target = self.pendingSeek
                         self.pendingSeek = 0
                         self.seekFile(target)
-                    } else if self.pendingSeek > 15 {
+                    } else if self.pendingSeek > 1 {
                         let target = self.pendingSeek
                         self.pendingSeek = 0
                         self.player.seek(to: CMTime(seconds: target, preferredTimescale: 600),

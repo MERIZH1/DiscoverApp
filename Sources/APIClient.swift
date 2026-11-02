@@ -129,21 +129,6 @@ final class APIClient: ObservableObject {
         let r: InstallSignal? = try? await get("/api/app/install-started")
         return r
     }
-    /// Admin: Deezer/Deemix global an/aus (Server-Toggle).
-    func deezerEnabled() async -> Bool? {
-        struct R: Codable { let enabled: Bool }
-        let r: R? = try? await get("/api/admin/deezer-enabled")
-        return r?.enabled
-    }
-    @discardableResult
-    func setDeezerEnabled(_ on: Bool) async -> Bool {
-        (try? await data("/api/admin/deezer-enabled", method: "POST", json: ["enabled": on])) != nil
-    }
-    /// Admin: Log wann Deezer gebraucht worden waere (obwohl aus).
-    func deezerSkipLog() async -> [DeezerSkip] {
-        let r: DeezerSkipResponse? = try? await get("/api/admin/deezer-skiplog")
-        return r?.entries ?? []
-    }
     /// Server-Ausfaelle (id = down-Zeitstempel) nach `since` -> fuer "war offline von X bis Y".
     func outages(since: Int) async -> [Outage] {
         let r: OutagesResponse? = try? await get("/api/outages?since=\(since)")
@@ -470,7 +455,6 @@ final class APIClient: ObservableObject {
         try await get("/api/podcast/\(enc(showURI))")
     }
 
-    /// Empfehlung in die Playlist hinzufuegen (Spotify-Playlist + paralleler Deemix-Download).
     /// Mehrere Tracks auf einmal hinzufuegen (Mehrfachauswahl). Gibt Anzahl erfolgreich zurueck.
     @discardableResult func addTracks(playlistURI: String, tracks: [Track]) async -> Int {
         let arr = tracks.map { t -> [String: Any] in
@@ -482,11 +466,12 @@ final class APIClient: ObservableObject {
               let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return 0 }
         return (o["added"] as? Int) ?? 0
     }
+    /// Empfehlung in die Playlist hinzufuegen, der Server speichert sie parallel von YouTube.
     func addTrack(playlistURI: String, track: Track, playlistName: String) async -> Bool {
         let body: [String: Any] = [
             "playlist_uri": playlistURI,
             "track_uri": track.uri,
-            "deezer_link": track.deezer_link ?? "",
+            "download": true,
             "playlist_name": playlistName,
             "title": track.name, "artist": track.artist,
             "image": track.image ?? "",
@@ -795,6 +780,35 @@ final class APIClient: ObservableObject {
         ]
         let d = try await data("/api/radio", method: "POST", json: body)
         return try JSONDecoder().decode(RadioResponse.self, from: d)
+    }
+}
+
+// MARK: - Verweise für Songs ohne Spotify-Daten
+extension APIClient {
+    /// Spotify-Eintrag zu einem lokalen, YouTube- oder Radio-Song. Gleiches Album geht vor.
+    func spotifyMatch(for t: Track) async -> (track: Track?, artist: Card?) {
+        let artist = t.artist.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces) ?? ""
+        guard let r = try? await search("\(t.name) \(artist)") else { return (nil, nil) }
+        let want = artist.lowercased()
+        let hits = (r.tracks ?? []).filter { $0.artist.lowercased().contains(want) }
+        return (hits.first { $0.album == t.album } ?? hits.first,
+                (r.artists ?? []).first { $0.name.lowercased() == want })
+    }
+    func artistURI(of t: Track) async -> String? {
+        if let u = t.artists?.first?.uri, !u.isEmpty { return u }
+        let hit = await spotifyMatch(for: t)
+        if let u = hit.track?.artists?.first?.uri, !u.isEmpty { return u }
+        return hit.artist?.uri
+    }
+    func albumURI(of t: Track) async -> String? {
+        if let u = t.album_uri, !u.isEmpty { return u }
+        // Lokale Songs bleiben im eigenen Album
+        if t.isLocal, let album = t.album, !album.isEmpty,
+           let r = try? await search(album),
+           let hit = (r.local_albums ?? []).first(where: { $0.name.caseInsensitiveCompare(album) == .orderedSame }) {
+            return hit.uri
+        }
+        return await spotifyMatch(for: t).track?.album_uri
     }
 }
 

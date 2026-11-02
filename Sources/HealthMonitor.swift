@@ -69,7 +69,6 @@ final class HealthMonitor {
         if !wasReachable { wasReachable = true; lastDown = [] }   // Ausfaelle neu bewerten
         var down: Set<String> = []
         if !s.spotify.ok   && wants("alertSpotify")   { down.insert("Spotify") }
-        if !s.deezer.ok    && wants("alertDeezer")    { down.insert("Deezer") }
         if !s.navidrome.ok && wants("alertNavidrome") { down.insert("Navidrome") }
         if !s.youtube.ok   && wants("alertYouTube")   { down.insert("YouTube") }
         let newlyDown = down.subtracting(lastDown)

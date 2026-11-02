@@ -9,7 +9,6 @@ struct ServiceStatus: Codable, Hashable {
 struct PushTest: Codable { let id: Int; let msg: String }
 struct SystemStatus: Codable {
     let spotify: ServiceStatus
-    let deezer: ServiceStatus
     let navidrome: ServiceStatus
     let youtube: ServiceStatus
     let push_test: PushTest?   // Debug: vom Server (curl) ausgeloeste Test-Benachrichtigung
@@ -55,7 +54,6 @@ struct SmartCacheConfig: Codable {
 struct ServerConfig: Codable {
     let navidrome_url: String?
     let navidrome_user: String?
-    let deemix_url: String?
     let spotify_user_id: String?
     let navidrome_pass_set: Bool?
     let discord_webhook_set: Bool?
@@ -169,14 +167,10 @@ struct AdminConsoleView: View {
     @State private var disks: [DiskInfo] = []
     @AppStorage("serverAlerts") private var serverAlerts = true
     @AppStorage("alertSpotify") private var alertSpotify = true
-    @AppStorage("alertDeezer") private var alertDeezer = true
     @AppStorage("alertNavidrome") private var alertNavidrome = true
     @AppStorage("alertYouTube") private var alertYouTube = true
     @State private var smartCache = SmartCacheConfig(min_listened_sec: 45, min_listened_pct: 0, min_play_count: 4, enabled: true)
     @State private var smartCacheLoaded = false
-    @State private var deezerEnabled = true
-    @State private var deezerLoaded = false
-    @State private var deezerSkips: [DeezerSkip] = []
     @State private var serverConfig: ServerConfig?
     @State private var profiles: [Profile] = []
     @StateObject private var updater = AppUpdater()
@@ -189,7 +183,6 @@ struct AdminConsoleView: View {
                     SettingsGroup("STATUS") {
                         if let s = status {
                             statusRow("Spotify", "spotify", s.spotify)
-                            statusRow("Deezer", "deezer", s.deezer)
                             statusRow("Navidrome", "navidrome", s.navidrome)
                             statusRow("YouTube", "youtube", s.youtube)
                         } else if loading {
@@ -266,7 +259,7 @@ struct AdminConsoleView: View {
                         debugButton("Discover-Server neustarten", icon: "arrow.clockwise.circle") { await doRestart("gallien-discover") }
                         debugButton("Caches leeren", icon: "trash") { await doClearCache() }
                         Menu {
-                            ForEach(["deemix", "navidrome", "jellyfin", "gallienbot", "sabnzbd"], id: \.self) { svc in
+                            ForEach(["navidrome", "jellyfin", "gallienbot", "sabnzbd"], id: \.self) { svc in
                                 Button(svc) { Task { await doRestart(svc) } }
                             }
                         } label: {
@@ -358,7 +351,7 @@ struct AdminConsoleView: View {
 
                     SettingsGroup("NOTFALL") {
                         debugButton("Alle Dienste neustarten", icon: "exclamationmark.arrow.circlepath") { await restartAll() }
-                        Text("Startet deemix, navidrome, jellyfin, bot, sabnzbd + Discover neu.")
+                        Text("Startet navidrome, jellyfin, bot, sabnzbd + Discover neu.")
                             .font(.caption2).foregroundStyle(Theme.mute)
                     }
 
@@ -370,7 +363,6 @@ struct AdminConsoleView: View {
                         if serverAlerts {
                             Text("Fuer welche Dienste:").font(.caption2).foregroundStyle(Theme.mute).padding(.top, 2)
                             Toggle(isOn: $alertSpotify)   { Text("Spotify").font(.system(size: 14)).foregroundStyle(Theme.text) }.tint(Theme.accent)
-                            Toggle(isOn: $alertDeezer)    { Text("Deezer").font(.system(size: 14)).foregroundStyle(Theme.text) }.tint(Theme.accent)
                             Toggle(isOn: $alertNavidrome) { Text("Navidrome").font(.system(size: 14)).foregroundStyle(Theme.text) }.tint(Theme.accent)
                             Toggle(isOn: $alertYouTube)   { Text("YouTube").font(.system(size: 14)).foregroundStyle(Theme.text) }.tint(Theme.accent)
                         }
@@ -394,40 +386,10 @@ struct AdminConsoleView: View {
                         }
                     }
 
-                    if deezerLoaded {
-                        SettingsGroup("DEEZER (DOWNLOADS)") {
-                            Toggle(isOn: Binding(get: { deezerEnabled }, set: { v in
-                                deezerEnabled = v
-                                Task { await app.api.setDeezerEnabled(v) }
-                            })) {
-                                Text("Deezer/Deemix aktiv").font(.system(size: 15)).foregroundStyle(Theme.text)
-                            }.tint(Theme.accent)
-                            Text("Aus = keine Deezer-Downloads/Fallbacks und keine \"ARL abgelaufen\"-Alerts. Songs laufen weiter ueber YouTube.")
-                                .font(.caption2).foregroundStyle(Theme.mute)
-                        }
-                        SettingsGroup("DEEZER-BEDARF (LOG)") {
-                            if deezerSkips.isEmpty {
-                                Text("Noch nichts — Deezer wurde seit dem Abschalten nicht gebraucht.")
-                                    .font(.caption).foregroundStyle(Theme.mute)
-                            } else {
-                                Text("\(deezerSkips.count)x waere Deezer gebraucht worden (neueste zuerst):")
-                                    .font(.caption2).foregroundStyle(Theme.mute)
-                                ForEach(deezerSkips.prefix(50)) { e in
-                                    VStack(alignment: .leading, spacing: 1) {
-                                        Text(e.songLine).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.text)
-                                        Text(e.metaLine).font(.caption2).foregroundStyle(Theme.mute)
-                                    }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                            }
-                        }
-                    }
-
                     if let sc = serverConfig {
                         SettingsGroup("SERVER-KONFIG (Info)") {
                             cfgRow("Navidrome", sc.navidrome_url)
                             cfgRow("Navidrome-User", sc.navidrome_user)
-                            cfgRow("Deemix", sc.deemix_url)
                             cfgRow("Spotify-User", sc.spotify_user_id)
                             cfgRow("Navidrome-Passwort", (sc.navidrome_pass_set ?? false) ? "gesetzt ✓" : "fehlt")
                             cfgRow("Discord-Webhook", (sc.discord_webhook_set ?? false) ? "gesetzt ✓" : "—")
@@ -517,8 +479,6 @@ struct AdminConsoleView: View {
         tokens = await app.api.adminTokens()
         disks = await app.api.adminDisk()
         if let sc = await app.api.smartCacheConfig() { smartCache = sc; smartCacheLoaded = true }
-        if let dz = await app.api.deezerEnabled() { deezerEnabled = dz; deezerLoaded = true }
-        deezerSkips = await app.api.deezerSkipLog()
         serverConfig = await app.api.serverConfig()
         profiles = (try? await app.api.profiles()) ?? []
         await updater.check(api: app.api, prompt: false)
@@ -588,7 +548,7 @@ struct AdminConsoleView: View {
     }
     private func restartAll() async {
         busy = true
-        for svc in ["deemix", "navidrome", "jellyfin", "gallienbot", "sabnzbd"] {
+        for svc in ["navidrome", "jellyfin", "gallienbot", "sabnzbd"] {
             _ = await app.api.adminRestart(service: svc)
         }
         toast = "Dienste neugestartet — Discover folgt…"
@@ -704,8 +664,6 @@ struct AdminConsoleView: View {
         switch key {
         case "spotify":
             return "→ sp_dc-Cookie erneuern: bei open.spotify.com einloggen, Entwicklertools (F12) → Application → Cookies → 'sp_dc' kopieren → in Discover unter Einstellungen → Spotify-Cookie einfügen. (Oder unten 'Cookie erneuern'.)"
-        case "deezer":
-            return "→ Deezer-ARL abgelaufen: bei deezer.com einloggen, Cookie 'arl' kopieren und serverseitig hinterlegen."
         case "navidrome":
             return "→ Navidrome nicht erreichbar: läuft der Navidrome-Container? NAVIDROME_URL/USER/PASS prüfen."
         case "youtube":

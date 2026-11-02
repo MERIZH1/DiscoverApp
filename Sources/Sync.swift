@@ -113,7 +113,7 @@ final class SyncManager: ObservableObject {
                 lastPoll = now
                 let s = await api.syncGetState()
                 let nowMs = now * 1000
-                if let s, s.device_name != deviceName, let seen = s.owner_seen_at {
+                if let s, s.device_id != deviceID, let seen = s.owner_seen_at {
                     // Frische-Fenster: ein aktiv SPIELENDES Remote toleriert ein paar
                     // verpasste Heartbeats (Netz-Hiccup, Heartbeat ~2.5s), ein
                     // pausiertes/gestopptes Remote verschwindet dagegen zuegig — sonst
@@ -242,18 +242,15 @@ final class SyncManager: ObservableObject {
         // mischt play() die Queue neu (fisherYates) und Index/Position passen nicht.
         p.shuffle = false
         p.repeatMode = (s.repeatMode == "one" ? .one : (s.repeatMode == "all" ? .all : .off))
+        p.handoffPosition = max(0, s.position ?? 0)
         if !tracks.isEmpty {
             let idx = max(0, min(tracks.count - 1, s.queue_idx ?? 0))
             p.play(tracks: tracks, startAt: idx, contextName: "Wiedergabe", contextURI: "connect:transfer")
         } else if let t = s.track {
             p.play(tracks: [Track(uri: t.uri, name: t.name, artist: t.artist, image: t.image)],
                    startAt: 0, contextName: "Wiedergabe", contextURI: "connect:transfer")
-        } else { return }
+        } else { p.handoffPosition = 0; return }
         p.shuffle = (s.shuffle == "on")   // UI-Flag nachziehen (mischt nicht neu)
-        let pos = s.position ?? 0
-        if pos > 1 {
-            Task { try? await Task.sleep(nanoseconds: 900_000_000); p.seek(pos) }
-        }
         remote = nil
     }
 }

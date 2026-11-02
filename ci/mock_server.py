@@ -99,12 +99,23 @@ def route(path, q):
     if path.startswith("/api/playlist/") or path.startswith("/api/album/"):
         return {"name": "Playlist", "tracks": [track(i) for i in range(1, 101)]}
     if path == "/api/search":
+        if q.get("q", [""])[0].startswith("Lokal"):
+            lokal = {"uri": "navidrome:test50", "name": "Lokaler Song", "artist": "Kuenstler 2", "album": "Album 3",
+                     "image": "/cover/3.png", "duration_ms": 180000, "navidromeId": "test50"}
+            return {"tracks": [lokal], "playlists": [], "albums": [],
+                    "artists": [{"uri": "spotify:artist:test2", "name": "Kuenstler 2", "image": "/cover/2.png"}]}
+        if q.get("q", [""])[0] == "Album 3":
+            return {"tracks": [], "artists": [], "albums": [], "playlists": [],
+                    "local_albums": [{"uri": "navialbum:test3", "name": "Album 3", "image": "/cover/3.png"}]}
         if q.get("q", [""])[0].startswith("Tot"):
             return {"tracks": [dict(track(1), name="Toter Song", navidromeId="")], "artists": [], "albums": [], "playlists": []}
         return {"tracks": [track(i) for i in range(1, 11)],
                 "artists": [{"uri": f"spotify:artist:test{i}", "name": f"Kuenstler {i}",
                              "image": f"/cover/{i}.png"} for i in range(1, 6)],
                 "playlists": [dict(playlist(i), artist=None, owner="Test", desc="") for i in range(1, 7)]}
+    if path.startswith("/api/artist/"):
+        return {"uri": "spotify:artist:test2", "name": "Kuenstler 2", "image": "/cover/2.png", "followers": 1000,
+                "top_tracks": [track(i) for i in range(1, 6)], "albums": []}
     if path == "/api/radio-livestream/favorites":
         return {"items": stations()}
     return {}

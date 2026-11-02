@@ -53,6 +53,7 @@ struct HomeItem: Codable, Identifiable, Hashable {
     let image: String?
     let sub: String?
     let type: String?   // "playlist" | "album" | "artist"
+    var mosaic: [String]? = nil   // vier Songcover statt eines Bildes
 }
 struct HomeSection: Codable, Identifiable, Hashable {
     var id: String { title + (uri ?? "") }
@@ -116,7 +117,6 @@ struct Track: Codable, Identifiable, Hashable {
     let image: String?
     let duration_ms: Int?
     var downloaded: Bool?
-    let deezer_link: String?    // fuer /api/add-track (Empfehlungen)
     let navidromeId: String?    // lokale Songs (Navidrome) -> direktes Streaming
 
     var durationSec: Double { Double(duration_ms ?? 0) / 1000.0 }
@@ -129,9 +129,9 @@ struct Track: Codable, Identifiable, Hashable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case uri, name, artist, artists, album, album_uri, image, duration_ms, downloaded, deezer_link, navidromeId
+        case uri, name, artist, artists, album, album_uri, image, duration_ms, downloaded, navidromeId
     }
-    private enum ExtraKeys: String, CodingKey { case deezer_cover, spotify_uri }
+    private enum ExtraKeys: String, CodingKey { case spotify_uri }
     init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self)
         let extra = try? d.container(keyedBy: ExtraKeys.self)
@@ -143,19 +143,16 @@ struct Track: Codable, Identifiable, Hashable {
         artists     = try? c.decode([ArtistRef].self, forKey: .artists)
         album       = try? c.decode(String.self, forKey: .album)
         album_uri   = try? c.decode(String.self, forKey: .album_uri)
-        // Empfehlungen liefern teils nur deezer_cover statt image
-        image       = (try? c.decode(String.self, forKey: .image))
-                      ?? (extra.flatMap { try? $0.decode(String.self, forKey: .deezer_cover) })
+        image       = try? c.decode(String.self, forKey: .image)
         duration_ms = try? c.decode(Int.self, forKey: .duration_ms)
         downloaded  = try? c.decode(Bool.self, forKey: .downloaded)
-        deezer_link = try? c.decode(String.self, forKey: .deezer_link)
         navidromeId = (try? c.decode(String.self, forKey: .navidromeId)).flatMap { $0.isEmpty ? nil : $0 }
     }
     init(uri: String, name: String, artist: String, image: String?) {
         self.uri = uri; self.name = name; self.artist = artist
         self.image = image; self.artists = nil; self.album = nil
         self.album_uri = nil; self.duration_ms = nil; self.downloaded = nil
-        self.deezer_link = nil; self.navidromeId = nil
+        self.navidromeId = nil
     }
 }
 
@@ -335,18 +332,3 @@ struct UserSettings: Codable {
     var prebuffer_count: Int?
     var smart_cache: SmartCache?
 }
-
-// MARK: - Deezer-Bedarfs-Log (wann waere Deezer gebraucht worden, obwohl aus)
-struct DeezerSkip: Codable, Identifiable {
-    let ts: Int
-    let name: String
-    let artist: String
-    let who: String
-    var id: String { "\(ts)-\(name)-\(who)" }
-    var songLine: String { artist.isEmpty ? name : "\(artist) - \(name)" }
-    var metaLine: String {
-        let f = DateFormatter(); f.dateFormat = "dd.MM. HH:mm"
-        return "\(f.string(from: Date(timeIntervalSince1970: TimeInterval(ts)))) · \(who)"
-    }
-}
-struct DeezerSkipResponse: Codable { let entries: [DeezerSkip] }

@@ -111,6 +111,34 @@ final class DiscoverSmokeTests: XCTestCase {
         shot("31-toter-song-player")
     }
 
+    /// Lokaler Song ohne Spotify-Verweise: Künstler und Album gehen trotzdem auf.
+    func testMenueZiele() {
+        tab("Suchen")
+        let feld = app.searchFields.firstMatch.exists ? app.searchFields.firstMatch : app.textFields.firstMatch
+        XCTAssertTrue(feld.waitForExistence(timeout: 10))
+        feld.tap()
+        feld.typeText("Lokal")
+        app.keyboards.buttons["search"].firstMatch.tap()
+        let song = app.staticTexts["Lokaler Song"].firstMatch
+        XCTAssertTrue(song.waitForExistence(timeout: 10))
+
+        song.press(forDuration: 1.2)
+        shot("40-song-menue")
+        app.buttons["Gehe zu"].firstMatch.tap()
+        app.buttons["Künstler"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Kuenstler 2"].firstMatch.waitForExistence(timeout: 10))
+        shot("41-kuenstler-lokal")
+        app.swipeDown(velocity: .fast)
+        sleep(1)
+
+        XCTAssertTrue(song.waitForExistence(timeout: 10))
+        song.press(forDuration: 1.2)
+        app.buttons["Gehe zu"].firstMatch.tap()
+        app.buttons["Album"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Song 1"].firstMatch.waitForExistence(timeout: 10))
+        shot("42-album-lokal")
+    }
+
     func testRadio() {
         tab("Radio")
         shot("10-radio")

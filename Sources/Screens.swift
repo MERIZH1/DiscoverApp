@@ -99,11 +99,17 @@ struct GlassSymbolButton: View {
             Image(systemName: systemName)
                 .font(.system(size: symbolSize, weight: .semibold))
                 .foregroundStyle(active ? Theme.accent : Theme.text)
+                .contentTransition(.symbolEffect(.replace))
                 .frame(width: size, height: size)
                 .overlay(alignment: .bottom) {
                     // Wie bei Spotify: Der Punkt zeigt auch auf hellem Cover, dass der Modus an ist
-                    if active { Circle().fill(Theme.accent).frame(width: 5, height: 5).padding(.bottom, 5) }
+                    if active {
+                        Circle().fill(Theme.accent).frame(width: 5, height: 5).padding(.bottom, 5)
+                            .transition(.scale.combined(with: .opacity))
+                    }
                 }
+                .animation(Motion.quick, value: systemName)
+                .animation(Motion.spring, value: active)
                 .glassButton(glass, shape: Circle(), fallback: Theme.input.opacity(0.92),
                              tint: active ? Theme.accent.opacity(0.22) : nil)
                 .contentShape(Circle())
@@ -151,8 +157,10 @@ struct MainView: View {
                 // EIN Player — zeigt lokal ODER das Remote-Geraet (kein doppelter Banner mehr)
                 if (now.hasContent || sync.remote?.track != nil) && !keyboardVisible {
                     NowPlayingBar(showPlayer: $showPlayer)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
+            .animation(Motion.spring, value: now.hasContent)
             .padding(.horizontal, app.liquidGlass ? 14 : 8)
             .padding(.bottom, app.liquidGlass ? 58 : 50)
             .ignoresSafeArea(.keyboard, edges: .bottom)
@@ -173,7 +181,7 @@ struct MainView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: sync.injectToast)
+        .animation(Motion.spring, value: sync.injectToast)
         .overlay(alignment: .bottom) {
             if !app.toast.isEmpty {
                 Text(app.toast)
@@ -185,7 +193,7 @@ struct MainView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: app.toast)
+        .animation(Motion.spring, value: app.toast)
         .onAppear { configureAppearance(glass: app.liquidGlass) }
         .onChange(of: showPlayer) { _, open in
             if open { dismissKeyboard(); keyboardVisible = false }
@@ -238,6 +246,7 @@ struct Pill: View {
             .padding(.horizontal, 14).padding(.vertical, 7)
             .glassSurface(active ? false : glass, shape: Capsule(), fallback: active ? activeBg : Theme.input)
             .clipShape(Capsule())
+            .animation(Motion.quick, value: active)
         }.buttonStyle(.pressable)
     }
 }
@@ -247,9 +256,9 @@ struct Pill: View {
 struct PressableStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
             .opacity(configuration.isPressed ? 0.8 : 1)
-            .animation(.snappy(duration: 0.12), value: configuration.isPressed)
+            .animation(.spring(duration: 0.28, bounce: 0.4), value: configuration.isPressed)
     }
 }
 extension ButtonStyle where Self == PressableStyle {
@@ -350,6 +359,8 @@ struct TrackMenu: View, Equatable {
     private var others: [Profile] {
         (app?.allProfiles ?? []).filter { $0.id != app?.profile?.id }
     }
+    private var onSpotify: Bool { track.uri.hasPrefix("spotify:track:") }
+    private var hasAlbum: Bool { !(track.album ?? "").isEmpty || !(track.album_uri ?? "").isEmpty }
     private func sendTo(_ p: Profile) {
         guard let api = app?.api else { return }
         Haptics.tap()
@@ -377,7 +388,9 @@ struct TrackMenu: View, Equatable {
                 if track.isLocal {
                     Button { copyArtistName() } label: { Label("Künstler + Name kopieren", systemImage: "doc.on.doc") }
                 } else {
-                    Button { copySpotify() } label: { Label("Spotify-Link kopieren", systemImage: "link") }
+                    if onSpotify {
+                        Button { copySpotify() } label: { Label("Spotify-Link kopieren", systemImage: "link") }
+                    }
                     Button { Task { await copyYouTube() } } label: { Label("YouTube-Link kopieren", systemImage: "play.rectangle") }
                 }
             } label: { Label("Teilen", systemImage: "square.and.arrow.up") }
@@ -404,12 +417,13 @@ struct TrackMenu: View, Equatable {
         if track.uri.hasPrefix("yt:") {
             Button { promptRename() } label: { Label("Umbenennen", systemImage: "pencil") }
         }
-        if (onShowArtist != nil && track.artists?.first?.uri != nil) || (onShowAlbum != nil && track.album_uri != nil) {
+        // Fehlt ein Spotify-Verweis, sucht die Zielseite ihn über den Namen
+        if (onShowArtist != nil && !track.artist.isEmpty) || (onShowAlbum != nil && hasAlbum) {
             Menu {
-                if onShowArtist != nil, track.artists?.first?.uri != nil {
+                if onShowArtist != nil, !track.artist.isEmpty {
                     Button { onShowArtist?() } label: { Label("Künstler", systemImage: "person") }
                 }
-                if onShowAlbum != nil, track.album_uri != nil {
+                if onShowAlbum != nil, hasAlbum {
                     Button { onShowAlbum?() } label: { Label("Album", systemImage: "square.stack") }
                 }
             } label: { Label("Gehe zu", systemImage: "arrow.forward.circle") }
@@ -421,7 +435,7 @@ struct TrackMenu: View, Equatable {
             } label: { Label("Match fixen", systemImage: "arrow.triangle.2.circlepath") }
         }
         Button { startRadio() } label: { Label("Song-Radio starten", systemImage: "dot.radiowaves.left.and.right") }
-        if !track.isLocal, track.uri.hasPrefix("spotify:") {
+        if !track.isLocal, onSpotify {
             Button { openTrackInSpotify() } label: { Label("Auf Spotify öffnen", systemImage: "arrow.up.forward.app") }
         }
         if !track.isLocal, !track.uri.isEmpty {
@@ -460,9 +474,12 @@ struct TrackMenu: View, Equatable {
         let radioName = "\(track.artist) — \(track.name)"
         player.play(tracks: [track], contextName: "Radio", contextURI: "")
         Task {
-            guard let r = try? await api.startRadio(track: track), r.ok,
+            // Lokale und YouTube-Songs starten das Radio über ihren Spotify-Eintrag
+            var seed: Track? = track
+            if !onSpotify { seed = await api.spotifyMatch(for: track).track }
+            guard let seed, let r = try? await api.startRadio(track: seed), r.ok,
                   let puri = r.playlist_uri else {
-                app?.flash("Radio konnte nicht erstellt werden")   // z.B. lokaler/YT-Song ohne Spotify-Empfehlungen
+                app?.flash("Radio konnte nicht erstellt werden")
                 return
             }
             let tracks: [Track]
@@ -511,12 +528,14 @@ struct PlaylistMenu: View, Equatable {
     let uri: String
     let name: String
     var isAlbum: Bool = false
+    var inLibrary: Bool = true
     var onOpen: (() -> Void)? = nil
     var onDeleted: (() -> Void)? = nil
     static func == (lhs: PlaylistMenu, rhs: PlaylistMenu) -> Bool {
         lhs.uri == rhs.uri &&
         lhs.name == rhs.name &&
         lhs.isAlbum == rhs.isAlbum &&
+        lhs.inLibrary == rhs.inLibrary &&
         (lhs.onOpen != nil) == (rhs.onOpen != nil) &&
         (lhs.onDeleted != nil) == (rhs.onDeleted != nil)
     }
@@ -536,14 +555,16 @@ struct PlaylistMenu: View, Equatable {
                 Button { saveAlbum() } label: { Label("Als Playlist speichern", systemImage: "plus.square.on.square") }
             }
             if !isAlbum {
-                Button { startRadio() } label: { Label("Playlist-Radio starten", systemImage: "dot.radiowaves.left.and.right") }
+                if isSpotifyPlaylist {
+                    Button { startRadio() } label: { Label("Playlist-Radio starten", systemImage: "dot.radiowaves.left.and.right") }
+                }
                 Button { copyAsOwn() } label: { Label("Als eigene Playlist kopieren", systemImage: "plus.square.on.square") }
                 if isSpotifyPlaylist {
                     Button { copyLink() } label: { Label("Link kopieren", systemImage: "link") }
                     Button { openInSpotify() } label: { Label("Auf Spotify öffnen", systemImage: "arrow.up.forward.app") }
                     Button { syncNow() } label: { Label("Jetzt synchronisieren", systemImage: "arrow.triangle.2.circlepath") }
                 }
-                if isSpotifyPlaylist || uri.hasPrefix("ytpl:") {
+                if inLibrary, isSpotifyPlaylist || uri.hasPrefix("ytpl:") {
                     Button(role: .destructive) { confirmDelete() } label: { Label("Playlist löschen", systemImage: "trash") }
                 }
             }
@@ -608,7 +629,7 @@ struct PlaylistMenu: View, Equatable {
         app.flash("Synchronisiere mit Spotify…")
         Task {
             // Wie PWA: frisch von Spotify ziehen (force=1 umgeht den Server-Cache,
-            // check=1 prueft lokal) -> neue Titel erscheinen. KEIN Deemix-Download,
+            // check=1 prueft lokal) -> neue Titel erscheinen. Kein Download,
             // nur YT-Link + Zuordnung vorcachen -> sofort spielbar (gestreamt).
             guard let resp = try? await app.api.playlistTracks(uri, check: true, force: true) else {
                 app.flash("Sync fehlgeschlagen"); return
@@ -843,7 +864,11 @@ struct HomeView: View {
                             ForEach(quick) { item in
                                 NavigationLink(value: item) {
                                     HStack(spacing: 12) {
-                                        Artwork(url: item.image, size: 56, corner: 0)
+                                        if let m = item.mosaic, m.count == 4 {
+                                            MosaicArtwork(urls: m, size: 56, corner: 0)
+                                        } else {
+                                            Artwork(url: item.image, size: 56, corner: 0)
+                                        }
                                         Text(item.name).font(.system(size: 14, weight: .bold))
                                             .foregroundStyle(Theme.text).lineLimit(2)
                                             .multilineTextAlignment(.leading).padding(.trailing, 12)
@@ -862,7 +887,7 @@ struct HomeView: View {
                     }
                     // Spotify-Home-Sektionen — kaputte "Zuletzt"-Sektion + Items ohne Cover rausfiltern
                     ForEach((home?.sections ?? []).filter { $0.title != "Zuletzt" && $0.title != "Zuletzt gespielt" }) { sec in
-                        let items = sec.items.filter { !($0.image ?? "").isEmpty }
+                        let items = sec.items.filter { !($0.image ?? "").isEmpty || $0.mosaic?.count == 4 }
                         if !items.isEmpty {
                             HomeRow(title: sec.title, subtitle: sec.subtitle, items: items)
                         }
@@ -946,10 +971,34 @@ struct HomeRow: View {
                 HStack(alignment: .top, spacing: 14) {
                     ForEach(items) { it in
                         NavigationLink(value: it) { BigCard(item: it) }.buttonStyle(.pressable)
+                            .contextMenu {
+                                if it.uri.hasPrefix("spotify:playlist:") || it.uri.hasPrefix("spotify:album:") {
+                                    PlaylistMenu(uri: it.uri, name: it.name, isAlbum: it.type == "album", inLibrary: false).equatable()
+                                }
+                            }
                     }
                 }.padding(.horizontal)
             }
         }
+    }
+}
+
+/// Vier Songcover als ein Bild, für die Playlists aus dem Hörverhalten.
+struct MosaicArtwork: View {
+    let urls: [String]
+    var size: CGFloat = 150
+    var corner: CGFloat = 6
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(0..<2, id: \.self) { row in
+                HStack(spacing: 0) {
+                    ForEach(0..<2, id: \.self) { col in
+                        Artwork(url: urls[row * 2 + col], size: size / 2, corner: 0)
+                    }
+                }
+            }
+        }
+        .frame(width: size, height: size).clipShape(RoundedRectangle(cornerRadius: corner))
     }
 }
 
@@ -958,8 +1007,14 @@ struct BigCard: View {
     var body: some View {
         let circle = (item.type ?? "") == "artist"
         VStack(alignment: .leading, spacing: 6) {
-            Artwork(url: item.image, size: 150, corner: circle ? 75 : 6)
-                .shadow(color: .black.opacity(0.35), radius: 8, y: 8)
+            Group {
+                if let m = item.mosaic, m.count == 4 {
+                    MosaicArtwork(urls: m)
+                } else {
+                    Artwork(url: item.image, size: 150, corner: circle ? 75 : 6)
+                }
+            }
+            .shadow(color: .black.opacity(0.35), radius: 8, y: 8)
             Text(item.name).font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.text).lineLimit(1)
             if let sub = item.sub, !sub.isEmpty {
@@ -1901,6 +1956,62 @@ struct CardRows: View {
 }
 
 // MARK: - Künstler/Album-Navigation aus dem Track-Menue (Modal-Sheets)
+/// Künstler oder Album eines Songs. Lokale, YouTube- und Radio-Songs kennen oft keine
+/// Spotify-Verweise, dann wird der passende Eintrag über Titel und Künstler gesucht.
+private struct TrackTargetView: View {
+    enum Kind { case artist, album }
+    let track: Track
+    let kind: Kind
+    @State private var uri: String?
+    @State private var failed = false
+    private var title: String {
+        kind == .artist ? (track.artists?.first?.name ?? track.artist) : (track.album ?? "Album")
+    }
+    var body: some View {
+        Group {
+            if let uri {
+                if kind == .artist {
+                    ArtistView(uri: uri, name: title, image: track.image)
+                } else {
+                    TrackListView(uri: uri, title: title, image: track.image, isAlbum: true)
+                }
+            } else if failed {
+                ContentUnavailableView("Nichts gefunden", systemImage: "magnifyingglass", description: Text(title))
+            } else {
+                LoadingView()
+            }
+        }
+        .task {
+            guard uri == nil, let api = DiscoverServices.app?.api else { return }
+            let found = kind == .artist ? await api.artistURI(of: track) : await api.albumURI(of: track)
+            withAnimation(Motion.quick) {
+                uri = found
+                failed = found == nil
+            }
+        }
+    }
+}
+
+/// Dasselbe Menü für Zeilen, die keine eigene Menü-Logik brauchen.
+private struct TrackContextMenu: ViewModifier {
+    let track: Track
+    @State private var showArtist = false
+    @State private var showAlbum = false
+    @State private var showAddPlaylist = false
+    @State private var showSendUser = false
+    @State private var showFixYT = false
+    func body(content: Content) -> some View {
+        content
+            .contextMenu {
+                TrackMenu(track: track, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true },
+                          onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true },
+                          onFixYTMatch: { showFixYT = true }).equatable()
+            }
+            .trackNavSheets(track: track, showArtist: $showArtist, showAlbum: $showAlbum, showAddPlaylist: $showAddPlaylist,
+                            showSendUser: $showSendUser, showFixYT: $showFixYT)
+    }
+}
+
 private struct TrackNavSheets: ViewModifier {
     let track: Track
     @Binding var showArtist: Bool
@@ -1911,20 +2022,12 @@ private struct TrackNavSheets: ViewModifier {
     func body(content: Content) -> some View {
         content
             .sheet(isPresented: $showArtist) {
-                NavigationStack {
-                    if let u = track.artists?.first?.uri {
-                        ArtistView(uri: u, name: track.artists?.first?.name ?? track.artist, image: track.image)
-                    }
-                }
-                .presentationDragIndicator(.visible)
+                NavigationStack { TrackTargetView(track: track, kind: .artist) }
+                    .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $showAlbum) {
-                NavigationStack {
-                    if let u = track.album_uri {
-                        TrackListView(uri: u, title: track.album ?? "Album", image: track.image, isAlbum: true)
-                    }
-                }
-                .presentationDragIndicator(.visible)
+                NavigationStack { TrackTargetView(track: track, kind: .album) }
+                    .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $showAddPlaylist) { AddToPlaylistSheet(track: track) }
             .sheet(isPresented: $showSendUser) { SendToUserSheet(track: track) }
@@ -1932,6 +2035,7 @@ private struct TrackNavSheets: ViewModifier {
     }
 }
 extension View {
+    func trackContextMenu(_ track: Track) -> some View { modifier(TrackContextMenu(track: track)) }
     func trackNavSheets(track: Track, showArtist: Binding<Bool>, showAlbum: Binding<Bool>, showAddPlaylist: Binding<Bool>, showSendUser: Binding<Bool>, showFixYT: Binding<Bool>) -> some View {
         modifier(TrackNavSheets(track: track, showArtist: showArtist, showAlbum: showAlbum, showAddPlaylist: showAddPlaylist, showSendUser: showSendUser, showFixYT: showFixYT))
     }
@@ -2230,6 +2334,7 @@ struct LibraryView: View {
                                     player.play(tracks: [Track(uri: e.uri, name: e.name, artist: e.artist ?? "", image: e.image)],
                                                 contextName: e.context_name ?? "", contextURI: e.context_uri ?? "")
                                 } label: { HistoryEntryRow(entry: e) }.buttonStyle(.pressable)
+                                .trackContextMenu(Track(uri: e.uri, name: e.name, artist: e.artist ?? "", image: e.image))
                             } else {
                                 NavigationLink(value: HomeItem(uri: e.uri, name: e.name, image: e.image, sub: e.context_name, type: e.kind)) {
                                     HistoryEntryRow(entry: e)
@@ -3401,6 +3506,7 @@ struct NumberedTrackRow: View {
             if selecting {
                 Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 22)).foregroundStyle(selected ? Theme.accent : Theme.mute).frame(width: 24)
+                    .contentTransition(.symbolEffect(.replace))
             } else {
                 Text("\(n)").font(.system(size: 14).monospacedDigit()).foregroundStyle(playing ? Theme.accent : Theme.sub)
                     .lineLimit(1)
@@ -3443,6 +3549,7 @@ struct RecRow: View {
             if selecting {
                 Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 22)).foregroundStyle(selected ? Theme.accent : Theme.mute)
+                    .contentTransition(.symbolEffect(.replace))
             }
             Artwork(url: track.image, size: 50, corner: 4)
             VStack(alignment: .leading, spacing: 2) {
@@ -3454,12 +3561,16 @@ struct RecRow: View {
                 Button(action: add) {
                     Image(systemName: added ? "checkmark.circle.fill" : "plus.circle")
                         .font(.system(size: 24)).foregroundStyle(added ? Theme.accent : Theme.text)
+                        .contentTransition(.symbolEffect(.replace))
+                        .symbolEffect(.bounce, value: added)
+                        .animation(Motion.spring, value: added)
                         .frame(width: 42, height: 42).contentShape(Rectangle())
                 }.buttonStyle(.pressable).disabled(added)
             }
         }
         .padding(.vertical, 8).padding(.horizontal).contentShape(Rectangle())
         .onTapGesture { if selecting { selectTap?() } else { play() } }
+        .trackContextMenu(track)
     }
 }
 
@@ -3487,6 +3598,7 @@ struct TrackRow: View {
             if selecting {
                 Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 22)).foregroundStyle(selected ? Theme.accent : Theme.mute)
+                    .contentTransition(.symbolEffect(.replace))
             }
             Artwork(url: track.image, size: 52, corner: 4)
             VStack(alignment: .leading, spacing: 2) {
@@ -3599,6 +3711,7 @@ struct NowPlayingBar: View {
                             Image(systemName: (showRemote ? (remote?.playing == true) : player.isPlaying) ? "pause.fill" : "play.fill")
                                 .font(.system(size: 17, weight: .bold))
                                 .foregroundStyle(glass ? Theme.text : .black)
+                                .contentTransition(.symbolEffect(.replace))
                                 .frame(width: 42, height: 42)
                                 .glassButton(glass, shape: Circle(), fallback: .white)
                                 .contentShape(Circle())
@@ -3779,12 +3892,16 @@ struct PlayerView: View {
                 }.padding(.horizontal, 4).padding(.top, 8)
                 Spacer()
                 Artwork(url: p.displayImage, size: 300, corner: 12).shadow(radius: 24)
+                    .scaleEffect(p.isPlaying ? 1 : 0.9)
+                    .animation(Motion.spring, value: p.isPlaying)
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(p.displayTitle)
                             .font(.title2.bold())
                             .foregroundStyle(.white)
                             .lineLimit(1)
+                            .contentTransition(.opacity)
+                            .animation(.easeInOut(duration: 0.25), value: p.displayTitle)
                             .shadow(color: .black.opacity(0.85), radius: 5, y: 1)
                         Text(p.displayArtist)
                             .font(.system(size: 17, weight: .semibold))
@@ -3852,6 +3969,8 @@ struct PlayerView: View {
                                 Image(systemName: p.isPlaying ? "pause.fill" : "play.fill")
                                     .font(.system(size: 30, weight: .bold))
                                     .foregroundStyle(Theme.text)
+                                    .contentTransition(.symbolEffect(.replace))
+                                    .animation(Motion.quick, value: p.isPlaying)
                                     .frame(width: 78, height: 78)
                                     .glassButton(glass, shape: Circle(), fallback: Theme.accent.opacity(0.95))
                             }
@@ -3884,6 +4003,8 @@ struct PlayerView: View {
                                         Image(systemName: p.isPlaying ? "pause.fill" : "play.fill")
                                             .font(.system(size: 32, weight: .bold))
                                             .foregroundStyle(glass ? Theme.text : .black)
+                                            .contentTransition(.symbolEffect(.replace))
+                                            .animation(Motion.quick, value: p.isPlaying)
                                     }
                                 }
                                 .frame(width: 82, height: 82)
@@ -3997,6 +4118,7 @@ struct QueuePage: View {
                 if let c = player.current {
                     Section {
                         QueueRow(track: c, playing: true)
+                            .trackContextMenu(c)
                             .listRowBackground(Color.clear).listRowSeparator(.hidden)
                     } header: { QueueHeader("Jetzt läuft") }
                 }
@@ -4007,6 +4129,7 @@ struct QueuePage: View {
                                 .listRowBackground(Color.clear).listRowSeparator(.hidden)
                                 .contentShape(Rectangle())
                                 .onTapGesture { player.playUpNext(i) }
+                                .trackContextMenu(t)
                                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                     Button(role: .destructive) { player.removeUpNext(at: i) } label: {
                                         Label("Entfernen", systemImage: "trash")
@@ -4278,24 +4401,31 @@ struct Artwork: View {
     private var pixels: Int { Int((size * displayScale).rounded(.up)) }
     var body: some View {
         // Aus dem Cache schon im ersten Durchlauf zeigen: sonst blitzt beim Scrollen der Platzhalter
-        let shown = image ?? resolved.flatMap { ImageLoader.shared.cached($0, pixels: pixels) }
+        let shown = resolved.flatMap { ImageLoader.shared.cached($0, pixels: pixels) } ?? image
         Group {
             if let shown {
-                Image(uiImage: shown).resizable().scaledToFill().transition(.opacity)
+                Image(uiImage: shown).resizable().scaledToFill()
+                    .id(ObjectIdentifier(shown)).transition(.opacity)
             } else {
-                RoundedRectangle(cornerRadius: corner).fill(Theme.card)
-                    .overlay(Image(systemName: "music.note").foregroundStyle(Theme.mute))
+                RoundedRectangle(cornerRadius: corner)
+                    .fill(LinearGradient(colors: [Color(hex6: 0x303030), Theme.card], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .overlay(Image(systemName: "music.note")
+                        .font(.system(size: size * 0.36, weight: .semibold)).foregroundStyle(Theme.mute))
             }
         }
         .frame(width: size, height: size).clipShape(RoundedRectangle(cornerRadius: corner))
         .task(id: resolved) {
             guard let u = resolved else { image = nil; return }
             if let c = ImageLoader.shared.cached(u, pixels: pixels) { image = c; return }
-            image = nil
+            // Das alte Bild bleibt stehen, bis das neue da ist. So blendet der Player von Cover zu Cover.
             let px = pixels
-            if let img = await ImageLoader.shared.load(u, pixels: px), u == resolved {
-                withAnimation(.easeOut(duration: 0.18)) { image = img }
+            var img = await ImageLoader.shared.load(u, pixels: px)
+            if img == nil, !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                img = await ImageLoader.shared.load(u, pixels: px)
             }
+            guard !Task.isCancelled, u == resolved else { return }
+            withAnimation(.easeOut(duration: 0.22)) { image = img }
         }
     }
 }
