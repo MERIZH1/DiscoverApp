@@ -133,6 +133,60 @@ func averageColor(_ urlStr: String?) async -> Color? {
     return Color(red: Double(px[0]) / 255, green: Double(px[1]) / 255, blue: Double(px[2]) / 255)
 }
 
+// MARK: - Navigation pro Tab
+/// Ziel von „Gehe zu Künstler/Album“.
+struct TrackTarget: Hashable {
+    let track: Track
+    let artist: Bool
+}
+
+/// Jeder Tab hat seinen eigenen Stapel. „Gehe zu“ öffnet die Seite im aktuellen Tab,
+/// die Tab-Leiste bleibt sichtbar, Zurück führt zur vorigen Seite. Aus dem großen
+/// Player heraus schließt der sich zuerst.
+@MainActor final class TabRouter: ObservableObject {
+    enum Tab: Hashable { case home, search, library, radio }
+    @Published var tab: Tab = .home
+    @Published var home = NavigationPath()
+    @Published var search = NavigationPath()
+    @Published var library = NavigationPath()
+    @Published var radio = NavigationPath()
+    @Published var playerOpen = false
+
+    func open(_ target: TrackTarget) {
+        if playerOpen {
+            playerOpen = false
+            // Erst nach dem Schließen schieben, sonst verschluckt SwiftUI den Schritt
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in self?.push(target) }
+        } else {
+            push(target)
+        }
+    }
+    private func push(_ target: TrackTarget) {
+        switch tab {
+        case .home: home.append(target)
+        case .search: search.append(target)
+        case .library: library.append(target)
+        case .radio: radio.append(target)
+        }
+    }
+}
+
+private struct TabRouterKey: EnvironmentKey { static let defaultValue: TabRouter? = nil }
+extension EnvironmentValues {
+    /// Fehlt außerhalb der Tabs (z. B. in Vorschauen). Dann gehen die Ziele wie früher als Blatt auf.
+    var tabRouter: TabRouter? {
+        get { self[TabRouterKey.self] }
+        set { self[TabRouterKey.self] = newValue }
+    }
+}
+extension View {
+    func trackTargetDestination() -> some View {
+        navigationDestination(for: TrackTarget.self) { t in
+            TrackTargetView(track: t.track, kind: t.artist ? .artist : .album)
+        }
+    }
+}
+
 // MARK: - Main
 struct MainView: View {
     @Environment(\.playerRef) private var playerRef
@@ -140,23 +194,23 @@ struct MainView: View {
     @EnvironmentObject var now: NowPlayingState
     @EnvironmentObject var sync: SyncManager
     @EnvironmentObject var app: AppState
-    @State private var showPlayer = false
+    @StateObject private var router = TabRouter()
     @State private var keyboardVisible = false
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            TabView {
-                HomeView().tabItem { Label("Home", systemImage: "house.fill") }
-                SearchView().tabItem { Label("Suchen", systemImage: "magnifyingglass") }
-                LibraryView().tabItem { Label("Bibliothek", systemImage: "books.vertical.fill") }
-                RadioView().tabItem { Label("Radio", systemImage: "antenna.radiowaves.left.and.right") }
+            TabView(selection: $router.tab) {
+                HomeView().tabItem { Label("Home", systemImage: "house.fill") }.tag(TabRouter.Tab.home)
+                SearchView().tabItem { Label("Suchen", systemImage: "magnifyingglass") }.tag(TabRouter.Tab.search)
+                LibraryView().tabItem { Label("Bibliothek", systemImage: "books.vertical.fill") }.tag(TabRouter.Tab.library)
+                RadioView().tabItem { Label("Radio", systemImage: "antenna.radiowaves.left.and.right") }.tag(TabRouter.Tab.radio)
             }
             .tint(Theme.text)
             VStack(spacing: 8) {
                 // EIN Player — zeigt lokal ODER das Remote-Geraet (kein doppelter Banner mehr)
                 if (now.hasContent || sync.remote?.track != nil) && !keyboardVisible {
-                    NowPlayingBar(showPlayer: $showPlayer)
+                    NowPlayingBar(showPlayer: $router.playerOpen)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
@@ -195,7 +249,7 @@ struct MainView: View {
         }
         .animation(Motion.spring, value: app.toast)
         .onAppear { configureAppearance(glass: app.liquidGlass) }
-        .onChange(of: showPlayer) { _, open in
+        .onChange(of: router.playerOpen) { _, open in
             if open { dismissKeyboard(); keyboardVisible = false }
         }
         .onChange(of: scenePhase) { _, phase in
@@ -213,7 +267,9 @@ struct MainView: View {
             if phase == .active { app.refreshPlaylistsIfStale() }
             keyboardVisible = false
         }
-        .sheet(isPresented: $showPlayer) { PlayerView() }
+        .sheet(isPresented: $router.playerOpen) { PlayerView().environmentObject(router).environment(\.tabRouter, router) }
+        .environmentObject(router)
+        .environment(\.tabRouter, router)
     }
 
     private func updateKeyboard(_ note: Notification) {
@@ -817,6 +873,7 @@ func avatarGradient(_ hex: String?) -> [Color] {
 // MARK: - Home
 struct HomeView: View {
     @EnvironmentObject var app: AppState
+    @EnvironmentObject private var router: TabRouter
     @State private var home: HomeResponse?
     @State private var recents: [HomeItem] = []
     @State private var filter = "all"
@@ -836,7 +893,7 @@ struct HomeView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $router.home) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     // Header
@@ -909,6 +966,7 @@ struct HomeView: View {
                 }.ignoresSafeArea()
             )
             .navigationBarHidden(true)
+            .trackTargetDestination()
             .navigationDestination(for: HomeItem.self) { item in
                 if (item.type ?? "") == "show" || item.uri.contains(":show:") {
                     PodcastView(uri: item.uri, title: item.name, image: item.image)
@@ -1532,6 +1590,7 @@ struct RecentSearchItem: Codable, Identifiable {
 
 struct SearchView: View {
     @EnvironmentObject var app: AppState
+    @EnvironmentObject private var router: TabRouter
     @Environment(\.playerRef) private var playerRef
     private var player: PlayerController { playerRef! }
     @EnvironmentObject var now: NowPlayingState
@@ -1545,7 +1604,6 @@ struct SearchView: View {
     @AppStorage("recentSearchItems") private var recentItemsRaw = ""
     @FocusState private var searchFocused: Bool
     @Environment(\.liquidGlass) private var glass
-    @State private var navPath = NavigationPath()
     @State private var selecting = false
     @State private var selected: Set<String> = []
     @State private var showMultiAdd = false
@@ -1604,7 +1662,7 @@ struct SearchView: View {
     }
 
     var body: some View {
-        NavigationStack(path: $navPath) {
+        NavigationStack(path: $router.search) {
             VStack(spacing: 12) {
                 HStack(spacing: 10) {
                     Image(systemName: "magnifyingglass").foregroundStyle(glass ? Theme.text : .black).font(.system(size: 18, weight: .semibold))
@@ -1707,6 +1765,7 @@ struct SearchView: View {
             .sheet(isPresented: $showMultiAdd, onDismiss: { selecting = false; selected = [] }) {
                 AddToPlaylistSheet(tracks: selectedTracks).environmentObject(app)
             }
+            .trackTargetDestination()
             .navigationDestination(for: Card.self) { c in
                 Group {
                     if c.uri.contains(":show:") {
@@ -1858,7 +1917,7 @@ struct SearchView: View {
                 player.play(tracks: [Track(uri: uri, name: name, artist: r.artist ?? "", image: r.image)],
                             contextName: "Spotify-Link", contextURI: "")
             } else {
-                navPath.append(Card(uri: uri, name: r.name ?? "", image: r.image, artist: nil, owner: nil, desc: nil))
+                router.search.append(Card(uri: uri, name: r.name ?? "", image: r.image, artist: nil, owner: nil, desc: nil))
             }
         }
     }
@@ -1880,7 +1939,7 @@ struct SearchView: View {
             guard let r, r.ok, let uri = r.uri else { return }
             query = ""
             NotificationCenter.default.post(name: .init("discoverPlaylistsChanged"), object: nil)
-            navPath.append(Card(uri: uri, name: r.name ?? "", image: nil, artist: nil, owner: nil, desc: nil))
+            router.search.append(Card(uri: uri, name: r.name ?? "", image: nil, artist: nil, owner: nil, desc: nil))
         }
     }
     /// Tippen -> nach kurzer Pause automatisch suchen (wie PWA).
@@ -2024,15 +2083,27 @@ private struct TrackNavSheets: ViewModifier {
     @Binding var showAddPlaylist: Bool
     @Binding var showSendUser: Bool
     @Binding var showFixYT: Bool
+    @Environment(\.tabRouter) private var router
     func body(content: Content) -> some View {
         content
-            .sheet(isPresented: $showArtist) {
+            // In den Tabs öffnet „Gehe zu“ eine echte Seite im Stapel, sonst ein Blatt
+            .sheet(isPresented: router == nil ? $showArtist : .constant(false)) {
                 NavigationStack { TrackTargetView(track: track, kind: .artist) }
                     .presentationDragIndicator(.visible)
             }
-            .sheet(isPresented: $showAlbum) {
+            .sheet(isPresented: router == nil ? $showAlbum : .constant(false)) {
                 NavigationStack { TrackTargetView(track: track, kind: .album) }
                     .presentationDragIndicator(.visible)
+            }
+            .onChange(of: showArtist) { _, on in
+                guard on, let router else { return }
+                showArtist = false
+                router.open(TrackTarget(track: track, artist: true))
+            }
+            .onChange(of: showAlbum) { _, on in
+                guard on, let router else { return }
+                showAlbum = false
+                router.open(TrackTarget(track: track, artist: false))
             }
             .sheet(isPresented: $showAddPlaylist) { AddToPlaylistSheet(track: track) }
             .sheet(isPresented: $showSendUser) { SendToUserSheet(track: track) }
@@ -2245,6 +2316,7 @@ struct AddToPlaylistSheet: View {
 // MARK: - Bibliothek
 struct LibraryView: View {
     @EnvironmentObject var app: AppState
+    @EnvironmentObject private var router: TabRouter
     @Environment(\.playerRef) private var playerRef
     private var player: PlayerController { playerRef! }
     @EnvironmentObject var now: NowPlayingState
@@ -2283,7 +2355,7 @@ struct LibraryView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $router.library) {
             ScrollView {
                 Text("Meine Bibliothek").font(.system(size: 28, weight: .heavy)).foregroundStyle(Theme.text)
                     .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal).padding(.top, 6)
@@ -2361,6 +2433,7 @@ struct LibraryView: View {
             .overlay { if !loaded && playlists.isEmpty && tab != "offline" { SkeletonRows() } }   // Offline-Tab nie blockieren
             .animation(.easeOut(duration: 0.25), value: loaded)
             .navigationTitle("").navigationBarTitleDisplayMode(.inline)
+            .trackTargetDestination()
             .navigationDestination(for: Playlist.self) { pl in
                 TrackListView(uri: pl.uri, title: pl.name, image: pl.image, isAlbum: false)
             }
@@ -2498,6 +2571,7 @@ struct RadioRow: View {
 // MARK: - Radio
 struct RadioView: View {
     @EnvironmentObject var app: AppState
+    @EnvironmentObject private var router: TabRouter
     @Environment(\.playerRef) private var playerRef
     private var player: PlayerController { playerRef! }
     @EnvironmentObject var now: NowPlayingState
@@ -2506,7 +2580,7 @@ struct RadioView: View {
     @State private var showSearch = false
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $router.radio) {
             ScrollView {
                 Text("Live-Radio").font(.system(size: 28, weight: .heavy)).foregroundStyle(Theme.text)
                     .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal).padding(.top, 6)
@@ -2525,6 +2599,7 @@ struct RadioView: View {
             }
             .scrollContentBackground(.hidden).background(Theme.bg)
             .navigationTitle("").navigationBarTitleDisplayMode(.inline)
+            .trackTargetDestination()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showSearch = true } label: {
@@ -2691,6 +2766,7 @@ struct ArtistView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar { ToolbarItem(placement: .topBarLeading) {
             Button { dismiss() } label: { Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold)).foregroundStyle(hero.isLight ? .black : Theme.text) }
+                .accessibilityLabel("Zurück")
         } }
         .overlay {
             if loading { LoadingView() } else if resp == nil { LoadFailedView { retry += 1 } }
@@ -2944,12 +3020,14 @@ struct TrackListView: View {
                         HStack {
                             Text("Empfehlungen").font(.title3.bold()).foregroundStyle(Theme.text)
                             Spacer()
-                            if moreLoading { ProgressView().tint(Theme.accent) }
+                            // 42 pt breit wie die Plus-Knöpfe darunter, so stehen alle auf einer Linie
+                            if moreLoading { ProgressView().tint(Theme.accent).frame(width: 42, height: 42) }
                             else {
                                 Button { loadMoreRecs() } label: {
                                     Image(systemName: "arrow.triangle.2.circlepath")
                                         .font(.system(size: 19, weight: .semibold)).foregroundStyle(Theme.text)
-                                }
+                                        .frame(width: 42, height: 42).contentShape(Rectangle())
+                                }.buttonStyle(.pressable).accessibilityLabel("Neue Empfehlungen")
                             }
                         }.padding(.horizontal).padding(.top, 8)
                         Text(isAlbum ? "Ähnliche Songs" : "Basierend auf den Songs deiner Playlist")
@@ -2992,7 +3070,7 @@ struct TrackListView: View {
             ToolbarItem(placement: .topBarLeading) {
                 Button { dismiss() } label: {
                     Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold)).foregroundStyle(hero.isLight ? .black : Theme.text)
-                }
+                }.accessibilityLabel("Zurück")
             }
             if !isAlbum {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -3335,6 +3413,7 @@ struct PodcastView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar { ToolbarItem(placement: .topBarLeading) {
             Button { dismiss() } label: { Image(systemName: "chevron.left").font(.system(size: 18, weight: .semibold)).foregroundStyle(hero.isLight ? .black : Theme.text) }
+                .accessibilityLabel("Zurück")
         } }
         .overlay {
             if loading { LoadingView() } else if resp == nil { LoadFailedView { retry += 1 } }
@@ -3813,6 +3892,7 @@ struct MiniQueueSheet: View {
 
 // MARK: - Vollbild-Player
 struct PlayerView: View {
+    @Environment(\.tabRouter) private var router
     @State private var modeHint = ""
     @State private var modeHintTask: Task<Void, Never>?
     private func repeatLabel(_ m: RepeatMode) -> String {
@@ -3911,7 +3991,7 @@ struct PlayerView: View {
                         }
                         Menu {
                             if let t = p.current {
-                                TrackMenu(track: t, onShowArtist: { showArtist = true }, onShowAlbum: { showAlbum = true }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }).equatable()
+                                TrackMenu(track: t, onShowArtist: { goTo(t, artist: true) }, onShowAlbum: { goTo(t, artist: false) }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }).equatable()
                             }
                         } label: {
                             Image(systemName: "ellipsis").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
@@ -4123,6 +4203,11 @@ struct PlayerView: View {
             }
         }
         .task(id: player.displayImage) { if let c = await averageColor(player.displayImage) { hero = c } }
+    }
+    /// In den Tabs: Player schließen und die Seite dort öffnen. Sonst wie früher als Blatt.
+    private func goTo(_ t: Track, artist: Bool) {
+        if let router { router.open(TrackTarget(track: t, artist: artist)) }
+        else if artist { showArtist = true } else { showAlbum = true }
     }
     private func fmt(_ s: Double) -> String {
         guard s.isFinite, s >= 0 else { return "0:00" }

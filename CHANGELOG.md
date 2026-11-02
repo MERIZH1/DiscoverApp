@@ -3,6 +3,10 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.9 — Künstler und Alben als echte Seiten
+- **Verbessert:** „Gehe zu Künstler/Album“ öffnet eine richtige Seite im aktuellen Tab. Die Tab-Leiste bleibt sichtbar, Zurück führt zur vorigen Seite. Aus dem großen Player heraus schließt der sich vorher.
+- **Verbessert:** Der Knopf für neue Empfehlungen steht genau über den Plus-Knöpfen.
+
 ## v1.1.8 — Cover, die zuverlässig laden
 - **Bugfix:** Cover in Listen bleiben nicht mehr leer, wenn Spotifys Bildserver kurz hängt. Jedes Bild bekommt drei Versuche mit 10 s Zeitlimit statt eines Versuchs mit 60 s.
 - **Verbessert (Server):** „Zuletzt“ zeigt wieder Künstlerbilder, die Lieblingssongs sind wieder gefüllt.

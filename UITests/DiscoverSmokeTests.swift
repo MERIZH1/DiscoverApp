@@ -127,8 +127,10 @@ final class DiscoverSmokeTests: XCTestCase {
         app.buttons["Gehe zu"].firstMatch.tap()
         app.buttons["Künstler"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Kuenstler 2"].firstMatch.waitForExistence(timeout: 10))
+        // Echte Seite im Such-Tab, die Tab-Leiste bleibt sichtbar
+        XCTAssertTrue(app.tabBars.firstMatch.exists)
         shot("41-kuenstler-lokal")
-        app.swipeDown(velocity: .fast)
+        app.buttons["Zurück"].firstMatch.tap()
         sleep(1)
 
         XCTAssertTrue(song.waitForExistence(timeout: 10))
