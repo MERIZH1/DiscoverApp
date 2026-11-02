@@ -3,6 +3,16 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.6 — Menüs, die überall hinführen
+- **Bugfix:** „Gehe zu Künstler“ und „Gehe zu Album“ gehen jetzt auch bei lokalen Songs und YouTube-Funden auf.
+- **Bugfix:** „Auf dem PC weiterspielen“ kommt zuverlässig an und steigt an der richtigen Stelle ein.
+- **Bugfix:** Hörbücher zeigen den richtigen Titel und einen Hinweis statt einer leeren Seite.
+- **Bugfix:** Die Begrüßung folgt deiner Uhrzeit.
+- **Neu:** Songs in Warteschlange und Verlauf haben dasselbe Menü wie überall sonst.
+- **Neu:** Mosaik-Cover für Statistik-Playlists, Platzhalter statt leerer Cover.
+- **Verbessert:** Federnde Animationen, Symbolwechsel und weiche Übergänge beim Laden.
+- **Verbessert:** Deezer ist entfernt, Downloads laufen über YouTube.
+
 ## v1.1.4 — Ehrlicher Player
 - **Bugfix:** Spielt ein Song nicht, zeigt der Hauptknopf nicht mehr Pause.
 - **Verbessert:** Solange kein Ton kommt, zeigen die Knöpfe Laden.

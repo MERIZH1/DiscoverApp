@@ -276,7 +276,7 @@ struct AdminConsoleView: View {
 
                     SettingsGroup("SERVER-LOGS") {
                         debugButton("Logs anzeigen (Klartext)", icon: "doc.text.magnifyingglass") { await loadAndShowLogs() }
-                        Text("Was der Server gerade tut — verstaendlich aufbereitet.")
+                        Text("Was der Server gerade tut — verständlich aufbereitet.")
                             .font(.caption2).foregroundStyle(Theme.mute)
                     }
 
@@ -361,7 +361,7 @@ struct AdminConsoleView: View {
                                 .font(.system(size: 15)).foregroundStyle(Theme.text)
                         }.tint(Theme.accent)
                         if serverAlerts {
-                            Text("Fuer welche Dienste:").font(.caption2).foregroundStyle(Theme.mute).padding(.top, 2)
+                            Text("Für welche Dienste:").font(.caption2).foregroundStyle(Theme.mute).padding(.top, 2)
                             Toggle(isOn: $alertSpotify)   { Text("Spotify").font(.system(size: 14)).foregroundStyle(Theme.text) }.tint(Theme.accent)
                             Toggle(isOn: $alertNavidrome) { Text("Navidrome").font(.system(size: 14)).foregroundStyle(Theme.text) }.tint(Theme.accent)
                             Toggle(isOn: $alertYouTube)   { Text("YouTube").font(.system(size: 14)).foregroundStyle(Theme.text) }.tint(Theme.accent)

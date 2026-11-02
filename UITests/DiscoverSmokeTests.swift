@@ -139,6 +139,23 @@ final class DiscoverSmokeTests: XCTestCase {
         shot("42-album-lokal")
     }
 
+    /// Hörbücher liefern keine Folgen: Die Seite erklärt das und führt zu Spotify.
+    func testHoerbuch() {
+        tab("Suchen")
+        let feld = app.searchFields.firstMatch.exists ? app.searchFields.firstMatch : app.textFields.firstMatch
+        XCTAssertTrue(feld.waitForExistence(timeout: 10))
+        feld.tap()
+        feld.typeText("Buch")
+        app.keyboards.buttons["search"].firstMatch.tap()
+        let karte = app.staticTexts["Testbuch"].firstMatch
+        XCTAssertTrue(karte.waitForExistence(timeout: 10))
+        karte.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["Auf Spotify öffnen"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Testbuch"].firstMatch.exists)
+        XCTAssertFalse(app.staticTexts["0 Folgen"].exists)
+        shot("43-hoerbuch")
+    }
+
     func testRadio() {
         tab("Radio")
         shot("10-radio")

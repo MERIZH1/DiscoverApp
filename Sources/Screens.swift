@@ -823,7 +823,9 @@ struct HomeView: View {
     @State private var showAccount = false
 
     private var greetingText: String {
-        let g = home?.greeting ?? "Hallo"
+        // Spotifys Gruß hängt an einer fremden Zeitzone, nachts stand dort „Guten Abend“
+        let h = Calendar.current.component(.hour, from: Date())
+        let g = h < 5 || h >= 22 ? "Gute Nacht" : h < 11 ? "Guten Morgen" : h < 17 ? "Guten Tag" : "Guten Abend"
         let n = home?.user_name ?? app.profile?.name ?? ""
         return n.isEmpty ? g : "\(g) \(n)"
     }
@@ -893,6 +895,8 @@ struct HomeView: View {
                         }
                     }
                 }.padding(.bottom, 130)
+                .animation(.easeOut(duration: 0.25), value: home == nil)
+                .animation(Motion.quick, value: filter)
             }
             .scrollContentBackground(.hidden)
             .background(
@@ -1284,7 +1288,7 @@ struct SettingsView: View {
                         Toggle(isOn: $app.liquidGlass) {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("iOS 26.5 Design").font(.system(size: 15)).foregroundStyle(Theme.text)
-                                Text("Liquid Glass, schwebende Controls und native Aktionsflaechen. Ausschalten = klassischer Discover-Look.").font(.caption2).foregroundStyle(Theme.mute)
+                                Text("Liquid Glass, schwebende Controls und native Aktionsflächen. Ausschalten = klassischer Discover-Look.").font(.caption2).foregroundStyle(Theme.mute)
                             }
                         }.tint(Theme.accent)
                         .onChange(of: app.liquidGlass) { _ in configureAppearance(glass: app.liquidGlass) }
@@ -1664,6 +1668,7 @@ struct SearchView: View {
                 }
                 .scrollContentBackground(.hidden)
                 .scrollDismissesKeyboard(.interactively)
+                .animation(.easeOut(duration: 0.2), value: res == nil)
                 .simultaneousGesture(TapGesture().onEnded { dismissSearchKeyboard() })
                 .safeAreaInset(edge: .bottom) { artistStrip }
             }
@@ -2080,7 +2085,7 @@ struct SendToUserSheet: View {
                                     AvatarCircle(name: p.name, color: p.color, size: 40)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(p.name).font(.system(size: 16)).foregroundStyle(Theme.text)
-                                        Text("Als naechstes oder in die Inbox")
+                                        Text("Als Nächstes oder in die Inbox")
                                             .font(.caption).foregroundStyle(Theme.sub)
                                     }
                                     Spacer()
@@ -2308,7 +2313,7 @@ struct LibraryView: View {
                         }
                     } else if tab == "offline" {
                         if downloads.tracks.isEmpty {
-                            Text("Noch nichts heruntergeladen.\nIm Song-Menue (…) auf Herunterladen tippen.")
+                            Text("Noch nichts heruntergeladen.\nIm Song-Menü (…) auf Herunterladen tippen.")
                                 .font(.system(size: 14)).foregroundStyle(Theme.mute)
                                 .multilineTextAlignment(.center).frame(maxWidth: .infinity).padding(.top, 50)
                         }
@@ -2350,9 +2355,11 @@ struct LibraryView: View {
                         }
                     }
                 }.padding(.top, 10).padding(.bottom, 130)
+                .animation(Motion.quick, value: tab)
             }
             .scrollContentBackground(.hidden).background(Theme.bg)
             .overlay { if !loaded && playlists.isEmpty && tab != "offline" { SkeletonRows() } }   // Offline-Tab nie blockieren
+            .animation(.easeOut(duration: 0.25), value: loaded)
             .navigationTitle("").navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: Playlist.self) { pl in
                 TrackListView(uri: pl.uri, title: pl.name, image: pl.image, isAlbum: false)
@@ -2526,6 +2533,7 @@ struct RadioView: View {
                 }
             }
             .overlay { if !loaded { LoadingView() } }
+            .animation(.easeOut(duration: 0.25), value: loaded)
         }
         .sheet(isPresented: $showSearch) { RadioSearchSheet(onAdded: { await reload() }).environmentObject(app) }
         .task { if !loaded { await reload() } }
@@ -2687,6 +2695,7 @@ struct ArtistView: View {
         .overlay {
             if loading { LoadingView() } else if resp == nil { LoadFailedView { retry += 1 } }
         }
+        .animation(.easeOut(duration: 0.25), value: loading)
         .task(id: retry) {
             if resp != nil { return }   // zurueck von einer Unterseite: Seite bleibt stehen
             loading = true
@@ -2769,7 +2778,7 @@ struct TrackListView: View {
         Task {
             let ok = await app.api.removeFromPlaylist(playlistUri: uri, trackUri: t.uri)
             await MainActor.run {
-                if ok { tracks.removeAll { $0.uri == t.uri } }
+                if ok { withAnimation(Motion.spring) { tracks.removeAll { $0.uri == t.uri } } }
                 copyMsg = ok ? "Entfernt ✓" : "Entfernen fehlgeschlagen"
             }
             app.flash(ok ? "Aus Playlist entfernt ✓" : "Entfernen fehlgeschlagen")
@@ -2903,7 +2912,7 @@ struct TrackListView: View {
                 }
                 .padding(.bottom, 16)
                 // Tracks (nummeriert)
-                if loading && tracks.isEmpty { SkeletonRows() }
+                if loading && tracks.isEmpty { SkeletonRows().transition(.opacity) }
                 if loadFailed && tracks.isEmpty { LoadFailedView { reload += 1 } }
                 LazyVStack(spacing: 0) {
                     ForEach(Array(tracks.enumerated()), id: \.element.id) { idx, t in
@@ -2960,6 +2969,7 @@ struct TrackListView: View {
             }
         }
         .scrollContentBackground(.hidden)
+        .animation(.easeOut(duration: 0.25), value: tracks.isEmpty)
         .refreshable { await refreshAll() }
         .onReceive(NotificationCenter.default.publisher(for: .init("discoverPlaylistsChanged"))) { _ in
             Task { await refreshAll() }   // z.B. nach Umbenennen/Aenderung -> offene Playlist auffrischen
@@ -3113,7 +3123,7 @@ struct YouTubePlaylistExportSheet: View {
                     Spacer()
                 }
 
-                Text("Erstellt eine nicht gelistete YouTube-Playlist mit gleicher Reihenfolge wie in Discover. Jeder mit Link kann sie oeffnen.")
+                Text("Erstellt eine nicht gelistete YouTube-Playlist mit gleicher Reihenfolge wie in Discover. Jeder mit Link kann sie öffnen.")
                     .font(.system(size: 14)).foregroundStyle(Theme.sub)
 
                 Toggle("Oeffentlich statt nicht gelistet", isOn: $publicList)
@@ -3121,7 +3131,7 @@ struct YouTubePlaylistExportSheet: View {
                     .disabled(busy)
 
                 if checking {
-                    HStack { ProgressView().tint(Theme.accent); Text("Pruefe YouTube-Verbindung...").foregroundStyle(Theme.sub) }
+                    HStack { ProgressView().tint(Theme.accent); Text("Prüfe YouTube-Verbindung …").foregroundStyle(Theme.sub) }
                 } else if !configured {
                     Text("YouTube OAuth ist am Server noch nicht konfiguriert.")
                         .font(.system(size: 14, weight: .semibold)).foregroundStyle(Color(hex6: 0xFF6B6B))
@@ -3130,7 +3140,7 @@ struct YouTubePlaylistExportSheet: View {
                         Text("YouTube muss einmal verbunden werden.")
                             .font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.text)
                         Button { openAuth() } label: {
-                            Label("Google-Login oeffnen", systemImage: "link")
+                            Label("Google-Login öffnen", systemImage: "link")
                                 .font(.system(size: 16, weight: .semibold)).foregroundStyle(.black)
                                 .frame(maxWidth: .infinity).padding(.vertical, 13)
                                 .background(Theme.accent).clipShape(RoundedRectangle(cornerRadius: 8))
@@ -3239,8 +3249,13 @@ struct PodcastView: View {
     @State private var loading = true
     @State private var hero: Color = Theme.elev
 
-    private var showName: String { resp?.show?.name ?? title }
+    // Hörbücher kommen ohne Namen oder mit dem Platzhalter „Podcast“
+    private var showName: String {
+        let n = resp?.show?.name ?? ""
+        return n.isEmpty || n == "Podcast" ? title : n
+    }
     private var showImage: String? { resp?.show?.image ?? image }
+    private var noEpisodes: Bool { resp != nil && resp?.episodes.isEmpty == true }
     private var episodeTracks: [Track] { (resp?.episodes ?? []).map { $0.track(podcast: showName, fallbackImage: showImage) } }
     private var allDownloaded: Bool { !episodeTracks.isEmpty && episodeTracks.allSatisfy { downloads.isDownloaded($0.uri) } }
     private var anyDownloaded: Bool { episodeTracks.contains { downloads.isDownloaded($0.uri) } }
@@ -3262,10 +3277,23 @@ struct PodcastView: View {
                             Label(String(format: "%.1f", r), systemImage: "star.fill")
                                 .font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.accent)
                         }
-                        Text("\(resp?.episodes.count ?? 0) Folgen").font(.system(size: 13)).foregroundStyle(Theme.sub)
+                        if !noEpisodes {
+                            Text("\(resp?.episodes.count ?? 0) Folgen").font(.system(size: 13)).foregroundStyle(Theme.sub)
+                        }
                     }
                     Text("Cover antippen für Beschreibung").font(.system(size: 11)).foregroundStyle(Theme.mute)
 
+                    if noEpisodes {
+                        Text("Hierzu liefert Spotify keine Folgen. Hörbücher lassen sich nur bei Spotify abspielen.")
+                            .font(.system(size: 14)).foregroundStyle(Theme.sub)
+                            .multilineTextAlignment(.center).padding(.horizontal, 32).padding(.top, 8)
+                        if let id = uri.split(separator: ":").last, let url = URL(string: "https://open.spotify.com/show/\(id)") {
+                            Link("Auf Spotify öffnen", destination: url)
+                                .font(.system(size: 14, weight: .semibold)).foregroundStyle(.black)
+                                .padding(.horizontal, 18).padding(.vertical, 10)
+                                .background(Theme.accent).clipShape(Capsule()).padding(.top, 6)
+                        }
+                    } else if resp != nil {
                     Button {
                         if anyDownloaded { for t in episodeTracks { downloads.delete(t.uri) } }
                         else { Task { for (i, t) in episodeTracks.enumerated() { await downloads.download(t, collection: podcastColl, order: i) } } }
@@ -3276,6 +3304,7 @@ struct PodcastView: View {
                             .padding(.horizontal, 18).padding(.vertical, 10)
                             .background(anyDownloaded ? Theme.input : Theme.accent).clipShape(Capsule())
                     }.padding(.top, 6)
+                    }
                 }.frame(maxWidth: .infinity).padding(.bottom, 16)
 
                 LazyVStack(spacing: 0) {
@@ -3310,6 +3339,7 @@ struct PodcastView: View {
         .overlay {
             if loading { LoadingView() } else if resp == nil { LoadFailedView { retry += 1 } }
         }
+        .animation(.easeOut(duration: 0.25), value: loading)
         .task(id: retry) {
             if resp != nil { return }
             loading = true
