@@ -152,7 +152,7 @@ struct Track: Codable, Identifiable, Hashable {
         self.uri = uri; self.name = name; self.artist = artist
         self.image = image; self.artists = nil; self.album = nil
         self.album_uri = nil; self.duration_ms = nil; self.downloaded = nil
-        self.navidromeId = nil
+        self.navidromeId = uri.hasPrefix("navidrome:") ? String(uri.dropFirst("navidrome:".count)) : nil
     }
 }
 

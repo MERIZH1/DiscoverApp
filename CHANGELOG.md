@@ -3,6 +3,12 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.7 — Immer nur ein Gerät spielt
+- **Bugfix:** Startet ein Song am iPhone, stoppt der PC, und umgekehrt.
+- **Verbessert:** Play am iPhone setzt die Wiedergabe hier fort, wenn das andere Gerät steht.
+- **Verbessert:** Die Suche liefert die vollen Listen von Spotify und zeigt wieder Künstler.
+- **Verbessert:** Songs, die Spotify ausblendet, stehen oben, wenn sie auf dem Server liegen.
+
 ## v1.1.6 — Menüs, die überall hinführen
 - **Bugfix:** „Gehe zu Künstler“ und „Gehe zu Album“ gehen jetzt auch bei lokalen Songs und YouTube-Funden auf.
 - **Bugfix:** „Auf dem PC weiterspielen“ kommt zuverlässig an und steigt an der richtigen Stelle ein.

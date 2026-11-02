@@ -99,7 +99,13 @@ final class SyncManager: ObservableObject {
                 if let snap = snapshot(p) { await api.syncPushState(snap); lastPush = now }
             }
             wasOwner = true
-            if remote != nil { remote = nil }
+            if let r = remote {
+                // Wie bei Spotify spielt immer nur ein Geraet: Startet hier der Ton, stoppt das andere.
+                if r.playing == true, let id = r.device_id {
+                    await api.syncSendCommand("pause", value: nil, target: id, fromID: deviceID)
+                }
+                remote = nil
+            }
         } else {
             // Play -> Pause-Wechsel: finalen State sofort pushen.
             if wasOwner {
@@ -183,7 +189,10 @@ final class SyncManager: ObservableObject {
         let target = remote?.device_id
         Task { await api.syncSendCommand(cmd, value: value, target: target, fromID: deviceID) }
     }
-    func remotePlayPause() { send((remote?.playing == true) ? "pause" : "play") }
+    /// Steht das andere Geraet, geht es hier weiter statt dort.
+    func remotePlayPause() {
+        if remote?.playing == true { send("pause") } else { pullPlaybackHere() }
+    }
     func remoteNext() { send("next") }
     func remotePrev() { send("prev") }
     func remoteSeek(_ t: Double) { send("seek", value: t) }
