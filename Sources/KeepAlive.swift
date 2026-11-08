@@ -21,6 +21,14 @@ final class ConnectKeepAlive {
     private var inBackground = false
     private var musicPlaying = false
     private(set) var running = false
+    /// Anruf oder andere App hat den Ton: bis zum nächsten eigenen Abspielen keinen stummen
+    /// Ton starten, sonst nähme Discover der anderen App den Ton weg.
+    private var yielded = false
+
+    func yieldToOtherAudio() {
+        yielded = true
+        stop()
+    }
 
     private init() {
         NotificationCenter.default.addObserver(forName: AVAudioSession.interruptionNotification,
@@ -28,12 +36,13 @@ final class ConnectKeepAlive {
             guard let raw = n.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
                   AVAudioSession.InterruptionType(rawValue: raw) == .began else { return }
             // Eine andere App spielt jetzt. Nicht dagegenhalten, iOS darf uns schlafen legen.
-            Task { @MainActor in ConnectKeepAlive.shared.stop() }
+            Task { @MainActor in ConnectKeepAlive.shared.yieldToOtherAudio() }
         }
     }
 
     func playerChanged(playing: Bool) {
         musicPlaying = playing
+        if playing { yielded = false }
         if playing {
             // Erst aus, wenn der echte Ton sicher läuft. Sonst friert iOS die App in der
             // Lücke zwischen Befehl und erstem Ton ein.
@@ -60,7 +69,7 @@ final class ConnectKeepAlive {
 
     private func start() {
         let min = Self.minutes
-        guard min > 0 else { return }
+        guard min > 0, !yielded else { return }
         stopSoon?.cancel()
         timer?.cancel()
         timer = Task { [weak self] in

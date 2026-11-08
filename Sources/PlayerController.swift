@@ -277,8 +277,132 @@ final class PlayerController: ObservableObject {
         setupRemoteCommands()
         addTimeObserver()
         outputObs = [playerA, playerB].map { candidate in
-            candidate.observe(\.timeControlStatus) { [weak self] _, _ in
-                Task { @MainActor in self?.updateBuffering() }
+            candidate.observe(\.timeControlStatus) { [weak self] p, _ in
+                Task { @MainActor in
+                    self?.updateBuffering()
+                    self?.checkExternalPause(p)
+                }
+            }
+        }
+        observeAudioSession()
+    }
+
+    /// Jeder Song darf „Stereo räumlich“ aus dem Kontrollzentrum nutzen (AirPods).
+    /// Ohne diese Freigabe räumlicht iOS nur Mehrkanal-Ton, Musik blieb also unverändert.
+    private func makeItem(_ url: URL) -> AVPlayerItem {
+        let item = AVPlayerItem(url: url)
+        item.allowedAudioSpatializationFormats = .monoStereoAndMultichannel
+        return item
+    }
+
+    // MARK: - Unterbrechungen (Anruf, Siri, andere App, Kontrollzentrum)
+    // Hielt iOS die Wiedergabe an, merkte die App das bisher nicht: Sie hielt sich weiter für
+    // „spielend“, die Knöpfe hingen, und im Hintergrund fror iOS sie ein, weil kein Ton mehr
+    // kam (08.11.2026: Musik stoppte beim Öffnen des Kontrollzentrums). Jetzt wie andere
+    // Musik-Apps: Zustand angleichen, nach kurzen Unterbrechungen weiterspielen,
+    // Kopfhörer raus = Pause. Jedes Ereignis landet als [BG]-Zeile im Server-Log.
+    private var interruptedWhilePlaying = false
+    private var interruptStart = Date.distantPast
+    private var lastSessionEvent = Date.distantPast
+    private var lastExtResume = Date.distantPast
+    private var sessionObs: [NSObjectProtocol] = []
+
+    private func observeAudioSession() {
+        let nc = NotificationCenter.default
+        sessionObs.append(nc.addObserver(forName: AVAudioSession.interruptionNotification,
+                                         object: nil, queue: .main) { [weak self] n in
+            let typeRaw = n.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+            let optRaw = n.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
+            let reason = n.userInfo?[AVAudioSessionInterruptionReasonKey] as? UInt ?? 0
+            Task { @MainActor in self?.handleInterruption(typeRaw, optRaw, reason) }
+        })
+        sessionObs.append(nc.addObserver(forName: AVAudioSession.routeChangeNotification,
+                                         object: nil, queue: .main) { [weak self] n in
+            let raw = n.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt ?? 0
+            let prev = (n.userInfo?[AVAudioSessionRouteChangePreviousRouteKey] as? AVAudioSessionRouteDescription)?
+                .outputs.map { $0.portType.rawValue }.joined(separator: "+") ?? ""
+            Task { @MainActor in self?.handleRouteChange(raw, prev: prev) }
+        })
+        sessionObs.append(nc.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification,
+                                         object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                self.lastSessionEvent = Date()
+                self.diag("audio_reset", self.trackDiag(self.current))
+                AudioSessionManager.activate()
+            }
+        })
+    }
+
+    private func handleInterruption(_ typeRaw: UInt?, _ optRaw: UInt, _ reason: UInt) {
+        lastSessionEvent = Date()
+        guard let raw = typeRaw, let type = AVAudioSession.InterruptionType(rawValue: raw) else { return }
+        if type == .began {
+            // Grund 1 = die App war eingefroren, die Meldung kommt erst beim Aufwachen: nichts verpasst.
+            if reason == 1 { diag("audio_interrupt", "began reason=1 (war eingefroren)"); return }
+            let was = wantPlay || isPlaying
+            interruptedWhilePlaying = was
+            interruptStart = Date()
+            diag("audio_interrupt", "began playing=\(was) reason=\(reason) \(trackDiag(current))")
+            guard was else { return }
+            // Erst den stummen Wach-Ton sperren, sonst nähme er der anderen App den Ton wieder weg.
+            ConnectKeepAlive.shared.yieldToOtherAudio()
+            wantPlay = false; isPlaying = false; updateBuffering(); updateRate()
+        } else {
+            let opts = AVAudioSession.InterruptionOptions(rawValue: optRaw)
+            let other = AVAudioSession.sharedInstance().isOtherAudioPlaying
+            let secs = Date().timeIntervalSince(interruptStart)
+            // Apple: weiter, wenn iOS es erlaubt. Dazu: kurze Unterbrechung ohne fremden Ton
+            // (z.B. Systemfenster) -> ebenfalls weiter, so wie andere Musik-Apps.
+            let go = interruptedWhilePlaying && (opts.contains(.shouldResume) || (secs < 20 && !other))
+            diag("audio_interrupt", "ended shouldResume=\(opts.contains(.shouldResume)) other=\(other) secs=\(Int(secs)) resume=\(go)")
+            interruptedWhilePlaying = false
+            if go { resume() }
+        }
+    }
+
+    private func handleRouteChange(_ raw: UInt, prev: String) {
+        lastSessionEvent = Date()
+        let reason = AVAudioSession.RouteChangeReason(rawValue: raw)
+        if reason != .categoryChange {
+            let now = AVAudioSession.sharedInstance().currentRoute.outputs.map { $0.portType.rawValue }.joined(separator: "+")
+            diag("audio_route", "reason=\(raw) from=\(prev) to=\(now) playing=\(isPlaying)")
+        }
+        // Kopfhörer raus oder AirPods weg: AVPlayer hält selbst an, die App zeigt Pause.
+        if reason == .oldDeviceUnavailable, wantPlay || isPlaying {
+            wantPlay = false; player.pause(); isPlaying = false; updateBuffering(); updateRate()
+        }
+    }
+
+    /// AVPlayer steht, obwohl die App spielen will, und keine Unterbrechung erklärt es:
+    /// einmal weiterspielen. Hält er binnen 20 s wieder an, gilt das als echte Pause.
+    private func checkExternalPause(_ p: AVPlayer) {
+        guard p === player, p.timeControlStatus == .paused, wantPlay, !loading, !crossfading,
+              let item = p.currentItem, item.status == .readyToPlay else { return }
+        let seen = Date()
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            guard let self, p === self.player, p.timeControlStatus == .paused, self.wantPlay,
+                  !self.loading, !self.crossfading, p.currentItem === item else { return }
+            if self.lastSessionEvent > seen.addingTimeInterval(-2) { return }   // Unterbrechung/Kopfhörer
+            let pos = CMTimeGetSeconds(item.currentTime())
+            let raw = CMTimeGetSeconds(item.duration)
+            var end = self.duration > 0 ? self.duration : Double.infinity
+            if raw.isFinite, raw > 0 { end = min(end, raw) }
+            if pos.isFinite, end.isFinite, pos >= end - 2 { return }   // Songende regelt next()
+            let state = UIApplication.shared.applicationState.rawValue
+            if Date().timeIntervalSince(self.lastExtResume) < 20 {
+                self.diag("player_paused_ext", "\(self.trackDiag(self.current)) pos=\(Int(pos)) app=\(state) -> Pause")
+                self.wantPlay = false; self.isPlaying = false; self.updateBuffering(); self.updateRate()
+                return
+            }
+            self.lastExtResume = Date()
+            self.diag("player_paused_ext", "\(self.trackDiag(self.current)) pos=\(Int(pos)) app=\(state) -> weiter")
+            self.startOutput()
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            if p === self.player, p.currentItem === item, self.wantPlay, p.timeControlStatus == .paused {
+                self.diag("player_paused_ext", "\(self.trackDiag(self.current)) weiter ging nicht -> Pause")
+                self.wantPlay = false; self.isPlaying = false; self.updateBuffering(); self.updateRate()
             }
         }
     }
@@ -616,7 +740,7 @@ final class PlayerController: ObservableObject {
         b.volume = 0
         // Lokal vorhanden (offline oder vorgepuffert)? -> sofort, kein Streamen.
         if let local = localOrPrebuffered(nt) {
-            b.replaceCurrentItem(with: AVPlayerItem(url: local)); b.play()
+            b.replaceCurrentItem(with: makeItem(local)); b.play()
             return
         }
         Task {
@@ -625,7 +749,7 @@ final class PlayerController: ObservableObject {
                 guard crossfading, xfTarget?.uri == nt.uri,
                       r.ok, let rel = r.url, let url = api.absoluteURL(rel) else { abortCrossfade(); return }
                 if let d = r.duration, d > 0 { streamDurations[nt.uri] = Double(d) }
-                b.replaceCurrentItem(with: AVPlayerItem(url: url)); b.play()
+                b.replaceCurrentItem(with: makeItem(url)); b.play()
             } catch { abortCrossfade() }
         }
     }
@@ -1150,7 +1274,7 @@ final class PlayerController: ObservableObject {
         // Offline vorhanden (und diese Session nicht als fehlerhaft markiert)? -> lokal abspielen
         if track.liveRange == nil, let local = downloads?.localURL(for: track.uri), !failedOffline.contains(track.uri) {
             source = "offline"
-            let item = AVPlayerItem(url: local)
+            let item = makeItem(local)
             attachItemObservers(item)
             player.replaceCurrentItem(with: item)
             applyEQ(to: item, thenResume: autoplay)
@@ -1163,7 +1287,7 @@ final class PlayerController: ObservableObject {
         // Vorgepuffert (Offline-Buffer)? -> lokale Temp-Datei sofort spielen.
         if let pre = prebuf[track.uri], FileManager.default.fileExists(atPath: pre.path) {
             source = "buffer"
-            let item = AVPlayerItem(url: pre)
+            let item = makeItem(pre)
             attachItemObservers(item)
             player.replaceCurrentItem(with: item)
             applyEQ(to: item, thenResume: autoplay)
@@ -1211,7 +1335,7 @@ final class PlayerController: ObservableObject {
                     first = hu
                     hlsFallback = (track.uri, url)
                 }
-                let item = AVPlayerItem(url: first)
+                let item = makeItem(first)
                 // Zum Start reicht ein Abschnitt, nach readyToPlay gilt wieder die normale Pufferung.
                 if hlsFallback != nil { item.preferredForwardBufferDuration = 12 }
                 attachItemObservers(item)
@@ -1248,7 +1372,7 @@ final class PlayerController: ObservableObject {
         hlsFallback = nil
         hlsWatchdog?.cancel()
         pendingSeek = currentTime
-        let item = AVPlayerItem(url: f.url)
+        let item = makeItem(f.url)
         attachItemObservers(item)
         player.replaceCurrentItem(with: item)
         applyEQ(to: item, thenResume: wantPlay)
@@ -1298,7 +1422,7 @@ final class PlayerController: ObservableObject {
         radioTitle = s.name; radioFavicon = s.favicon; radioNowPlaying = ""
         currentTime = 0; duration = 0; loading = true
         player.volume = 1                                   // Radio: volle Lautstaerke, kein Fade
-        let item = AVPlayerItem(url: url)
+        let item = makeItem(url)
         attachItemObservers(item)
         // ICY-StreamTitle (laufender Song) live mitlesen
         let mdOut = AVPlayerItemMetadataOutput(identifiers: nil)
