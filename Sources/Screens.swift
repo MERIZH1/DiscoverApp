@@ -3966,7 +3966,9 @@ struct PlayerView: View {
                         .accessibilityIdentifier("player.remote")
                 }
                 Spacer()
-                Artwork(url: p.displayImage, size: 300, corner: 12).shadow(radius: 24)
+                // Mit dem Banner des anderen Geräts wird das Cover kleiner, sonst ragt der Player
+                // oben und unten über den Bildschirm (Kopfzeile mit Zu-Knopf war weg)
+                Artwork(url: p.displayImage, size: sync.remote?.track != nil ? 190 : 300, corner: 12).shadow(radius: 24)
                     .scaleEffect(p.isPlaying ? 1 : 0.9)
                     .animation(Motion.spring, value: p.isPlaying)
                 HStack(alignment: .top) {
