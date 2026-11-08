@@ -18,13 +18,19 @@ struct SpecialResponse: Codable {
     var app: SpecialLook?
 }
 
+/// Ein Ausbruch: wann und von wo (Bildschirm-Koordinaten). Ohne Ort: unten Mitte.
+struct SpecialBurst: Equatable, Sendable {
+    let start: Date
+    let at: CGPoint?
+}
+
 @MainActor
 final class SpecialTheme: ObservableObject {
     static let shared = SpecialTheme()
 
     @Published private(set) var id = ""
     @Published private(set) var look = SpecialLook()
-    @Published private(set) var bursts: [Date] = []
+    @Published private(set) var bursts: [SpecialBurst] = []
     /// Wann der Regen beim Öffnen begann (einmal je Sonderdesign und App-Start).
     private(set) var rainStart: Date?
     private var rainFor = ""
@@ -86,11 +92,12 @@ final class SpecialTheme: ObservableObject {
         return rainStart
     }
 
-    /// Kleiner Ausbruch von Symbolen (Play, Liken). Ohne Sonderdesign passiert nichts.
-    func celebrate() {
+    /// Symbole sprühen aus dem gedrückten Knopf (Play, Liken). `at` ist dessen Mitte in
+    /// Bildschirm-Koordinaten. Ohne Sonderdesign passiert nichts.
+    func celebrate(at: CGPoint? = nil) {
         guard active, look.burst != nil else { return }
         let now = Date()
-        bursts = bursts.filter { now.timeIntervalSince($0) < 1.5 } + [now]
+        bursts = bursts.filter { now.timeIntervalSince($0.start) < 1.6 } + [SpecialBurst(start: now, at: at)]
     }
 }
 
@@ -98,17 +105,21 @@ final class SpecialTheme: ObservableObject {
 struct SpecialLayer: View {
     var density: Double = 1
     var rain = false
+    var floating = true      // schwebende Symbole und Regen
+    var sprays = true        // Ausbrüche aus Knöpfen
     @ObservedObject private var special = SpecialTheme.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var rainStart: Date?
+    @State private var origin: CGPoint = .zero   // eigene Lage auf dem Bildschirm
 
     var body: some View {
         if special.active, let symbol = special.look.symbol {
             let palette = (special.look.colors ?? []).compactMap { Color(hexString: $0) }
             let colors = palette.isEmpty ? [Theme.accent] : palette
             let burstSymbol = special.look.burst ?? symbol
-            let scene = Setup(count: max(4, Int(Double(special.look.count ?? 14) * density)), colors: colors.count,
-                              still: reduceMotion, rainStart: rainStart, bursts: special.bursts)
+            let scene = Setup(count: floating ? max(4, Int(Double(special.look.count ?? 14) * density)) : 0,
+                              colors: colors.count, still: reduceMotion, rainStart: floating ? rainStart : nil,
+                              bursts: sprays ? special.bursts : [], origin: origin)
             TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { tl in
                 Canvas { ctx, size in
                     Self.draw(&ctx, size: size, now: tl.date, scene: scene)
@@ -125,6 +136,7 @@ struct SpecialLayer: View {
             }
             .allowsHitTesting(false)
             .accessibilityHidden(true)
+            .onGeometryChange(for: CGPoint.self) { $0.frame(in: .global).origin } action: { origin = $0 }
             .onAppear { if rain && !reduceMotion { rainStart = special.takeRain() } }
         }
     }
@@ -137,7 +149,8 @@ struct SpecialLayer: View {
         let colors: Int
         let still: Bool
         let rainStart: Date?
-        let bursts: [Date]
+        let bursts: [SpecialBurst]
+        let origin: CGPoint
     }
 
     /// Gleichmäßig verteilte Zufallszahl 0..<1, fest je Teilchen i und Eigenschaft k.
@@ -188,18 +201,25 @@ struct SpecialLayer: View {
                 }
             }
         }
-        // Kleine Ausbrüche bei Play und Liken, von unten Mitte
-        for (b, start) in scene.bursts.enumerated() {
-            let age = now.timeIntervalSince(start)
-            guard age >= 0, age < 1.2 else { continue }
-            for i in 0..<9 {
-                let k = b * 31 + i
-                let a = -Double.pi / 2 + (Double(i) / 8 - 0.5) * 2.2 + (rnd(k, 21) - 0.5) * 0.3
-                let sp = 160 + rnd(k, 22) * 140
-                let x = w / 2 + cos(a) * sp * age
-                let y = h * 0.8 + sin(a) * sp * age + 200 * age * age
-                put(&ctx, 100 + i % colors, x: x, y: y, size: 12 + rnd(k, 23) * 10,
-                    angle: (rnd(k, 24) - 0.5) * age * 4, alpha: min(1, (1 - age / 1.2) * 1.8))
+        // Ausbrüche: Symbole sprühen aus dem gedrückten Knopf, rundherum mit Zug nach oben,
+        // dann fallen sie langsam und verblassen
+        for (b, burst) in scene.bursts.enumerated() {
+            let age = now.timeIntervalSince(burst.start)
+            guard age >= 0, age < 1.5 else { continue }
+            let cx = burst.at.map { $0.x - scene.origin.x } ?? w / 2
+            let cy = burst.at.map { $0.y - scene.origin.y } ?? h * 0.8
+            let count = burst.at == nil ? 10 : 20
+            for i in 0..<count {
+                let k = b * 53 + i
+                let a = -Double.pi / 2 + (Double(i) / Double(count) - 0.5) * 2 * Double.pi * 0.92 + (rnd(k, 21) - 0.5) * 0.35
+                let sp = 140 + rnd(k, 22) * 190
+                let life = 1.0 + rnd(k, 25) * 0.5
+                guard age < life else { continue }
+                let x = cx + cos(a) * sp * age
+                let y = cy + (sin(a) * sp - 90) * age + 260 * age * age
+                let grow = min(1, age * 7)   // kommen klein aus dem Knopf und werden groß
+                put(&ctx, 100 + i % colors, x: x, y: y, size: (10 + rnd(k, 23) * 14) * grow,
+                    angle: (rnd(k, 24) - 0.5) * age * 5, alpha: min(1, (1 - age / life) * 2))
             }
         }
     }

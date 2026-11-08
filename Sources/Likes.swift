@@ -68,12 +68,13 @@ final class LikeStore: ObservableObject {
 struct LikeButton: View {
     let track: Track
     @ObservedObject private var likes = LikeStore.shared
+    @State private var center: CGPoint?
 
     var body: some View {
         let liked = likes.isLiked(track)
         Button {
             Haptics.tap()
-            if !liked { SpecialTheme.shared.celebrate() }
+            if !liked { SpecialTheme.shared.celebrate(at: center) }
             Task { await likes.toggle(track) }
         } label: {
             Image(systemName: liked ? "heart.fill" : "heart")
@@ -83,6 +84,7 @@ struct LikeButton: View {
                 .symbolEffect(.bounce, value: liked)
         }
         .accessibilityLabel(liked ? "Aus Liked Songs entfernen" : "Zu Liked Songs hinzufügen")
+        .onGeometryChange(for: CGPoint.self) { CGPoint(x: $0.frame(in: .global).midX, y: $0.frame(in: .global).midY) } action: { center = $0 }
         .accessibilityIdentifier("player.like")
         .task(id: track.id) { await likes.refresh(track) }
     }

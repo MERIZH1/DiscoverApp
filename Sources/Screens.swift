@@ -3712,6 +3712,7 @@ struct NowPlayingBar: View {
     @EnvironmentObject var sync: SyncManager
     @State private var showDevices = false
     @State private var showQueue = false
+    @State private var miniPlayCenter: CGPoint?
     private var remote: RemoteState? { sync.remote }
     /// Spielt ein anderes Gerät, zeigt die Leiste dessen Song. Bei „Gleichzeitig auf mehreren
     /// Geräten“ geht der eigene Song vor, sobald hier einer geladen ist.
@@ -3776,7 +3777,7 @@ struct NowPlayingBar: View {
                         }
                         Button {
                             if showRemote { sync.remotePlayPause() } else {
-                                if !player.isPlaying { SpecialTheme.shared.celebrate() }
+                                if !player.isPlaying { SpecialTheme.shared.celebrate(at: miniPlayCenter) }
                                 player.toggle()
                             }
                         } label: {
@@ -3789,6 +3790,7 @@ struct NowPlayingBar: View {
                                 .contentShape(Circle())
                         }
                         .buttonStyle(.pressable)
+                        .onGeometryChange(for: CGPoint.self) { CGPoint(x: $0.frame(in: .global).midX, y: $0.frame(in: .global).midY) } action: { miniPlayCenter = $0 }
                     }
                 }
             }
@@ -3891,6 +3893,7 @@ struct PlayerView: View {
     @State private var showFixYT = false
     @State private var showDevices = false
     @State private var showNoise = false
+    @State private var playCenter: CGPoint?
     @ObservedObject private var noise = NoiseEngine.shared
     private var syncMgr: SyncManager? { DiscoverServices.app?.sync }
     private var heroTextPanel: some View {
@@ -3903,7 +3906,7 @@ struct PlayerView: View {
         let p = player
         ZStack {
             LinearGradient(colors: [hero.opacity(0.85), Theme.bg], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
-            SpecialLayer(density: 1.3).ignoresSafeArea()
+            SpecialLayer(density: 1.3, sprays: false).ignoresSafeArea()
             TabView(selection: $page) {
              GeometryReader { geo in
               ScrollViewReader { proxy in
@@ -4085,7 +4088,7 @@ struct PlayerView: View {
                             GlassSymbolButton(systemName: "backward.fill", size: 52, symbolSize: 24) { p.prev() }
                                 .frame(maxWidth: .infinity)
                             Button {
-                                if !p.isPlaying { SpecialTheme.shared.celebrate() }
+                                if !p.isPlaying { SpecialTheme.shared.celebrate(at: playCenter) }
                                 p.toggle()
                             } label: {
                                 Group {
@@ -4103,6 +4106,7 @@ struct PlayerView: View {
                                 .glassButton(glass, shape: Circle(), fallback: Theme.accent)
                             }
                             .buttonStyle(.pressable)
+                            .onGeometryChange(for: CGPoint.self) { CGPoint(x: $0.frame(in: .global).midX, y: $0.frame(in: .global).midY) } action: { playCenter = $0 }
                             .accessibilityIdentifier("player.play")
                             .accessibilityValue(p.isPlaying ? "spielt" : "angehalten")
                             .frame(maxWidth: .infinity)
@@ -4166,6 +4170,7 @@ struct PlayerView: View {
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
         }
+        .overlay { SpecialLayer(floating: false).ignoresSafeArea() }
         .presentationDragIndicator(.hidden)
         .sheet(isPresented: $showAddPlaylist) { if let t = player.current { AddToPlaylistSheet(track: t) } }
         .sheet(isPresented: $showSendUser) { if let t = player.current { SendToUserSheet(track: t) } }
