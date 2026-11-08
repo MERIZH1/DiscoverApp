@@ -515,6 +515,46 @@ final class APIClient: ObservableObject {
         return (obj["ok"] as? Bool) ?? false
     }
 
+    // MARK: Liked Songs (Herz im Player)
+    /// Welche Songs liegen in den Liked Songs? Nur spotify:track-URIs, nil bei Fehler.
+    func likedCheck(_ uris: [String]) async -> [String: Bool]? {
+        let list = uris.filter { $0.hasPrefix("spotify:track:") }
+        guard !list.isEmpty else { return [:] }
+        guard let d = try? await data("/api/liked/check?uris=\(enc(list.joined(separator: ",")))"),
+              let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
+              let m = o["liked"] as? [String: Any] else { return nil }
+        return m.compactMapValues { $0 as? Bool }
+    }
+
+    /// Song liken (liked=true) oder entfernen. Liefert die Spotify-URI, unter der er liegt,
+    /// oder den Fehlertext des Servers (z.B. „Song bei Spotify nicht gefunden“).
+    func setLiked(_ t: Track, liked: Bool) async -> (uri: String?, error: String?) {
+        guard let url = URL(string: base + "/api/liked") else { return (nil, APIError.badURL.errorDescription) }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.timeoutInterval = 20
+        if let pid = profileId { req.setValue(pid, forHTTPHeaderField: "X-Profile-Id") }
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = [
+            "uri": t.uri, "liked": liked, "name": t.name, "artist": t.artist,
+            "artists": (t.artists ?? []).map { ["name": $0.name, "uri": $0.uri ?? ""] },
+            "album": t.album ?? "", "album_uri": t.album_uri ?? "",
+            "image": t.image ?? "", "duration_ms": t.duration_ms ?? 0,
+        ]
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        do {
+            let (d, resp) = try await session.data(for: req)
+            let o = ((try? JSONSerialization.jsonObject(with: d)) as? [String: Any]) ?? [:]
+            let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+            if (200..<300).contains(code), (o["ok"] as? Bool) == true, let u = o["uri"] as? String {
+                return (u, nil)
+            }
+            return (nil, (o["error"] as? String) ?? "Server-Fehler (\(code))")
+        } catch {
+            return (nil, "Keine Verbindung zum Server")
+        }
+    }
+
 
     func youtubeOAuthStatus() async -> YouTubeOAuthStatus? {
         try? await get("/api/youtube/oauth/status")

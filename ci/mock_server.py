@@ -6,6 +6,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 PORT = 8765
 FIXTURE = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixture.m4a"), "rb").read()
 BASE = f"http://127.0.0.1:{PORT}"
+LIKED = set()   # Herz im Player: gelikte Songs
 
 
 @functools.lru_cache(maxsize=None)
@@ -88,8 +89,9 @@ def route(path, q):
         return {"profiles": [{"id": "test", "name": "Test", "color": "#1db954", "country": "DE", "is_admin": True}]}
     if path == "/api/playlists":
         off, lim = int(q.get("offset", ["0"])[0]), int(q.get("limit", ["50"])[0])
-        items = [playlist(i) for i in range(1, 301)][off:off + lim]
-        more = off + lim < 300
+        alle = [{"uri": "spotify:collection:tracks", "name": "Liked Songs", "image": "/cover/7.png"}] +                [playlist(i) for i in range(1, 301)]
+        items = alle[off:off + lim]
+        more = off + lim < len(alle)
         return {"items": items, "next_offset": off + lim if more else None, "has_more": more}
     if path == "/api/home":
         return {"greeting": "Guten Abend", "user_name": "Test", "country": "DE",
@@ -133,6 +135,8 @@ def route(path, q):
                 "color": "#3d5474", "bio": "Erfundene Bio fuer den Test. " * 8, "about_image": "/cover/2.png",
                 "related": rel, "discog_popular": rels[:4], "discog_albums": rels[:3], "discog_singles": rels[3:],
                 "top_tracks": [track(i) for i in range(1, 8)], "albums": rels}
+    if path == "/api/liked/check":
+        return {"liked": {u: u in LIKED for u in q.get("uris", [""])[0].split(",") if u}}
     if path == "/api/radio-livestream/favorites":
         return {"items": stations()}
     return {}
@@ -184,6 +188,12 @@ class H(BaseHTTPRequestHandler):
         body = self.rfile.read(int(self.headers.get("Content-Length") or 0))
         if urlparse(self.path).path == "/api/bglog":
             print("BGLOG", f"{time.time():.3f}", body[:220].decode("utf-8", "replace"), flush=True)
+        if urlparse(self.path).path == "/api/liked":
+            d = json.loads(body or b"{}")
+            uri, an = d.get("uri", ""), bool(d.get("liked", True))
+            (LIKED.add if an else LIKED.discard)(uri)
+            print("LIKED", "+" if an else "-", uri, flush=True)
+            return self.send(json.dumps({"ok": True, "uri": uri, "liked": an}).encode())
         if urlparse(self.path).path == "/api/stream-url" and b"Toter Song" in body:
             return self.send(json.dumps({"ok": True, "url": "/dead.wav", "source": "youtube", "duration": 180}).encode())
         if urlparse(self.path).path == "/api/stream-url":

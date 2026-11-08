@@ -2364,12 +2364,17 @@ struct LibraryView: View {
     ]
 
     private var shown: [Playlist] {
-        var list = playlists.filter { !isRadioItem($0.uri) && !isLiked($0.uri) }   // Radios + Liked Songs raus
+        var list = playlists.filter { !isRadioItem($0.uri) && !isLiked($0.uri) }   // Radios raus, Liked Songs extra
+        // Liked Songs steht seit 08.11.2026 wieder ganz oben: Das Herz im Player legt Songs dort ab.
+        var liked: [Playlist] = tab == "subs" ? [] : playlists.filter { isLiked($0.uri) }
         if tab == "subs" { list = list.filter { subs.contains($0.uri) } }
-        if !filter.isEmpty { list = list.filter { $0.name.localizedCaseInsensitiveContains(filter) } }
+        if !filter.isEmpty {
+            list = list.filter { $0.name.localizedCaseInsensitiveContains(filter) }
+            liked = liked.filter { $0.name.localizedCaseInsensitiveContains(filter) }
+        }
         if tab == "alpha" { list.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending } }
         // Abo-Playlists immer oben
-        return list.filter { subs.contains($0.uri) } + list.filter { !subs.contains($0.uri) }
+        return liked + list.filter { subs.contains($0.uri) } + list.filter { !subs.contains($0.uri) }
     }
 
     var body: some View {
@@ -3974,6 +3979,9 @@ struct PlayerView: View {
                     }
                     Spacer(minLength: 8)
                     if let t = p.current {
+                        if LikeStore.canLike(t) && !p.isRadio && !p.isEpisode {
+                            LikeButton(track: t)
+                        }
                         if t.liveRange == nil {
                             Button { downloads.toggle(t); Haptics.tap() } label: {
                                 Image(systemName: downloads.isDownloaded(t.uri) ? "arrow.down.circle.fill" : "arrow.down.circle")

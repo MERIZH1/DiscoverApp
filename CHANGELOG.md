@@ -3,6 +3,14 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.15 — Herz im Player
+- **Neu:** Im großen Player steht neben dem Songtitel ein Herz. Ein Tipp legt den laufenden Song in deine Liked Songs, ein zweiter nimmt ihn wieder raus. Klappt auch bei lokalen Songs und YouTube-Funden, der Server sucht dafür den passenden Spotify-Song.
+- **Neu:** Liked Songs steht wieder ganz oben in der Bibliothek.
+
+## v1.1.14 — Unterbrechungen wie bei anderen Musik-Apps
+- **Bugfix:** Nach Anruf, Siri, Kontrollzentrum oder einer anderen App passt die Anzeige wieder zur Wiedergabe, nach kurzen Unterbrechungen spielt die Musik weiter. Kopfhörer raus = Pause.
+- **Neu:** Jeder Song kann „Stereo räumlich“ aus dem Kontrollzentrum nutzen.
+
 ## v1.1.13 — Geräte reagieren sofort
 - **Verbessert:** Befehle von anderen Geräten (Pause, Weiter, Hier abspielen) kommen sofort an statt nach bis zu einer Sekunde. Die App fragt den Server dafür nur noch alle 12 Sekunden statt jede Sekunde, das schont den Akku.
 - **Bugfix:** Kein dunkler Streifen mehr oben im Titelbild der Künstlerseite.

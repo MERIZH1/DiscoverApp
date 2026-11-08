@@ -76,6 +76,15 @@ final class DiscoverSmokeTests: XCTestCase {
         shot("20-spielt")
         app.staticTexts["Song 2"].firstMatch.tap()
         shot("21-player")
+        // Herz: liken und wieder entfernen, der Testserver merkt sich den Stand
+        let herz = app.buttons["player.like"].firstMatch
+        XCTAssertTrue(herz.waitForExistence(timeout: 5), "Herz fehlt im Player")
+        herz.tap()
+        let gelikt = app.buttons["Aus Liked Songs entfernen"].firstMatch
+        XCTAssertTrue(gelikt.waitForExistence(timeout: 5), "Herz bleibt leer")
+        shot("21b-gelikt")
+        gelikt.tap()
+        XCTAssertTrue(app.buttons["Zu Liked Songs hinzufügen"].firstMatch.waitForExistence(timeout: 5), "Herz bleibt voll")
         let mix = app.buttons["player.shuffle"].firstMatch
         XCTAssertTrue(mix.waitForExistence(timeout: 5))
         mix.tap()
