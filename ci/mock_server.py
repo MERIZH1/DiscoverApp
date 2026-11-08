@@ -8,6 +8,17 @@ FIXTURE = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixture
 BASE = f"http://127.0.0.1:{PORT}"
 LIKED = set()   # Herz im Player: gelikte Songs
 REMOTE = {}     # Test „anderes Gerät spielt“: Stand, den /api/sync/wait meldet
+SPECIAL = {}    # Test Sonderdesign: was /api/special meldet
+
+
+def special_look():
+    """Aussehen fürs Sonderdesign im Test: ci/special.json, sonst neutrale Sterne."""
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "special.json")
+    if os.path.exists(p):
+        with open(p, encoding="utf-8") as f:
+            return json.load(f)
+    return {"symbol": "star.fill", "colors": ["#ffd60a", "#ffffff", "#ffe680"], "accent": "#ffd60a",
+            "count": 14, "burst": "star.fill", "rain": True}
 
 
 @functools.lru_cache(maxsize=None)
@@ -141,6 +152,8 @@ def route(path, q):
             return {"commands": [], "state": None, "wait": False}
         now = time.time() * 1000
         return {"commands": [], "state": {**REMOTE, "owner_seen_at": now, "updated_at": now}, "wait": False}
+    if path == "/api/special":
+        return SPECIAL
     if path == "/api/liked/check":
         return {"liked": {u: u in LIKED for u in q.get("uris", [""])[0].split(",") if u}}
     if path == "/api/radio-livestream/favorites":
@@ -194,6 +207,13 @@ class H(BaseHTTPRequestHandler):
         body = self.rfile.read(int(self.headers.get("Content-Length") or 0))
         if urlparse(self.path).path == "/api/bglog":
             print("BGLOG", f"{time.time():.3f}", body[:220].decode("utf-8", "replace"), flush=True)
+        if urlparse(self.path).path == "/test/special":
+            an = bool(json.loads(body or b"{}").get("on"))
+            SPECIAL.clear()
+            if an:
+                SPECIAL.update({"id": "test", "end": time.time() + 3600, "app": special_look()})
+            print("SPECIAL", an, flush=True)
+            return self.send(b'{"ok": true}')
         if urlparse(self.path).path == "/test/remote":
             REMOTE.clear()
             REMOTE.update(json.loads(body or b"{}"))

@@ -20,9 +20,25 @@ final class DiscoverSmokeTests: XCTestCase {
         _ = done.wait(timeout: .now() + 5)
     }
 
+    /// Testserver: Sonderdesign an oder aus.
+    private func setSpecial(_ on: Bool) {
+        var req = URLRequest(url: URL(string: "http://127.0.0.1:8765/test/special")!)
+        req.httpMethod = "POST"
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["on": on])
+        let done = DispatchSemaphore(value: 0)
+        URLSession.shared.dataTask(with: req) { _, _, _ in done.signal() }.resume()
+        _ = done.wait(timeout: .now() + 5)
+    }
+
+    private func shotNow(_ name: String) {
+        let png = XCUIScreen.main.screenshot().pngRepresentation
+        try? png.write(to: shots.appendingPathComponent(name + ".png"))
+    }
+
     override func setUp() {
         continueAfterFailure = true
         setRemote(nil)
+        setSpecial(false)
         try? FileManager.default.createDirectory(at: shots, withIntermediateDirectories: true)
         app.launchArguments = ["-serverURL", "http://127.0.0.1:8765", "-profileId", "test"]
         app.launch()
@@ -125,9 +141,11 @@ final class DiscoverSmokeTests: XCTestCase {
         let song = app.staticTexts["Song 2"].firstMatch
         XCTAssertTrue(song.waitForExistence(timeout: 10))
         song.tap()
-        app.staticTexts["Song 2"].firstMatch.tap()
+        let leisteEigen = app.staticTexts["Song 2"].firstMatch
+        XCTAssertTrue(leisteEigen.waitForExistence(timeout: 15))
+        leisteEigen.tap()
         let play = app.buttons["player.play"].firstMatch
-        XCTAssertTrue(play.waitForExistence(timeout: 8))
+        XCTAssertTrue(play.waitForExistence(timeout: 15))
         sleep(2)
         play.tap()   // hier anhalten, sonst zählt das andere Gerät nicht
         sleep(1)
@@ -140,6 +158,44 @@ final class DiscoverSmokeTests: XCTestCase {
         XCTAssertTrue(app.buttons["player.play"].firstMatch.waitForExistence(timeout: 8), "Player geht nicht auf")
         XCTAssertTrue(app.staticTexts["Läuft auf Test-PC"].firstMatch.waitForExistence(timeout: 8), "Anderes Gerät fehlt im Player")
         shot("31-anderes-geraet-player")
+    }
+
+    /// Sonderdesign vom Server: Symbole schweben, die Akzentfarbe wechselt, Play und Liken
+    /// lösen einen kleinen Ausbruch aus. Ohne Sonderdesign ist alles wie immer.
+    func testSonderdesign() {
+        defer { setSpecial(false) }
+        setSpecial(true)
+        app.terminate()
+        app.launch()
+        tab("Home")
+        sleep(1)
+        shotNow("40-sonderdesign-start")
+        sleep(5)
+        shotNow("41-sonderdesign-home")
+        tab("Bibliothek")
+        let liste = app.staticTexts["Playlist 2"].firstMatch
+        XCTAssertTrue(liste.waitForExistence(timeout: 20))
+        liste.tap()
+        shot("42-sonderdesign-playlist")
+        let song = app.staticTexts["Song 2"].firstMatch
+        XCTAssertTrue(song.waitForExistence(timeout: 10))
+        song.tap()
+        app.staticTexts["Song 2"].firstMatch.tap()
+        let liken = app.buttons["player.like"].firstMatch
+        XCTAssertTrue(liken.waitForExistence(timeout: 8), "Player geht nicht auf")
+        sleep(2)
+        shotNow("43-sonderdesign-player")
+        liken.tap()
+        usleep(350_000)
+        shotNow("44-sonderdesign-ausbruch")
+        liken.tap()
+        // Ende: Der Server meldet nichts mehr, nach dem Zurückholen ist alles wie immer
+        setSpecial(false)
+        XCUIDevice.shared.press(.home)
+        sleep(2)
+        app.activate()
+        sleep(4)
+        shotNow("45-sonderdesign-vorbei")
     }
 
     /// Song ohne Ton und ohne Nachfolger: Der Player darf nicht behaupten, er spiele.

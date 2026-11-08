@@ -73,6 +73,7 @@ struct LikeButton: View {
         let liked = likes.isLiked(track)
         Button {
             Haptics.tap()
+            if !liked { SpecialTheme.shared.celebrate() }
             Task { await likes.toggle(track) }
         } label: {
             Image(systemName: liked ? "heart.fill" : "heart")

@@ -515,6 +515,12 @@ final class APIClient: ObservableObject {
         return (obj["ok"] as? Bool) ?? false
     }
 
+    /// Sonderdesign für besondere Tage (Special.swift). nil bei Netzfehler, leer wenn keins gilt.
+    func special() async -> SpecialResponse? {
+        guard let d = try? await data("/api/special") else { return nil }
+        return try? JSONDecoder().decode(SpecialResponse.self, from: d)
+    }
+
     // MARK: Liked Songs (Herz im Player)
     /// Welche Songs liegen in den Liked Songs? Nur spotify:track-URIs, nil bei Fehler.
     func likedCheck(_ uris: [String]) async -> [String: Bool]? {

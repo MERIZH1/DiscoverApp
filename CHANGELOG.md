@@ -3,6 +3,12 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.18 — Vorbereitung für besondere Tage
+- **Intern:** Die App kann für einen Tag ein Sonderdesign vom Server zeigen. Ohne Eintrag auf dem Server bleibt alles wie gewohnt.
+
+## v1.1.17 — Player passt wieder
+- **Bugfix:** Steht im Player oben das andere Gerät, wird das Cover kleiner. Vorher ragte der Player über den Bildschirm und der Zu-Knopf fehlte.
+
 ## v1.1.16 — Mehrere Geräte gleichzeitig
 - **Bugfix:** Der Player geht wieder auf, auch wenn gerade der PC spielt. Der PC steht dann oben im Player, mit eigenen Knöpfen für Zurück, Pause und Weiter.
 - **Neu:** Schalter „Gleichzeitig auf mehreren Geräten“ in der Geräteauswahl. Ist er an, hält ein Song am iPhone den PC nicht mehr an, und die Leiste zeigt deinen eigenen Song. Der Schalter gilt für alle Geräte deines Profils.

@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var app = AppState()
     @StateObject private var updater = AppUpdater()
+    @ObservedObject private var special = SpecialTheme.shared
     @State private var booting = true
     @State private var showTailscaleWarning = false
     @State private var tailscaleWarningDismissedThisActivation = false
@@ -18,7 +19,8 @@ struct ContentView: View {
                 } else if app.profile == nil {
                     ProfilePickerView()
                 } else {
-                    MainView()
+                    // Beginnt oder endet ein Sonderdesign, baut sich die Oberfläche mit dessen Farben neu auf
+                    MainView().id(special.id)
                 }
             }
             if showTailscaleWarning, !booting {

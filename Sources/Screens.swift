@@ -224,6 +224,7 @@ struct MainView: View {
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardVisible = false }
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { _ in keyboardVisible = false }
         }
+        .overlay { SpecialLayer(rain: true).ignoresSafeArea() }
         .overlay(alignment: .top) {
             if !sync.injectToast.isEmpty {
                 Text(sync.injectToast)
@@ -249,6 +250,7 @@ struct MainView: View {
         }
         .animation(Motion.spring, value: app.toast)
         .onAppear { configureAppearance(glass: app.liquidGlass) }
+        .task { SpecialTheme.shared.start(api: app.api) }
         .onChange(of: router.playerOpen) { _, open in
             if open { dismissKeyboard(); keyboardVisible = false }
         }
@@ -264,7 +266,10 @@ struct MainView: View {
                 // am Songende blockieren.
                 app.player.flushPlayStats(completed: false, partial: true)
             }
-            if phase == .active { app.refreshPlaylistsIfStale() }
+            if phase == .active {
+                app.refreshPlaylistsIfStale()
+                Task { await SpecialTheme.shared.refresh(app.api) }
+            }
             keyboardVisible = false
         }
         .sheet(isPresented: $router.playerOpen) { PlayerView().environmentObject(router).environment(\.tabRouter, router) }
@@ -3770,7 +3775,10 @@ struct NowPlayingBar: View {
                             showDevices = true
                         }
                         Button {
-                            if showRemote { sync.remotePlayPause() } else { player.toggle() }
+                            if showRemote { sync.remotePlayPause() } else {
+                                if !player.isPlaying { SpecialTheme.shared.celebrate() }
+                                player.toggle()
+                            }
                         } label: {
                             Image(systemName: (showRemote ? (remote?.playing == true) : player.isPlaying) ? "pause.fill" : "play.fill")
                                 .font(.system(size: 17, weight: .bold))
@@ -3895,6 +3903,7 @@ struct PlayerView: View {
         let p = player
         ZStack {
             LinearGradient(colors: [hero.opacity(0.85), Theme.bg], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+            SpecialLayer(density: 1.3).ignoresSafeArea()
             TabView(selection: $page) {
              GeometryReader { geo in
               ScrollViewReader { proxy in
@@ -4075,7 +4084,10 @@ struct PlayerView: View {
                                 .frame(maxWidth: .infinity)
                             GlassSymbolButton(systemName: "backward.fill", size: 52, symbolSize: 24) { p.prev() }
                                 .frame(maxWidth: .infinity)
-                            Button { p.toggle() } label: {
+                            Button {
+                                if !p.isPlaying { SpecialTheme.shared.celebrate() }
+                                p.toggle()
+                            } label: {
                                 Group {
                                     if p.isPlaying && (p.loading || p.buffering) {
                                         ProgressView().controlSize(.large).tint(glass ? Theme.text : .black)

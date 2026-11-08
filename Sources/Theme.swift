@@ -10,7 +10,9 @@ enum Theme {
     static let text   = Color.white
     static let sub    = Color(hex6: 0xB3B3B3)
     static let mute   = Color(hex6: 0x7A7A7A)
-    static let accent = Color(hex6: 0x1ED760)
+    /// Sonderdesign (Special.swift) kann die Akzentfarbe für einen Tag ersetzen.
+    static var accentOverride: Color?
+    static var accent: Color { accentOverride ?? Color(hex6: 0x1ED760) }
 }
 
 /// App-Version aus dem Bundle (fuer Server-/Account-Menue).
