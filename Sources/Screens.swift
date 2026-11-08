@@ -3708,7 +3708,9 @@ struct NowPlayingBar: View {
     @State private var showDevices = false
     @State private var showQueue = false
     private var remote: RemoteState? { sync.remote }
-    private var showRemote: Bool { remote?.track != nil }
+    /// Spielt ein anderes Gerät, zeigt die Leiste dessen Song. Bei „Gleichzeitig auf mehreren
+    /// Geräten“ geht der eigene Song vor, sobald hier einer geladen ist.
+    private var showRemote: Bool { remote?.track != nil && !(sync.multiDevice && player.hasContent) }
     private let swipeThreshold: CGFloat = 55
     private var progress: Double {
         if showRemote, let d = remote?.duration, d > 0, let p = remote?.position {
@@ -3797,7 +3799,9 @@ struct NowPlayingBar: View {
             .clipShape(RoundedRectangle(cornerRadius: 22))
             .shadow(color: .black.opacity(glass ? 0.32 : 0.5), radius: glass ? 18 : 12, y: glass ? 8 : 4)
             .contentShape(RoundedRectangle(cornerRadius: 22))
-            .onTapGesture { if showRemote { showDevices = true } else { showPlayer = true } }
+            // Der eigene Player geht immer auf, auch wenn gerade ein anderes Gerät spielt.
+            // Dort steht das andere Gerät oben mit eigenen Knöpfen. Ohne eigenen Song: Geräteauswahl.
+            .onTapGesture { if player.hasContent { showPlayer = true } else { showDevices = true } }
             .onLongPressGesture(minimumDuration: 0.35) {
                 guard !showRemote else { showDevices = true; return }
                 showQueue = true
@@ -3806,15 +3810,15 @@ struct NowPlayingBar: View {
             .simultaneousGesture(
                 DragGesture(minimumDistance: 25)
                     .onEnded { value in
-                        guard !showRemote else { return }
                         let dx = value.translation.width
                         let dy = value.translation.height
                         if dy < -swipeThreshold, abs(dy) > abs(dx) * 1.25 {
+                            guard player.hasContent else { return }
                             showPlayer = true
                             Haptics.tap(.medium)
                             return
                         }
-                        guard abs(dx) >= swipeThreshold, abs(dx) > abs(dy) * 1.4 else { return }
+                        guard !showRemote, abs(dx) >= swipeThreshold, abs(dx) > abs(dy) * 1.4 else { return }
                         if dx < 0 {
                             player.next()
                         } else {
@@ -3903,6 +3907,7 @@ struct PlayerView: View {
                         Image(systemName: "chevron.down").font(.system(size: 18, weight: .semibold)).foregroundStyle(Theme.text)
                             .glassIconCircle(glass)
                     }
+                    .accessibilityIdentifier("player.close")
                     Spacer()
                     VStack(spacing: 2) {
                         Text("WIEDERGABE").font(.system(size: 11, weight: .bold)).foregroundStyle(Theme.sub).tracking(1)
@@ -3953,6 +3958,13 @@ struct PlayerView: View {
                       }
                     }
                 }.padding(.horizontal, 4).padding(.top, 8)
+                // Spielt gerade ein anderes Gerät: oben mit eigenen Knöpfen, Tippen öffnet die Geräteauswahl
+                if sync.remote?.track != nil {
+                    SyncBanner()
+                        .contentShape(Rectangle())
+                        .onTapGesture { showDevices = true }
+                        .accessibilityIdentifier("player.remote")
+                }
                 Spacer()
                 Artwork(url: p.displayImage, size: 300, corner: 12).shadow(radius: 24)
                     .scaleEffect(p.isPlaying ? 1 : 0.9)

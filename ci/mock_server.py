@@ -7,6 +7,7 @@ PORT = 8765
 FIXTURE = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixture.m4a"), "rb").read()
 BASE = f"http://127.0.0.1:{PORT}"
 LIKED = set()   # Herz im Player: gelikte Songs
+REMOTE = {}     # Test „anderes Gerät spielt“: Stand, den /api/sync/wait meldet
 
 
 @functools.lru_cache(maxsize=None)
@@ -135,6 +136,11 @@ def route(path, q):
                 "color": "#3d5474", "bio": "Erfundene Bio fuer den Test. " * 8, "about_image": "/cover/2.png",
                 "related": rel, "discog_popular": rels[:4], "discog_albums": rels[:3], "discog_singles": rels[3:],
                 "top_tracks": [track(i) for i in range(1, 8)], "albums": rels}
+    if path in ("/api/sync/wait", "/api/sync/state"):
+        if not REMOTE:
+            return {"commands": [], "state": None, "wait": False}
+        now = time.time() * 1000
+        return {"commands": [], "state": {**REMOTE, "owner_seen_at": now, "updated_at": now}, "wait": False}
     if path == "/api/liked/check":
         return {"liked": {u: u in LIKED for u in q.get("uris", [""])[0].split(",") if u}}
     if path == "/api/radio-livestream/favorites":
@@ -188,6 +194,11 @@ class H(BaseHTTPRequestHandler):
         body = self.rfile.read(int(self.headers.get("Content-Length") or 0))
         if urlparse(self.path).path == "/api/bglog":
             print("BGLOG", f"{time.time():.3f}", body[:220].decode("utf-8", "replace"), flush=True)
+        if urlparse(self.path).path == "/test/remote":
+            REMOTE.clear()
+            REMOTE.update(json.loads(body or b"{}"))
+            print("REMOTE", REMOTE.get("device_name"), flush=True)
+            return self.send(b'{"ok": true}')
         if urlparse(self.path).path == "/api/liked":
             d = json.loads(body or b"{}")
             uri, an = d.get("uri", ""), bool(d.get("liked", True))

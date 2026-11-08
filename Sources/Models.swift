@@ -392,4 +392,5 @@ struct UserSettings: Codable {
     var normalize_volume: Bool?
     var prebuffer_count: Int?
     var smart_cache: SmartCache?
+    var multi_device: Bool?
 }

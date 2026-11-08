@@ -47,6 +47,9 @@ struct SyncDevicesResponse: Codable { let devices: [SyncDevice] }
 final class SyncManager: ObservableObject {
     @Published var remote: RemoteState?     // anderes Geraet spielt gerade
     @Published var injectToast = ""          // "X hat dir einen Song geschickt"
+    /// Gleichzeitig auf mehreren Geräten hören (gilt fürs ganze Profil, liegt auf dem Server):
+    /// Startet hier ein Song, hält das andere Gerät nicht an, und die Leiste zeigt den eigenen Song.
+    @Published private(set) var multiDevice = UserDefaults.standard.bool(forKey: "multiDevice")
 
     private let api: APIClient
     private weak var player: PlayerController?
@@ -82,6 +85,7 @@ final class SyncManager: ObservableObject {
                 try? await Task.sleep(nanoseconds: ns)
             }
         }
+        Task { [weak self] in await self?.loadMultiDevice() }
         waiter = Task { [weak self] in
             var fails: UInt64 = 0
             while !Task.isCancelled {
@@ -91,6 +95,17 @@ final class SyncManager: ObservableObject {
             }
         }
     }
+    func setMultiDevice(_ on: Bool) {
+        multiDevice = on
+        UserDefaults.standard.set(on, forKey: "multiDevice")
+        Task { await api.saveSettings(["multi_device": on]) }
+    }
+    func loadMultiDevice() async {
+        guard let m = (try? await api.settings())?.multi_device, m != multiDevice else { return }
+        multiDevice = m
+        UserDefaults.standard.set(m, forKey: "multiDevice")
+    }
+
     func stop() {
         loop?.cancel(); loop = nil
         waiter?.cancel(); waiter = nil
@@ -113,7 +128,8 @@ final class SyncManager: ObservableObject {
             wasOwner = true
             if let r = remote {
                 // Wie bei Spotify spielt immer nur ein Geraet: Startet hier der Ton, stoppt das andere.
-                if r.playing == true, let id = r.device_id {
+                // Ausnahme: Schalter „Gleichzeitig auf mehreren Geräten“.
+                if r.playing == true, let id = r.device_id, !multiDevice {
                     await api.syncSendCommand("pause", value: nil, target: id, fromID: deviceID)
                 }
                 remote = nil
@@ -345,6 +361,18 @@ struct DevicePickerSheet: View {
                         }
                     }
                 }
+                Section {
+                    Toggle(isOn: Binding(get: { sync.multiDevice }, set: { sync.setMultiDevice($0) })) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Gleichzeitig auf mehreren Geräten")
+                                .font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.text)
+                            Text("Startet hier ein Song, spielt das andere Gerät weiter")
+                                .font(.system(size: 12)).foregroundStyle(Theme.sub)
+                        }
+                    }
+                    .tint(Theme.accent)
+                    .accessibilityIdentifier("devices.multi")
+                }
             }
             .scrollContentBackground(.hidden)
             .background(Theme.bg.ignoresSafeArea())
@@ -352,7 +380,12 @@ struct DevicePickerSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Fertig") { dismiss() } } }
         }
-        .task { loading = true; devices = await sync.devices(); loading = false }
+        .task {
+            loading = true
+            devices = await sync.devices()
+            loading = false
+            await sync.loadMultiDevice()
+        }
         .alert("Gerät umbenennen", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("Name", text: $newName)
             Button("Sichern") {

@@ -6,8 +6,23 @@ final class DiscoverSmokeTests: XCTestCase {
     private let app = XCUIApplication()
     private let shots = URL(fileURLWithPath: "/tmp/discover-shots")
 
+    /// Testserver: so tun, als spiele ein anderes Gerät (nil = keins).
+    private func setRemote(_ name: String?) {
+        var req = URLRequest(url: URL(string: "http://127.0.0.1:8765/test/remote")!)
+        req.httpMethod = "POST"
+        let body: [String: Any] = name.map { ["device_id": "test-pc", "device_name": $0, "playing": true,
+                                              "position": 30.0, "duration": 200.0,
+                                              "track": ["name": "Fremder Song", "artist": "Kuenstler 5",
+                                                        "uri": "spotify:track:test77", "image": "/cover/5.png"]] } ?? [:]
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        let done = DispatchSemaphore(value: 0)
+        URLSession.shared.dataTask(with: req) { _, _, _ in done.signal() }.resume()
+        _ = done.wait(timeout: .now() + 5)
+    }
+
     override func setUp() {
         continueAfterFailure = true
+        setRemote(nil)
         try? FileManager.default.createDirectory(at: shots, withIntermediateDirectories: true)
         app.launchArguments = ["-serverURL", "http://127.0.0.1:8765", "-profileId", "test"]
         app.launch()
@@ -98,6 +113,33 @@ final class DiscoverSmokeTests: XCTestCase {
             let png = XCUIScreen.main.screenshot().pngRepresentation
             try? png.write(to: shots.appendingPathComponent("23-wiederholen-\(i + 1).png"))
         }
+    }
+
+    /// Spielt ein anderes Gerät, geht der eigene Player trotzdem auf. Das andere Gerät steht dort oben.
+    func testAnderesGeraet() {
+        defer { setRemote(nil) }
+        tab("Bibliothek")
+        let liste = app.staticTexts["Playlist 2"].firstMatch
+        XCTAssertTrue(liste.waitForExistence(timeout: 20))
+        liste.tap()
+        let song = app.staticTexts["Song 2"].firstMatch
+        XCTAssertTrue(song.waitForExistence(timeout: 10))
+        song.tap()
+        app.staticTexts["Song 2"].firstMatch.tap()
+        let play = app.buttons["player.play"].firstMatch
+        XCTAssertTrue(play.waitForExistence(timeout: 8))
+        sleep(2)
+        play.tap()   // hier anhalten, sonst zählt das andere Gerät nicht
+        sleep(1)
+        app.buttons["player.close"].firstMatch.tap()
+        setRemote("Test-PC")
+        let leiste = app.staticTexts["Fremder Song"].firstMatch
+        XCTAssertTrue(leiste.waitForExistence(timeout: 12), "Leiste zeigt das andere Gerät nicht")
+        shot("30-anderes-geraet-leiste")
+        leiste.tap()
+        XCTAssertTrue(app.buttons["player.play"].firstMatch.waitForExistence(timeout: 8), "Player geht nicht auf")
+        XCTAssertTrue(app.staticTexts["Läuft auf Test-PC"].firstMatch.waitForExistence(timeout: 8), "Anderes Gerät fehlt im Player")
+        shot("31-anderes-geraet-player")
     }
 
     /// Song ohne Ton und ohne Nachfolger: Der Player darf nicht behaupten, er spiele.

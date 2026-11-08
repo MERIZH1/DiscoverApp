@@ -3,6 +3,10 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.16 — Mehrere Geräte gleichzeitig
+- **Bugfix:** Der Player geht wieder auf, auch wenn gerade der PC spielt. Der PC steht dann oben im Player, mit eigenen Knöpfen für Zurück, Pause und Weiter.
+- **Neu:** Schalter „Gleichzeitig auf mehreren Geräten“ in der Geräteauswahl. Ist er an, hält ein Song am iPhone den PC nicht mehr an, und die Leiste zeigt deinen eigenen Song. Der Schalter gilt für alle Geräte deines Profils.
+
 ## v1.1.15 — Herz im Player
 - **Neu:** Im großen Player steht neben dem Songtitel ein Herz. Ein Tipp legt den laufenden Song in deine Liked Songs, ein zweiter nimmt ihn wieder raus. Klappt auch bei lokalen Songs und YouTube-Funden, der Server sucht dafür den passenden Spotify-Song.
 - **Neu:** Liked Songs steht wieder ganz oben in der Bibliothek.
