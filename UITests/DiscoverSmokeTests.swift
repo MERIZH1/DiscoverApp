@@ -189,6 +189,13 @@ final class DiscoverSmokeTests: XCTestCase {
         usleep(350_000)
         shotNow("44-sonderdesign-ausbruch")
         liken.tap()
+        // Play: einmal anhalten, dann starten, die Symbole sprühen aus dem Knopf
+        let play = app.buttons["player.play"].firstMatch
+        play.tap()
+        sleep(2)
+        play.tap()
+        usleep(300_000)
+        shotNow("44b-sonderdesign-play")
         // Ende: Der Server meldet nichts mehr, nach dem Zurückholen ist alles wie immer
         setSpecial(false)
         XCUIDevice.shared.press(.home)
