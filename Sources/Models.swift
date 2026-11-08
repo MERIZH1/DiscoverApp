@@ -118,6 +118,7 @@ struct Track: Codable, Identifiable, Hashable {
     let duration_ms: Int?
     var downloaded: Bool?
     let navidromeId: String?    // lokale Songs (Navidrome) -> direktes Streaming
+    let section: String?        // Kapitel in eigenen Playlists (Überschrift vor dem ersten Song)
 
     var durationSec: Double { Double(duration_ms ?? 0) / 1000.0 }
     var isLocal: Bool { uri.hasPrefix("navidrome:") || (navidromeId?.isEmpty == false) }
@@ -129,7 +130,7 @@ struct Track: Codable, Identifiable, Hashable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case uri, name, artist, artists, album, album_uri, image, duration_ms, downloaded, navidromeId
+        case uri, name, artist, artists, album, album_uri, image, duration_ms, downloaded, navidromeId, section
     }
     private enum ExtraKeys: String, CodingKey { case spotify_uri }
     init(from d: Decoder) throws {
@@ -147,12 +148,14 @@ struct Track: Codable, Identifiable, Hashable {
         duration_ms = try? c.decode(Int.self, forKey: .duration_ms)
         downloaded  = try? c.decode(Bool.self, forKey: .downloaded)
         navidromeId = (try? c.decode(String.self, forKey: .navidromeId)).flatMap { $0.isEmpty ? nil : $0 }
+        section     = (try? c.decode(String.self, forKey: .section)).flatMap { $0.isEmpty ? nil : $0 }
     }
     init(uri: String, name: String, artist: String, image: String?) {
         self.uri = uri; self.name = name; self.artist = artist
         self.image = image; self.artists = nil; self.album = nil
         self.album_uri = nil; self.duration_ms = nil; self.downloaded = nil
         self.navidromeId = uri.hasPrefix("navidrome:") ? String(uri.dropFirst("navidrome:".count)) : nil
+        self.section = nil
     }
 }
 

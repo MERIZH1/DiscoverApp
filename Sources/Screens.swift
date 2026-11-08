@@ -883,8 +883,10 @@ struct HomeView: View {
     @State private var recents: [HomeItem] = []
     @State private var filter = "all"
     @State private var showAccount = false
+    @ObservedObject private var special = SpecialTheme.shared
 
     private var greetingText: String {
+        if let g = special.greeting { return g }
         // Spotifys Gruß hängt an einer fremden Zeitzone, nachts stand dort „Guten Abend“
         let h = Calendar.current.component(.hour, from: Date())
         let g = h < 5 || h >= 22 ? "Gute Nacht" : h < 11 ? "Guten Morgen" : h < 17 ? "Guten Tag" : "Guten Abend"
@@ -918,6 +920,11 @@ struct HomeView: View {
                                 Pill(text: f.1, active: filter == f.0) { filter = f.0 }
                             }
                         }.padding(.horizontal)
+                    }
+
+                    // Sonderkarte (nur wenn das Sonderdesign eine mitbringt)
+                    if let c = special.card, let u = c.uri, !u.isEmpty {
+                        SpecialCardView(card: c, uri: u).padding(.horizontal)
                     }
 
                     // Quick-Grid (4x2)
@@ -2936,6 +2943,13 @@ struct TrackListView: View {
                 if loadFailed && tracks.isEmpty { LoadFailedView { reload += 1 } }
                 LazyVStack(spacing: 0) {
                     ForEach(Array(tracks.enumerated()), id: \.element.id) { idx, t in
+                        // Kapitel: Überschrift vor dem ersten Song eines Kapitels
+                        if let s = t.section, idx == 0 || tracks[idx - 1].section != s {
+                            Text(s).font(.system(size: 19, weight: .heavy)).foregroundStyle(Theme.text)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal).padding(.top, idx == 0 ? 4 : 22).padding(.bottom, 6)
+                                .accessibilityAddTraits(.isHeader)
+                        }
                         NumberedTrackRow(n: idx + 1, track: t, showCover: !isAlbum, playing: now.track?.id == t.id,
                                          onRemoveFromPlaylist: canRemoveTracks ? { removeTrack(t) } : nil,
                                          selecting: selecting, selected: selected.contains(t.uri)) {

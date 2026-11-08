@@ -172,6 +172,13 @@ final class DiscoverSmokeTests: XCTestCase {
         shotNow("40-sonderdesign-start")
         sleep(5)
         shotNow("41-sonderdesign-home")
+        // Sonderkarte und eigene Begrüßung; die Karte öffnet eine Playlist mit Kapiteln
+        XCTAssertTrue(app.staticTexts["Probe-Gruß"].firstMatch.waitForExistence(timeout: 10), "Begrüßung fehlt")
+        let karte = app.descendants(matching: .any).matching(identifier: "home.specialCard").firstMatch
+        XCTAssertTrue(karte.waitForExistence(timeout: 10), "Sonderkarte fehlt")
+        karte.tap()
+        XCTAssertTrue(app.staticTexts["Kapitel 2"].firstMatch.waitForExistence(timeout: 10), "Kapitel fehlen")
+        shot("41b-sonderkarte-playlist")
         tab("Bibliothek")
         let liste = app.staticTexts["Playlist 2"].firstMatch
         XCTAssertTrue(liste.waitForExistence(timeout: 20))

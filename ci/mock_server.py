@@ -115,6 +115,10 @@ def route(path, q):
                 "release_precision": "DAY", "year": "2013", "album_type": "album",
                 "artists": [{"name": "Kuenstler 2", "uri": "spotify:artist:test2"}],
                 "copyright": ["(C) 2013 Testlabel", "(P) 2013 Testlabel"]}
+    if path.startswith("/api/playlist/") and "probe" in path:
+        # Playlist mit Kapiteln (Feld „section“)
+        return {"name": "Sonderkarte",
+                "tracks": [dict(track(i), section=f"Kapitel {(i - 1) // 4 + 1}") for i in range(1, 13)]}
     if path.startswith("/api/playlist/"):
         return {"name": "Playlist", "tracks": [track(i) for i in range(1, 101)]}
     if path == "/api/search":
@@ -211,7 +215,10 @@ class H(BaseHTTPRequestHandler):
             an = bool(json.loads(body or b"{}").get("on"))
             SPECIAL.clear()
             if an:
-                SPECIAL.update({"id": "test", "end": time.time() + 3600, "app": special_look()})
+                SPECIAL.update({"id": "test", "end": time.time() + 3600, "app": special_look(),
+                                "greeting": "Probe-Gruß",
+                                "card": {"kicker": "Probe", "title": "Sonderkarte", "sub": "Nur im Test",
+                                         "uri": "ytpl:probe", "image": "/cover/12.png"}})
             print("SPECIAL", an, flush=True)
             return self.send(b'{"ok": true}')
         if urlparse(self.path).path == "/test/remote":

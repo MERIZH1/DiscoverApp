@@ -12,10 +12,21 @@ struct SpecialLook: Codable, Equatable {
     var rain: Bool?          // beim Öffnen einmal viele auf einmal
 }
 
+/// Große Karte oben auf der Startseite (z.B. eine Playlist für den Tag).
+struct SpecialCard: Codable, Equatable {
+    var title: String?
+    var sub: String?
+    var kicker: String?      // kleine Zeile über dem Titel
+    var uri: String?
+    var image: String?
+}
+
 struct SpecialResponse: Codable {
     var id: String?
     var end: Double?
     var app: SpecialLook?
+    var greeting: String?    // ersetzt die Begrüßung auf der Startseite
+    var card: SpecialCard?
 }
 
 /// Ein Ausbruch: wann und von wo (Bildschirm-Koordinaten). Ohne Ort: unten Mitte.
@@ -31,6 +42,8 @@ final class SpecialTheme: ObservableObject {
     @Published private(set) var id = ""
     @Published private(set) var look = SpecialLook()
     @Published private(set) var bursts: [SpecialBurst] = []
+    @Published private(set) var card: SpecialCard?
+    @Published private(set) var greeting: String?
     /// Wann der Regen beim Öffnen begann (einmal je Sonderdesign und App-Start).
     private(set) var rainStart: Date?
     private var rainFor = ""
@@ -71,6 +84,8 @@ final class SpecialTheme: ObservableObject {
     private func apply(_ r: SpecialResponse?) {
         guard let r, let rid = r.id, !rid.isEmpty, let e = r.end, e > Date().timeIntervalSince1970 else {
             Theme.accentOverride = nil
+            if card != nil { card = nil }
+            if greeting != nil { greeting = nil }
             if active { look = SpecialLook(); id = "" }
             end = 0
             UserDefaults.standard.removeObject(forKey: key)
@@ -81,6 +96,9 @@ final class SpecialTheme: ObservableObject {
         // Erst die Farbe, dann die ID: Die ID baut die Oberfläche neu auf (siehe ContentView).
         Theme.accentOverride = l.accent.flatMap { Color(hexString: $0) }
         if look != l { look = l }
+        if card != r.card { card = r.card }
+        let g = r.greeting.flatMap { $0.isEmpty ? nil : $0 }
+        if greeting != g { greeting = g }
         if id != rid { id = rid }
         if let d = try? JSONEncoder().encode(r) { UserDefaults.standard.set(d, forKey: key) }
     }
@@ -220,6 +238,71 @@ struct SpecialLayer: View {
                 let grow = min(1, age * 7)   // kommen klein aus dem Knopf und werden groß
                 put(&ctx, 100 + i % colors, x: x, y: y, size: (10 + rnd(k, 23) * 14) * grow,
                     angle: (rnd(k, 24) - 0.5) * age * 5, alpha: min(1, (1 - age / life) * 2))
+            }
+        }
+    }
+}
+
+/// Die Sonderkarte oben auf der Startseite: Antippen öffnet die Playlist, der Knopf spielt sie.
+struct SpecialCardView: View {
+    let card: SpecialCard
+    let uri: String
+    @EnvironmentObject var app: AppState
+    @Environment(\.playerRef) private var playerRef
+    @State private var playCenter: CGPoint?
+    @State private var starting = false
+
+    var body: some View {
+        NavigationLink(value: HomeItem(uri: uri, name: card.title ?? "", image: card.image, sub: card.sub, type: "playlist")) {
+            HStack(spacing: 14) {
+                Artwork(url: card.image, size: 92, corner: 10)
+                    .shadow(color: .black.opacity(0.4), radius: 10, y: 4)
+                VStack(alignment: .leading, spacing: 4) {
+                    if let k = card.kicker, !k.isEmpty {
+                        Text(k.uppercased()).font(.system(size: 11, weight: .bold)).tracking(1)
+                            .foregroundStyle(.white.opacity(0.8))
+                    }
+                    Text(card.title ?? "").font(.system(size: 26, weight: .heavy)).foregroundStyle(.white)
+                        .lineLimit(2).multilineTextAlignment(.leading)
+                    if let s = card.sub, !s.isEmpty {
+                        Text(s).font(.system(size: 13)).foregroundStyle(.white.opacity(0.85))
+                            .lineLimit(2).multilineTextAlignment(.leading)
+                    }
+                }
+                Spacer(minLength: 0)
+                Color.clear.frame(width: 50, height: 50)   // Platz für den Play-Knopf
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(LinearGradient(colors: [Theme.accent.opacity(0.55), Theme.elev],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing),
+                        in: RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.pressable)
+        .accessibilityIdentifier("home.specialCard")
+        .overlay(alignment: .trailing) {
+            Button { play() } label: {
+                Image(systemName: "play.fill").font(.system(size: 19, weight: .bold)).foregroundStyle(.black)
+                    .frame(width: 50, height: 50)
+                    .background(Theme.accent, in: Circle())
+                    .shadow(color: .black.opacity(0.35), radius: 8, y: 3)
+            }
+            .buttonStyle(.pressable)
+            .onGeometryChange(for: CGPoint.self) { CGPoint(x: $0.frame(in: .global).midX, y: $0.frame(in: .global).midY) } action: { playCenter = $0 }
+            .padding(.trailing, 14)
+            .accessibilityLabel("Abspielen")
+            .accessibilityIdentifier("home.specialCard.play")
+        }
+    }
+
+    private func play() {
+        guard !starting, let player = playerRef else { return }
+        starting = true
+        SpecialTheme.shared.celebrate(at: playCenter)
+        Task {
+            defer { starting = false }
+            if let r = try? await app.api.playlistTracks(uri), !r.tracks.isEmpty {
+                player.play(tracks: r.tracks, startAt: 0, contextName: card.title ?? r.name ?? "", contextURI: uri)
             }
         }
     }

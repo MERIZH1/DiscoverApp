@@ -3,6 +3,10 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.21 — Kapitel in Playlists
+- **Neu:** Playlists können in Kapitel unterteilt sein, zum Beispiel nach Jahren. Vor dem ersten Song eines Kapitels steht dann eine Überschrift.
+- **Intern:** Ein Sonderdesign vom Server kann eine eigene Begrüßung und eine große Karte oben auf der Startseite mitbringen.
+
 ## v1.1.18 — Vorbereitung für besondere Tage
 - **Intern:** Die App kann für einen Tag ein Sonderdesign vom Server zeigen. Ohne Eintrag auf dem Server bleibt alles wie gewohnt.
 
