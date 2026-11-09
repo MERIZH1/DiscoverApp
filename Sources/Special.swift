@@ -32,13 +32,6 @@ struct SpecialMessage: Codable, Equatable {
     var uri: String?
 }
 
-/// Sprachaufnahme, die einmal nach `after` Songwechseln läuft.
-struct SpecialVoice: Codable, Equatable {
-    var url: String?
-    var after: Int?
-    var label: String?
-}
-
 /// Einblendung ab Uhrzeit `at` (Unix-Zeit); Antippen spielt das Video.
 struct SpecialNotice: Codable, Equatable {
     var at: Double?
@@ -54,7 +47,6 @@ struct SpecialResponse: Codable {
     var greeting: String?    // ersetzt die Begrüßung auf der Startseite
     var card: SpecialCard?
     var message: SpecialMessage?
-    var voice: SpecialVoice?
     var notice: SpecialNotice?
 }
 
@@ -80,24 +72,10 @@ final class SpecialTheme: ObservableObject {
     @Published private(set) var noticeDue = false       // Uhrzeit erreicht -> Einblendung zeigen
     @Published var videoOpen = false
     @Published private(set) var videoPath: String?      // Video, das gerade offen ist
-    @Published private(set) var voiceLabel: String?     // solange die Sprachaufnahme läuft
-    private var voice: VoiceState?
-    private var voicePlayer: AVAudioPlayer?
-    private var voiceDelegate: VoiceDelegate?
-    private var voiceDone: (() -> Void)?
     private var noticeTask: Task<Void, Never>?
     private var api: APIClient?
     private let seenKey = "specialSeen"
     nonisolated static let noticeID = "special-notice"
-
-    private struct VoiceState {
-        var url: String
-        var after: Int
-        var label: String
-        var count = 0
-        var file: URL?
-        var loading = false
-    }
     /// Wann der Regen beim Öffnen begann (einmal je Sonderdesign und App-Start).
     private(set) var rainStart: Date?
     private var rainFor = ""
@@ -115,7 +93,6 @@ final class SpecialTheme: ObservableObject {
     /// Beim Start, alle 5 Minuten und pünktlich zum Ende nachfragen.
     func start(api: APIClient) {
         self.api = api
-        loadVoice()
         guard loop == nil else { return }
         loop = Task { [weak self] in
             while !Task.isCancelled {
@@ -144,7 +121,6 @@ final class SpecialTheme: ObservableObject {
             if greeting != nil { greeting = nil }
             if message != nil { message = nil }
             if notice != nil { notice = nil; scheduleNotice() }
-            if voicePlayer == nil { voice = nil }
             if active { look = SpecialLook(); id = "" }
             end = 0
             UserDefaults.standard.removeObject(forKey: key)
@@ -163,7 +139,7 @@ final class SpecialTheme: ObservableObject {
         if let d = try? JSONEncoder().encode(r) { UserDefaults.standard.set(d, forKey: key) }
     }
 
-    // MARK: Nachricht, Einblendung mit Video, Sprachaufnahme
+    // MARK: Nachricht, Einblendung mit Video
 
     private func seenHere(_ what: String) -> Bool {
         (UserDefaults.standard.stringArray(forKey: seenKey) ?? []).contains("\(id):\(what)")
@@ -185,14 +161,6 @@ final class SpecialTheme: ObservableObject {
         if message == nil, let m = r.message, m.text?.isEmpty == false, !seenHere("message") { message = m }
         let n = (r.notice?.at != nil && !seenHere("notice")) ? r.notice : nil
         if notice != n { notice = n; scheduleNotice() }
-        if let v = r.voice, let u = v.url, !u.isEmpty, !seenHere("voice") {
-            if voice?.url != u {
-                voice = VoiceState(url: u, after: max(1, v.after ?? 2), label: v.label ?? "")
-                loadVoice()
-            }
-        } else if voicePlayer == nil {
-            voice = nil
-        }
     }
 
     /// Nachricht ist zu sehen -> gilt als gezeigt (auch wenn die App gleich danach beendet wird).
@@ -239,53 +207,6 @@ final class SpecialTheme: ObservableObject {
     }
 
     func videoClosed() { videoPath = nil }
-
-    private func loadVoice() {
-        guard let v = voice, v.file == nil, !v.loading, let api, let u = api.absoluteURL(v.url) else { return }
-        voice?.loading = true
-        Task { [weak self] in
-            let file = FileManager.default.temporaryDirectory
-                .appendingPathComponent("special-voice-" + u.lastPathComponent)
-            if let (tmp, resp) = try? await URLSession.shared.download(from: u),
-               (resp as? HTTPURLResponse)?.statusCode == 200 {
-                try? FileManager.default.removeItem(at: file)
-                try? FileManager.default.moveItem(at: tmp, to: file)
-                if self?.voice?.url == v.url { self?.voice?.file = file }
-            }
-            self?.voice?.loading = false
-        }
-    }
-
-    /// Beim Songwechsel (PlayerController.next): Ist jetzt die Sprachaufnahme dran, spielt sie
-    /// und ruft danach `weiter`. true = der Songwechsel wartet so lange.
-    func voiceGate(weiter: @escaping () -> Void) -> Bool {
-        guard active, var v = voice, voicePlayer == nil else { return false }
-        v.count += 1
-        voice = v
-        guard v.count >= v.after, let file = v.file, let p = try? AVAudioPlayer(contentsOf: file) else { return false }
-        let d = VoiceDelegate { [weak self] in self?.finishVoice() }
-        p.delegate = d
-        guard p.play() else { return false }
-        voicePlayer = p
-        voiceDelegate = d
-        voiceDone = weiter
-        voiceLabel = v.label.isEmpty ? "Eine Nachricht für dich" : v.label
-        return true
-    }
-
-    /// Aufnahme zu Ende oder „Weiter“ getippt: einmal gehört, weiter mit dem nächsten Song.
-    func finishVoice() {
-        guard let p = voicePlayer else { return }
-        p.stop()
-        voicePlayer = nil
-        voiceDelegate = nil
-        voiceLabel = nil
-        voice = nil
-        markSeen("voice")
-        let w = voiceDone
-        voiceDone = nil
-        w?()
-    }
 
     /// Einmal je Sonderdesign: der Regen beim Öffnen.
     func takeRain() -> Date? {
@@ -489,17 +410,6 @@ struct SpecialCardView: View {
                 player.play(tracks: r.tracks, startAt: 0, contextName: card.title ?? r.name ?? "", contextURI: uri)
             }
         }
-    }
-}
-
-private final class VoiceDelegate: NSObject, AVAudioPlayerDelegate, @unchecked Sendable {
-    let onEnd: @MainActor @Sendable () -> Void
-    init(_ onEnd: @escaping @MainActor @Sendable () -> Void) { self.onEnd = onEnd }
-    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        Task { @MainActor in self.onEnd() }
-    }
-    func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
-        Task { @MainActor in self.onEnd() }
     }
 }
 

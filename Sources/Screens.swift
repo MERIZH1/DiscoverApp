@@ -227,7 +227,7 @@ struct MainView: View {
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { _ in keyboardVisible = false }
         }
         .overlay { SpecialLayer(rain: true).ignoresSafeArea() }
-        // Sonderdesign: Einblendung ab Uhrzeit, Hinweis während der Sprachaufnahme, Nachricht
+        // Sonderdesign: Einblendung ab Uhrzeit, Nachricht
         .overlay(alignment: .top) {
             if special.noticeDue, let n = special.notice, !special.videoOpen {
                 SpecialNoticeBanner(notice: n) { special.openVideo() }
@@ -236,26 +236,6 @@ struct MainView: View {
             }
         }
         .animation(Motion.spring, value: special.noticeDue && special.notice != nil)
-        .overlay(alignment: .bottom) {
-            if let l = special.voiceLabel {
-                Button { special.finishVoice() } label: {
-                    HStack(spacing: 10) {
-                        Circle().fill(Theme.accent).frame(width: 10, height: 10)
-                        Text(l).font(.system(size: 14, weight: .bold))
-                        Text("Weiter").font(.system(size: 14, weight: .semibold)).foregroundStyle(.black.opacity(0.55))
-                    }
-                    .foregroundStyle(.black)
-                    .padding(.horizontal, 18).padding(.vertical, 12)
-                    .background(.white, in: Capsule())
-                    .shadow(color: .black.opacity(0.4), radius: 10, y: 4)
-                }
-                .buttonStyle(.pressable)
-                .padding(.bottom, 150)
-                .accessibilityIdentifier("special.voice")
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-        }
-        .animation(Motion.spring, value: special.voiceLabel)
         .overlay {
             if let m = special.message {
                 SpecialMessageView(message: m, close: { special.closeMessage() }, play: {

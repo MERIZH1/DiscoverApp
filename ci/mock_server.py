@@ -187,8 +187,6 @@ class H(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/cover/(\d+)\.png", u.path)
         if m:
             return self.send(png(int(m.group(1))), "image/png", extra={"Cache-Control": "max-age=86400"})
-        if u.path == "/special/voice.m4a":
-            return self.send(FIXTURE, "audio/mp4")
         if u.path == "/special/video.mp4":
             r = re.fullmatch(r"bytes=(\d+)-(\d*)", self.headers.get("Range", ""))
             if r:
@@ -234,13 +232,12 @@ class H(BaseHTTPRequestHandler):
                                 "card": {"kicker": "Probe", "title": "Sonderkarte", "sub": "Nur im Test",
                                          "uri": "ytpl:probe", "image": "/cover/12.png"}})
             if an and d.get("extras"):
-                # Nachricht beim Öffnen, Einblendung in 4 s mit Video, Sprachaufnahme nach 1 Songwechsel
+                # Nachricht beim Öffnen, Einblendung in 4 s mit Video
                 SPECIAL.update({
                     "message": {"title": "Probe-Nachricht", "text": "Erste Zeile.\nZweite Zeile.",
                                 "button": "Playlist abspielen", "uri": "ytpl:probe"},
                     "notice": {"at": time.time() + 4, "title": "Probe-Einblendung", "text": "Tippen spielt das Video",
-                               "video": "/special/video.mp4"},
-                    "voice": {"url": "/special/voice.m4a", "after": 1, "label": "Probe-Aufnahme"}})
+                               "video": "/special/video.mp4"}})
             print("SPECIAL", an, flush=True)
             return self.send(b'{"ok": true}')
         if urlparse(self.path).path == "/api/special/seen":

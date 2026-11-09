@@ -212,7 +212,7 @@ final class DiscoverSmokeTests: XCTestCase {
         shotNow("45-sonderdesign-vorbei")
     }
 
-    /// Sonderdesign mit Nachricht beim Öffnen, Einblendung mit Video und Sprachaufnahme.
+    /// Sonderdesign mit Nachricht beim Öffnen und Einblendung mit Video.
     func testSonderNachricht() {
         defer { setSpecial(false) }
         setSpecial(true, extras: true)
@@ -243,26 +243,6 @@ final class DiscoverSmokeTests: XCTestCase {
         XCTAssertFalse(zu.exists, "Video schließt sich am Ende nicht")
         sleep(1)
         XCTAssertFalse(banner.exists, "Einblendung noch da, obwohl das Video zu Ende lief")
-        // Sprachaufnahme nach dem ersten Songwechsel
-        tab("Bibliothek")
-        let liste = app.staticTexts["Playlist 2"].firstMatch
-        XCTAssertTrue(liste.waitForExistence(timeout: 20))
-        liste.tap()
-        let song = app.staticTexts["Song 2"].firstMatch
-        XCTAssertTrue(song.waitForExistence(timeout: 10))
-        song.tap()
-        app.staticTexts["Song 2"].firstMatch.tap()
-        let weiter = app.buttons["player.next"].firstMatch
-        XCTAssertTrue(weiter.waitForExistence(timeout: 8), "Player geht nicht auf")
-        sleep(2)
-        weiter.tap()
-        let aufnahme = app.buttons["special.voice"].firstMatch
-        XCTAssertTrue(aufnahme.waitForExistence(timeout: 8), "Sprachaufnahme startet nicht")
-        shotNow("49-aufnahme")
-        aufnahme.tap()
-        sleep(2)
-        XCTAssertFalse(aufnahme.exists, "Hinweis bleibt nach Weiter")
-        shot("49b-nach-aufnahme")
     }
 
     /// Song ohne Ton und ohne Nachfolger: Der Player darf nicht behaupten, er spiele.
