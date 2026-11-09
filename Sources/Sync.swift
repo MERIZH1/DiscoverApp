@@ -22,9 +22,13 @@ struct RemoteState: Codable {
     let queue_tracks: [SyncTrack]?
     let owner_seen_at: Double?   // vom Server gesetzt (ms) -> Frische-Check
     var updated_at: Double? = nil   // vom Server gesetzt (ms), Merker für /api/sync/wait
+    /// Woher die Songs kommen (Playlist/Album). Übernimmt dieses Gerät, zählt die Statistik
+    /// für dieselbe Playlist weiter statt für „Wiedergabe“.
+    var context_uri: String? = nil
+    var context_name: String? = nil
     enum CodingKeys: String, CodingKey {
         case device_id, device_name, track, position, duration, playing, shuffle
-        case queue_idx, queue_len, queue_tracks, owner_seen_at, updated_at
+        case queue_idx, queue_len, queue_tracks, owner_seen_at, updated_at, context_uri, context_name
         case repeatMode = "repeat"
     }
 }
@@ -45,7 +49,14 @@ struct SyncDevicesResponse: Codable { let devices: [SyncDevice] }
 // Remote = ein anderes Geraet spielt -> wir zeigen Banner + senden Commands.
 @MainActor
 final class SyncManager: ObservableObject {
-    @Published var remote: RemoteState?     // anderes Geraet spielt gerade
+    @Published var remote: RemoteState? {   // anderes Geraet spielt gerade
+        didSet {
+            // Listen markieren dann dessen Song (NowPlayingState)
+            player?.nowState.remote = remote?.track.map {
+                Track(uri: $0.uri, name: $0.name, artist: $0.artist, image: $0.image)
+            }
+        }
+    }
     @Published var injectToast = ""          // "X hat dir einen Song geschickt"
     /// Gleichzeitig auf mehreren Geräten hören (gilt fürs ganze Profil, liegt auf dem Server):
     /// Startet hier ein Song, hält das andere Gerät nicht an, und die Leiste zeigt den eigenen Song.
@@ -179,6 +190,7 @@ final class SyncManager: ObservableObject {
 
     private func snapshot(_ p: PlayerController) -> [String: Any]? {
         guard let t = p.current else { return nil }
+        let transferred = p.ctxURI == "connect:transfer"
         func enc(_ x: Track) -> [String: Any] {
             ["name": x.name, "artist": x.artist, "uri": x.uri, "image": x.image ?? ""]
         }
@@ -190,6 +202,8 @@ final class SyncManager: ObservableObject {
             "repeat": p.repeatMode == .one ? "one" : (p.repeatMode == .all ? "all" : "off"),
             "queue_idx": p.index, "queue_len": p.queue.count,
             "queue_tracks": p.queue.prefix(200).map(enc),
+            "context_uri": transferred ? "" : p.ctxURI,
+            "context_name": transferred ? "" : p.ctxName,
         ]
     }
 
@@ -292,13 +306,23 @@ final class SyncManager: ObservableObject {
         // mischt play() die Queue neu (fisherYates) und Index/Position passen nicht.
         p.shuffle = false
         p.repeatMode = (s.repeatMode == "one" ? .one : (s.repeatMode == "all" ? .all : .off))
-        p.handoffPosition = max(0, s.position ?? 0)
+        // Der Stand ist beim Ankommen schon etwas alt (Push alle 2,5 s, dazu der Weg).
+        // Läuft es dort, die Zeit seitdem draufrechnen, sonst fehlen hier ein paar Sekunden.
+        var pos = max(0, s.position ?? 0)
+        if s.playing == true, let u = s.updated_at, u > 0 {
+            pos += min(30, max(0, Date().timeIntervalSince1970 - u / 1000))
+            if let d = s.duration, d > 1 { pos = min(pos, d - 1) }
+        }
+        p.handoffPosition = pos
+        let cu = s.context_uri ?? "", cn = s.context_name ?? ""
+        let ctxURI = cu.isEmpty ? "connect:transfer" : cu
+        let ctxName = cu.isEmpty || cn.isEmpty ? "Wiedergabe" : cn
         if !tracks.isEmpty {
             let idx = max(0, min(tracks.count - 1, s.queue_idx ?? 0))
-            p.play(tracks: tracks, startAt: idx, contextName: "Wiedergabe", contextURI: "connect:transfer")
+            p.play(tracks: tracks, startAt: idx, contextName: ctxName, contextURI: ctxURI)
         } else if let t = s.track {
             p.play(tracks: [Track(uri: t.uri, name: t.name, artist: t.artist, image: t.image)],
-                   startAt: 0, contextName: "Wiedergabe", contextURI: "connect:transfer")
+                   startAt: 0, contextName: ctxName, contextURI: ctxURI)
         } else { p.handoffPosition = 0; return }
         p.shuffle = (s.shuffle == "on")   // UI-Flag nachziehen (mischt nicht neu)
         remote = nil

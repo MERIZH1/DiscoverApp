@@ -3637,6 +3637,7 @@ struct NumberedTrackRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(track.name).font(.system(size: 16, weight: .regular))
                     .foregroundStyle(playing ? Theme.accent : Theme.text).lineLimit(1)
+                    .accessibilityAddTraits(playing ? .isSelected : [])
                 Text(track.artist).font(.system(size: 14)).foregroundStyle(Theme.sub).lineLimit(1)
             }
             Spacer()
@@ -3726,6 +3727,7 @@ struct TrackRow: View {
                 HStack(spacing: 5) {
                     Text(track.name).font(.system(size: 16))
                         .foregroundStyle(playing ? Theme.accent : Theme.text).lineLimit(1)
+                        .accessibilityAddTraits(playing ? .isSelected : [])
                     if track.uri.hasPrefix("yt:") { YTBadge() }
                 }
                 Text(track.artist).font(.system(size: 14)).foregroundStyle(Theme.sub).lineLimit(1)

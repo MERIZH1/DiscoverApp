@@ -543,6 +543,6 @@ struct SpecialVideoView: View {
             onEnd()
             dismiss()
         }
-        .accessibilityIdentifier("special.video")
+        // Keine Kennung am ganzen Fenster: Sie ging auf den Zu-Knopf über, der Test fand ihn nicht
     }
 }

@@ -3,6 +3,10 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.23 — Gerätewechsel
+- **Bugfix:** Spielt ein anderes Gerät, leuchtet in den Listen dessen Song grün und wechselt mit. Vorher blieb die Markierung auf dem Song stehen, der zuletzt auf dem iPhone lief.
+- **Bugfix:** Holst du die Wiedergabe aufs iPhone, geht es an der richtigen Stelle weiter (vorher fehlten bis zu drei Sekunden), und die Hörstatistik zählt für dieselbe Playlist statt für „Wiedergabe“.
+
 ## v1.1.22 — Vorbereitung für Sonderdesigns
 - **Intern:** Ein Sonderdesign vom Server kann jetzt mehr mitbringen. Ohne Eintrag auf dem Server bleibt alles wie gewohnt.
 - **Intern:** Der Weiter-Knopf im Player hat eine Kennung für die automatischen Tests.

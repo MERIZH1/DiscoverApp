@@ -121,8 +121,17 @@ enum AudioSessionManager {
 /// Bibliothek, Suche und Playlists im Hintergrund komplett neu.
 @MainActor
 final class NowPlayingState: ObservableObject {
-    @Published var track: Track?
+    @Published private(set) var track: Track?
     @Published var hasContent = false
+    /// Song, der hier läuft (PlayerController), und der auf einem anderen Gerät (SyncManager).
+    /// Spielt ein anderes Gerät, leuchtet dessen Song in den Listen, wie in der Leiste unten.
+    /// Vorher blieb die Markierung auf dem Song stehen, der zuletzt hier lief.
+    var local: Track? { didSet { refresh() } }
+    var remote: Track? { didSet { refresh() } }
+    private func refresh() {
+        let t = remote ?? local
+        if track?.id != t?.id { track = t }
+    }
 }
 
 /// Player fuer Aktionen, ohne seine Aenderungen zu beobachten.
@@ -138,7 +147,7 @@ extension EnvironmentValues {
 final class PlayerController: ObservableObject {
     let nowState = NowPlayingState()
     private func syncNowState() {
-        if nowState.track?.id != current?.id { nowState.track = current }
+        if nowState.local?.id != current?.id { nowState.local = current }
         if nowState.hasContent != hasContent { nowState.hasContent = hasContent }
     }
     @Published private(set) var queue: [Track] = [] { didSet { syncNowState() } }   // physische Playback-Queue (ggf. geshuffelt)
@@ -407,7 +416,7 @@ final class PlayerController: ObservableObject {
         }
     }
 
-    private var ctxName = ""
+    private(set) var ctxName = ""
     private(set) var ctxURI = ""   // aktuell laufender Playlist-/Album-Kontext (fuer "Zu Playlist"-Sortierung lesbar)
     // Fuer die Hoerstatistik: welches YT-Video laeuft, zu welchem Track, und
     // ob wir es fuer diesen Durchlauf schon gemeldet haben.

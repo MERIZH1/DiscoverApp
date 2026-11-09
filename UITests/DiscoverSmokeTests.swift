@@ -7,13 +7,15 @@ final class DiscoverSmokeTests: XCTestCase {
     private let shots = URL(fileURLWithPath: "/tmp/discover-shots")
 
     /// Testserver: so tun, als spiele ein anderes Gerät (nil = keins).
-    private func setRemote(_ name: String?) {
+    /// song: dort läuft „Song <n>“ aus den Test-Playlists, sonst ein fremder Song.
+    private func setRemote(_ name: String?, song: Int? = nil) {
         var req = URLRequest(url: URL(string: "http://127.0.0.1:8765/test/remote")!)
         req.httpMethod = "POST"
+        let t: [String: Any] = song.map { ["name": "Song \($0)", "artist": "Kuenstler \($0 % 9 + 1)",
+                                          "uri": "spotify:track:test\($0)", "image": "/cover/\($0 % 40 + 1).png"] }
+            ?? ["name": "Fremder Song", "artist": "Kuenstler 5", "uri": "spotify:track:test77", "image": "/cover/5.png"]
         let body: [String: Any] = name.map { ["device_id": "test-pc", "device_name": $0, "playing": true,
-                                              "position": 30.0, "duration": 200.0,
-                                              "track": ["name": "Fremder Song", "artist": "Kuenstler 5",
-                                                        "uri": "spotify:track:test77", "image": "/cover/5.png"]] } ?? [:]
+                                              "position": 30.0, "duration": 200.0, "track": t] } ?? [:]
         req.httpBody = try? JSONSerialization.data(withJSONObject: body)
         let done = DispatchSemaphore(value: 0)
         URLSession.shared.dataTask(with: req) { _, _, _ in done.signal() }.resume()
@@ -158,6 +160,18 @@ final class DiscoverSmokeTests: XCTestCase {
         XCTAssertTrue(app.buttons["player.play"].firstMatch.waitForExistence(timeout: 8), "Player geht nicht auf")
         XCTAssertTrue(app.staticTexts["Läuft auf Test-PC"].firstMatch.waitForExistence(timeout: 8), "Anderes Gerät fehlt im Player")
         shot("31-anderes-geraet-player")
+        // Die Markierung in der Liste folgt dem Song auf dem anderen Gerät
+        app.buttons["player.close"].firstMatch.tap()
+        func markiert(_ name: String) -> XCUIElement {
+            app.staticTexts.matching(NSPredicate(format: "label == %@ AND selected == true", name)).firstMatch
+        }
+        setRemote("Test-PC", song: 4)
+        XCTAssertTrue(markiert("Song 4").waitForExistence(timeout: 12), "Markierung folgt dem anderen Gerät nicht")
+        XCTAssertFalse(markiert("Song 2").exists, "Alter Song bleibt markiert")
+        shot("32-anderes-geraet-markierung")
+        setRemote("Test-PC", song: 5)
+        XCTAssertTrue(markiert("Song 5").waitForExistence(timeout: 12), "Markierung wechselt nicht mit")
+        XCTAssertFalse(markiert("Song 4").exists, "Vorheriger Song bleibt markiert")
     }
 
     /// Sonderdesign vom Server: Symbole schweben, die Akzentfarbe wechselt, Play und Liken
