@@ -227,7 +227,9 @@ class H(BaseHTTPRequestHandler):
             an = bool(d.get("on"))
             SPECIAL.clear()
             if an:
-                SPECIAL.update({"id": "test" + ("-extras" if d.get("extras") else ""), "end": time.time() + 3600,
+                # Eigene ID je Einschalten: Was das Gerät schon gezeigt hat, gilt dann nicht mehr
+                SPECIAL.update({"id": f"test-extras-{int(time.time())}" if d.get("extras") else "test",
+                                "end": time.time() + 3600,
                                 "app": special_look(), "greeting": "Probe-Gruß",
                                 "card": {"kicker": "Probe", "title": "Sonderkarte", "sub": "Nur im Test",
                                          "uri": "ytpl:probe", "image": "/cover/12.png"}})

@@ -172,7 +172,9 @@ final class SpecialTheme: ObservableObject {
     private func markSeen(_ what: String) {
         var a = UserDefaults.standard.stringArray(forKey: seenKey) ?? []
         let k = "\(id):\(what)"
-        if !a.contains(k) { a.append(k); UserDefaults.standard.set(Array(a.suffix(30)), forKey: seenKey) }
+        guard !a.contains(k) else { return }
+        a.append(k)
+        UserDefaults.standard.set(Array(a.suffix(30)), forKey: seenKey)
         let api = self.api
         Task { await api?.specialSeen(what) }
     }
@@ -445,7 +447,7 @@ struct SpecialCardView: View {
                             .foregroundStyle(.white.opacity(0.8))
                     }
                     Text(card.title ?? "").font(.system(size: 26, weight: .heavy)).foregroundStyle(.white)
-                        .lineLimit(2).multilineTextAlignment(.leading)
+                        .lineLimit(1).minimumScaleFactor(0.55)
                     if let s = card.sub, !s.isEmpty {
                         Text(s).font(.system(size: 13)).foregroundStyle(.white.opacity(0.85))
                             .lineLimit(2).multilineTextAlignment(.leading)

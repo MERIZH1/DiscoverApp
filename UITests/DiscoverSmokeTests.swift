@@ -235,11 +235,13 @@ final class DiscoverSmokeTests: XCTestCase {
         // Vor dem Ende geschlossen: Die Einblendung bleibt
         zu.tap()
         XCTAssertTrue(banner.waitForExistence(timeout: 8), "Einblendung weg, obwohl das Video nicht zu Ende lief")
-        // Bis zum Ende geschaut: Die Einblendung verschwindet
+        // Bis zum Ende geschaut (Probevideo 12 s): Die Einblendung verschwindet
         banner.tap()
         XCTAssertTrue(zu.waitForExistence(timeout: 10))
-        sleep(8)
+        let ende = Date().addingTimeInterval(35)
+        while zu.exists && Date() < ende { sleep(1) }
         XCTAssertFalse(zu.exists, "Video schließt sich am Ende nicht")
+        sleep(1)
         XCTAssertFalse(banner.exists, "Einblendung noch da, obwohl das Video zu Ende lief")
         // Sprachaufnahme nach dem ersten Songwechsel
         tab("Bibliothek")
