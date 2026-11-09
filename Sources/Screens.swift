@@ -197,6 +197,8 @@ struct MainView: View {
     @StateObject private var router = TabRouter()
     @State private var keyboardVisible = false
     @Environment(\.scenePhase) private var scenePhase
+    @ObservedObject private var special = SpecialTheme.shared
+    @State private var resumeAfterVideo = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -225,6 +227,64 @@ struct MainView: View {
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { _ in keyboardVisible = false }
         }
         .overlay { SpecialLayer(rain: true).ignoresSafeArea() }
+        // Sonderdesign: Einblendung ab Uhrzeit, Hinweis während der Sprachaufnahme, Nachricht
+        .overlay(alignment: .top) {
+            if special.noticeDue, let n = special.notice, !special.videoOpen {
+                SpecialNoticeBanner(notice: n) { special.openVideo() }
+                    .padding(.top, 6)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(Motion.spring, value: special.noticeDue && special.notice != nil)
+        .overlay(alignment: .bottom) {
+            if let l = special.voiceLabel {
+                Button { special.finishVoice() } label: {
+                    HStack(spacing: 10) {
+                        Circle().fill(Theme.accent).frame(width: 10, height: 10)
+                        Text(l).font(.system(size: 14, weight: .bold))
+                        Text("Weiter").font(.system(size: 14, weight: .semibold)).foregroundStyle(.black.opacity(0.55))
+                    }
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 18).padding(.vertical, 12)
+                    .background(.white, in: Capsule())
+                    .shadow(color: .black.opacity(0.4), radius: 10, y: 4)
+                }
+                .buttonStyle(.pressable)
+                .padding(.bottom, 150)
+                .accessibilityIdentifier("special.voice")
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(Motion.spring, value: special.voiceLabel)
+        .overlay {
+            if let m = special.message {
+                SpecialMessageView(message: m, close: { special.closeMessage() }, play: {
+                    special.closeMessage()
+                    guard let uri = m.uri else { return }
+                    Task {
+                        if let r = try? await app.api.playlistTracks(uri), !r.tracks.isEmpty {
+                            player.play(tracks: r.tracks, startAt: 0, contextName: r.name ?? "", contextURI: uri)
+                        }
+                    }
+                })
+                .onAppear { special.messageAppeared() }
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.3), value: special.message)
+        .fullScreenCover(isPresented: $special.videoOpen, onDismiss: {
+            special.videoClosed()
+            if resumeAfterVideo { player.resume(); resumeAfterVideo = false }
+        }) {
+            if let p = special.videoPath, let u = app.api.absoluteURL(p) {
+                SpecialVideoView(url: u) { special.videoFinished() }
+            } else {
+                Color.black.ignoresSafeArea()
+            }
+        }
+        .onChange(of: special.videoOpen) { _, open in
+            if open && player.isPlaying { resumeAfterVideo = true; player.pause() }
+        }
         .overlay(alignment: .top) {
             if !sync.injectToast.isEmpty {
                 Text(sync.injectToast)
@@ -4125,6 +4185,7 @@ struct PlayerView: View {
                             .accessibilityValue(p.isPlaying ? "spielt" : "angehalten")
                             .frame(maxWidth: .infinity)
                             GlassSymbolButton(systemName: "forward.fill", size: 52, symbolSize: 24) { p.next() }
+                                .accessibilityIdentifier("player.next")
                                 .frame(maxWidth: .infinity)
                             GlassSymbolButton(systemName: p.repeatMode == .one ? "repeat.1" : "repeat", active: p.repeatMode != .off, size: 48, symbolSize: 19) {
                                 Haptics.tap()

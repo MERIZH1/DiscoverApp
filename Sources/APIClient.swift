@@ -517,8 +517,13 @@ final class APIClient: ObservableObject {
 
     /// Sonderdesign für besondere Tage (Special.swift). nil bei Netzfehler, leer wenn keins gilt.
     func special() async -> SpecialResponse? {
-        guard let d = try? await data("/api/special") else { return nil }
+        guard let d = try? await data("/api/special?client=ios") else { return nil }
         return try? JSONDecoder().decode(SpecialResponse.self, from: d)
+    }
+
+    /// Nachricht, Einblendung oder Sprachaufnahme wurde gezeigt -> der Server meldet sie nicht nochmal.
+    func specialSeen(_ what: String) async {
+        _ = try? await data("/api/special/seen", method: "POST", json: ["what": what])
     }
 
     // MARK: Liked Songs (Herz im Player)

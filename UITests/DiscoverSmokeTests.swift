@@ -21,10 +21,10 @@ final class DiscoverSmokeTests: XCTestCase {
     }
 
     /// Testserver: Sonderdesign an oder aus.
-    private func setSpecial(_ on: Bool) {
+    private func setSpecial(_ on: Bool, extras: Bool = false) {
         var req = URLRequest(url: URL(string: "http://127.0.0.1:8765/test/special")!)
         req.httpMethod = "POST"
-        req.httpBody = try? JSONSerialization.data(withJSONObject: ["on": on])
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["on": on, "extras": extras])
         let done = DispatchSemaphore(value: 0)
         URLSession.shared.dataTask(with: req) { _, _, _ in done.signal() }.resume()
         _ = done.wait(timeout: .now() + 5)
@@ -210,6 +210,57 @@ final class DiscoverSmokeTests: XCTestCase {
         app.activate()
         sleep(4)
         shotNow("45-sonderdesign-vorbei")
+    }
+
+    /// Sonderdesign mit Nachricht beim Öffnen, Einblendung mit Video und Sprachaufnahme.
+    func testSonderNachricht() {
+        defer { setSpecial(false) }
+        setSpecial(true, extras: true)
+        app.terminate()
+        app.launch()
+        let nachricht = app.descendants(matching: .any).matching(identifier: "special.message").firstMatch
+        XCTAssertTrue(nachricht.waitForExistence(timeout: 20), "Nachricht fehlt")
+        sleep(1)
+        shotNow("46-nachricht")
+        app.buttons["special.message.close"].firstMatch.tap()
+        // Einblendung zur Uhrzeit, Antippen öffnet das Video
+        let banner = app.descendants(matching: .any).matching(identifier: "special.notice").firstMatch
+        XCTAssertTrue(banner.waitForExistence(timeout: 20), "Einblendung fehlt")
+        shotNow("47-einblendung")
+        banner.tap()
+        let zu = app.buttons["special.video.close"].firstMatch
+        XCTAssertTrue(zu.waitForExistence(timeout: 10), "Video geht nicht auf")
+        sleep(2)
+        shotNow("48-video")
+        // Vor dem Ende geschlossen: Die Einblendung bleibt
+        zu.tap()
+        XCTAssertTrue(banner.waitForExistence(timeout: 8), "Einblendung weg, obwohl das Video nicht zu Ende lief")
+        // Bis zum Ende geschaut: Die Einblendung verschwindet
+        banner.tap()
+        XCTAssertTrue(zu.waitForExistence(timeout: 10))
+        sleep(8)
+        XCTAssertFalse(zu.exists, "Video schließt sich am Ende nicht")
+        XCTAssertFalse(banner.exists, "Einblendung noch da, obwohl das Video zu Ende lief")
+        // Sprachaufnahme nach dem ersten Songwechsel
+        tab("Bibliothek")
+        let liste = app.staticTexts["Playlist 2"].firstMatch
+        XCTAssertTrue(liste.waitForExistence(timeout: 20))
+        liste.tap()
+        let song = app.staticTexts["Song 2"].firstMatch
+        XCTAssertTrue(song.waitForExistence(timeout: 10))
+        song.tap()
+        app.staticTexts["Song 2"].firstMatch.tap()
+        let weiter = app.buttons["player.next"].firstMatch
+        XCTAssertTrue(weiter.waitForExistence(timeout: 8), "Player geht nicht auf")
+        sleep(2)
+        weiter.tap()
+        let aufnahme = app.buttons["special.voice"].firstMatch
+        XCTAssertTrue(aufnahme.waitForExistence(timeout: 8), "Sprachaufnahme startet nicht")
+        shotNow("49-aufnahme")
+        aufnahme.tap()
+        sleep(2)
+        XCTAssertFalse(aufnahme.exists, "Hinweis bleibt nach Weiter")
+        shot("49b-nach-aufnahme")
     }
 
     /// Song ohne Ton und ohne Nachfolger: Der Player darf nicht behaupten, er spiele.

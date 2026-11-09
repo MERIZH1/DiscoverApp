@@ -17,7 +17,18 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 willPresent notification: UNNotification,
                                 withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        // Die Einblendung des Sonderdesigns zeigt die App selbst, wenn sie offen ist
+        if notification.request.identifier == SpecialTheme.noticeID { completionHandler([]); return }
         completionHandler([.banner, .list, .sound])
+    }
+    // Mitteilung angetippt: Bei der Einblendung des Sonderdesigns geht gleich das Video auf.
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        if response.notification.request.identifier == SpecialTheme.noticeID {
+            Task { @MainActor in SpecialTheme.shared.openVideo() }
+        }
+        completionHandler()
     }
     func application(_ application: UIApplication,
                      handleEventsForBackgroundURLSession identifier: String,

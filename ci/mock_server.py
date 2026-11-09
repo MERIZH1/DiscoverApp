@@ -5,6 +5,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 PORT = 8765
 FIXTURE = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixture.m4a"), "rb").read()
+VIDEO = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixture.mp4"), "rb").read()
 BASE = f"http://127.0.0.1:{PORT}"
 LIKED = set()   # Herz im Player: gelikte Songs
 REMOTE = {}     # Test „anderes Gerät spielt“: Stand, den /api/sync/wait meldet
@@ -186,6 +187,16 @@ class H(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/cover/(\d+)\.png", u.path)
         if m:
             return self.send(png(int(m.group(1))), "image/png", extra={"Cache-Control": "max-age=86400"})
+        if u.path == "/special/voice.m4a":
+            return self.send(FIXTURE, "audio/mp4")
+        if u.path == "/special/video.mp4":
+            r = re.fullmatch(r"bytes=(\d+)-(\d*)", self.headers.get("Range", ""))
+            if r:
+                a = int(r.group(1))
+                b = min(int(r.group(2) or len(VIDEO) - 1), len(VIDEO) - 1)
+                return self.send(VIDEO[a:b + 1], "video/mp4", 206, {
+                    "Accept-Ranges": "bytes", "Content-Range": f"bytes {a}-{b}/{len(VIDEO)}"})
+            return self.send(VIDEO, "video/mp4", extra={"Accept-Ranges": "bytes"})
         if u.path == "/dead.wav":
             return self.send(b"{}", code=502)
         if u.path == "/hls.m3u8":
@@ -212,14 +223,28 @@ class H(BaseHTTPRequestHandler):
         if urlparse(self.path).path == "/api/bglog":
             print("BGLOG", f"{time.time():.3f}", body[:220].decode("utf-8", "replace"), flush=True)
         if urlparse(self.path).path == "/test/special":
-            an = bool(json.loads(body or b"{}").get("on"))
+            d = json.loads(body or b"{}")
+            an = bool(d.get("on"))
             SPECIAL.clear()
             if an:
-                SPECIAL.update({"id": "test", "end": time.time() + 3600, "app": special_look(),
-                                "greeting": "Probe-Gruß",
+                SPECIAL.update({"id": "test" + ("-extras" if d.get("extras") else ""), "end": time.time() + 3600,
+                                "app": special_look(), "greeting": "Probe-Gruß",
                                 "card": {"kicker": "Probe", "title": "Sonderkarte", "sub": "Nur im Test",
                                          "uri": "ytpl:probe", "image": "/cover/12.png"}})
+            if an and d.get("extras"):
+                # Nachricht beim Öffnen, Einblendung in 4 s mit Video, Sprachaufnahme nach 1 Songwechsel
+                SPECIAL.update({
+                    "message": {"title": "Probe-Nachricht", "text": "Erste Zeile.\nZweite Zeile.",
+                                "button": "Playlist abspielen", "uri": "ytpl:probe"},
+                    "notice": {"at": time.time() + 4, "title": "Probe-Einblendung", "text": "Tippen spielt das Video",
+                               "video": "/special/video.mp4"},
+                    "voice": {"url": "/special/voice.m4a", "after": 1, "label": "Probe-Aufnahme"}})
             print("SPECIAL", an, flush=True)
+            return self.send(b'{"ok": true}')
+        if urlparse(self.path).path == "/api/special/seen":
+            what = json.loads(body or b"{}").get("what")
+            SPECIAL.pop(what, None)
+            print("SPECIAL seen", what, flush=True)
             return self.send(b'{"ok": true}')
         if urlparse(self.path).path == "/test/remote":
             REMOTE.clear()

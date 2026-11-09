@@ -3,6 +3,10 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.22 — Vorbereitung für Sonderdesigns
+- **Intern:** Ein Sonderdesign vom Server kann jetzt mehr mitbringen. Ohne Eintrag auf dem Server bleibt alles wie gewohnt.
+- **Intern:** Der Weiter-Knopf im Player hat eine Kennung für die automatischen Tests.
+
 ## v1.1.21 — Kapitel in Playlists
 - **Neu:** Playlists können in Kapitel unterteilt sein, zum Beispiel nach Jahren. Vor dem ersten Song eines Kapitels steht dann eine Überschrift.
 - **Intern:** Ein Sonderdesign vom Server kann eine eigene Begrüßung und eine große Karte oben auf der Startseite mitbringen.

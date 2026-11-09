@@ -1070,6 +1070,8 @@ final class PlayerController: ObservableObject {
         if auto && sleepAtEnd { sleepAtEnd = false; pause(); return }
         if isRadio { return }
         if auto && repeatMode == .one { seek(liveConcert ? liveStart : 0); resume(); return }
+        // Sonderdesign: einmal eine Sprachaufnahme zwischen zwei Songs (Special.swift)
+        if SpecialTheme.shared.voiceGate(weiter: { [weak self] in self?.next() }) { pause(); return }
         // 1) Manuelle Queue (Play-Next/Add-to-Queue) zuerst
         if !manualQueue.isEmpty {
             let inj = manualQueue.removeFirst()
