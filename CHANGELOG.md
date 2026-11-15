@@ -3,6 +3,11 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.27 — Aufgeräumte Menüs, Logo ohne Kachel
+- **Neu:** Song- und Playlist-Menüs sind wie am PC geordnet: oben Einreihen, dann Radio und „Künstler*in/Album anzeigen“ direkt (kein Untermenü „Gehe zu“ mehr), Seltenes unter „Mehr“, Löschen rot ganz unten. „Senden an Profil“ steckt jetzt in „Teilen“.
+- **Neu:** Im Playlist-Menü kannst du abonnieren bzw. das Abo beenden.
+- **Neu:** Ladebild und Logo-Auswahl zeigen das Logo ohne Hintergrund. Das Symbol auf dem Home-Bildschirm behält seinen Grund (iOS verlangt das).
+
 ## v1.1.26 — Neues App-Logo zum Auswählen
 - **Neu:** Das App-Symbol ist jetzt ein Equalizer in Regenbogenfarben. Unter Einstellungen → Darstellung → „App-Logo“ wählst du aus 13 Varianten (z.B. Pastell, Grün, Sonnenuntergang). Die Wahl gilt für dein Profil, also auch in der PWA und im Programm am PC. Beim Wechsel zeigt iOS kurz einen Hinweis.
 

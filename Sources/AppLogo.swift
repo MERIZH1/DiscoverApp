@@ -53,10 +53,12 @@ struct AppLogoPicker: View {
             LazyVGrid(columns: cols, alignment: .leading, spacing: 12) {
                 ForEach(AppLogo.all, id: \.id) { logo in
                     let on = logo.id == selected
+                    // Logo ohne Hintergrund auf dezenter Fläche (wie im Web); das Home-Symbol selbst hat den Grund
                     Image(AppLogo.imageName(logo.id))
                         .resizable().scaledToFit()
+                        .padding(9)
                         .frame(width: 56, height: 56)
-                        .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                        .background(Color.white.opacity(on ? 0.12 : 0.06), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous)
                             .strokeBorder(on ? Theme.accent : .clear, lineWidth: 2.5).padding(-4))
                         .contentShape(Rectangle())

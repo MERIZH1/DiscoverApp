@@ -140,10 +140,8 @@ struct SplashView: View {
             VStack(spacing: 16) {
                 Image(AppLogo.imageName(AppLogo.current))
                     .resizable().scaledToFit()
-                    .frame(width: 104, height: 104)
-                    .clipShape(RoundedRectangle(cornerRadius: 22))
+                    .frame(width: 84, height: 84)              // Logo ohne Hintergrund, keine Kachel
                     .scaleEffect(pulse ? 1.06 : 0.92)
-                    .shadow(color: .black.opacity(0.4), radius: 18, y: 8)
                 Text("Lädt…").font(.system(size: 13)).foregroundStyle(.white.opacity(0.55))
             }
         }

@@ -481,70 +481,76 @@ struct TrackMenu: View, Equatable {
         }
     }
 
+    // Reihenfolge wie im Web (Wiki `interface`, „Menüs“): Einreihen · Gehe zu · Mehr · Löschendes (rot) zuletzt.
     var body: some View {
-        // Quick-Actions als Icon-Reihe oben — alle drei sind Controls (ShareLink + Buttons)
-        // -> ControlGroup rendert sie gleich gross. ShareLink = natives Teilen-Menue.
+        // Schnellaktionen als Symbolreihe oben (ControlGroup zeigt sie gleich gross nebeneinander)
         ControlGroup {
+            Button { app?.player.playNext(track); Haptics.tap() } label: { Label("Als Nächstes", systemImage: "text.line.first.and.arrowtriangle.forward") }
+            Button { app?.player.addToQueue(track); Haptics.tap() } label: { Label("Warteschlange", systemImage: "text.badge.plus") }
             Menu {
                 if track.isLocal {
-                    Button { copyArtistName() } label: { Label("Künstler + Name kopieren", systemImage: "doc.on.doc") }
+                    Button { copyArtistName() } label: { Label("Künstler und Titel kopieren", systemImage: "doc.on.doc") }
                 } else {
                     if onSpotify {
                         Button { copySpotify() } label: { Label("Spotify-Link kopieren", systemImage: "link") }
                     }
                     Button { Task { await copyYouTube() } } label: { Label("YouTube-Link kopieren", systemImage: "play.rectangle") }
                 }
-            } label: { Label("Teilen", systemImage: "square.and.arrow.up") }
-            Button { app?.player.playNext(track); Haptics.tap() } label: { Label("Als Nächstes", systemImage: "text.line.first.and.arrowtriangle.forward") }
-            Menu {
-                if others.isEmpty {
-                    Text("Keine anderen Profile")
-                } else {
-                    ForEach(others) { p in
-                        Button { sendTo(p) } label: { Label(p.name, systemImage: "person.crop.circle") }
+                if !others.isEmpty {
+                    Section("An Profil senden") {
+                        ForEach(others) { p in
+                            Button { sendTo(p) } label: { Label(p.name, systemImage: "paperplane") }
+                        }
                     }
                 }
-            } label: { Label("Senden", systemImage: "paperplane") }
+            } label: { Label("Teilen", systemImage: "square.and.arrow.up") }
         }
-        // restliche Optionen als Liste darunter
-        Button { app?.player.addToQueue(track); Haptics.tap() } label: { Label("Zur Warteschlange", systemImage: "text.badge.plus") }
-        if let onAdd = onAddToPlaylist {
-            Button { onAdd() } label: { Label("Zu Playlist hinzufügen", systemImage: "plus.circle") }
+        Section {
+            if let onAdd = onAddToPlaylist {
+                Button { onAdd() } label: { Label("Zu Playlist hinzufügen", systemImage: "plus.circle") }
+            }
+            Button { app?.downloads.toggle(track) } label: {
+                let dl = app?.downloads.isDownloaded(track.uri) ?? false
+                Label(dl ? "Aus Offline entfernen" : "Herunterladen", systemImage: dl ? "minus.circle" : "arrow.down.circle")
+            }
         }
-        Button { app?.downloads.toggle(track) } label: {
-            let dl = app?.downloads.isDownloaded(track.uri) ?? false
-            Label(dl ? "Aus Offline entfernen" : "Herunterladen", systemImage: dl ? "trash" : "arrow.down.circle")
+        Section {
+            Button { startRadio() } label: { Label("Song-Radio starten", systemImage: "dot.radiowaves.left.and.right") }
+            // Fehlt ein Spotify-Verweis, sucht die Zielseite ihn über den Namen
+            if onShowArtist != nil, !track.artist.isEmpty {
+                Button { onShowArtist?() } label: { Label("Künstler*in anzeigen", systemImage: "person") }
+            }
+            if onShowAlbum != nil, hasAlbum {
+                Button { onShowAlbum?() } label: { Label("Album anzeigen", systemImage: "square.stack") }
+            }
         }
-        if track.uri.hasPrefix("yt:") {
-            Button { promptRename() } label: { Label("Umbenennen", systemImage: "pencil") }
-        }
-        // Fehlt ein Spotify-Verweis, sucht die Zielseite ihn über den Namen
-        if (onShowArtist != nil && !track.artist.isEmpty) || (onShowAlbum != nil && hasAlbum) {
-            Menu {
-                if onShowArtist != nil, !track.artist.isEmpty {
-                    Button { onShowArtist?() } label: { Label("Künstler", systemImage: "person") }
-                }
-                if onShowAlbum != nil, hasAlbum {
-                    Button { onShowAlbum?() } label: { Label("Album", systemImage: "square.stack") }
-                }
-            } label: { Label("Gehe zu", systemImage: "arrow.forward.circle") }
-        }
-        if let onFix = onFixYTMatch {
-            Menu {
-                Button { autoFixYTMatch() } label: { Label("Automatisch fixen", systemImage: "wand.and.stars") }
-                Button { onFix() } label: { Label("Manuell fixen", systemImage: "magnifyingglass") }
-            } label: { Label("Match fixen", systemImage: "arrow.triangle.2.circlepath") }
-        }
-        Button { startRadio() } label: { Label("Song-Radio starten", systemImage: "dot.radiowaves.left.and.right") }
-        if !track.isLocal, onSpotify {
-            Button { openTrackInSpotify() } label: { Label("Auf Spotify öffnen", systemImage: "arrow.up.forward.app") }
-        }
-        if !track.isLocal, !track.uri.isEmpty {
-            Button { Task { await forgetCache() } } label: { Label("Falsch gespielt – Cache zurücksetzen", systemImage: "arrow.counterclockwise") }
+        if hasMore {
+            Section {
+                Menu {
+                    if !track.isLocal, !track.uri.isEmpty {
+                        Button { Task { await forgetCache() } } label: { Label("Falscher Song? Neu suchen", systemImage: "arrow.counterclockwise") }
+                    }
+                    if let onFix = onFixYTMatch {
+                        Button { autoFixYTMatch() } label: { Label("Match automatisch fixen", systemImage: "wand.and.stars") }
+                        Button { onFix() } label: { Label("Match von Hand fixen", systemImage: "magnifyingglass") }
+                    }
+                    if track.uri.hasPrefix("yt:") {
+                        Button { promptRename() } label: { Label("Umbenennen", systemImage: "pencil") }
+                    }
+                    if !track.isLocal, onSpotify {
+                        Button { openTrackInSpotify() } label: { Label("Auf Spotify öffnen", systemImage: "arrow.up.forward.app") }
+                    }
+                } label: { Label("Mehr", systemImage: "ellipsis.circle") }
+            }
         }
         if let onRemove = onRemoveFromPlaylist {
-            Button(role: .destructive) { onRemove() } label: { Label("Aus Playlist entfernen", systemImage: "trash") }
+            Section {
+                Button(role: .destructive) { onRemove() } label: { Label("Aus Playlist entfernen", systemImage: "trash") }
+            }
         }
+    }
+    private var hasMore: Bool {
+        (!track.isLocal && !track.uri.isEmpty) || onFixYTMatch != nil || track.uri.hasPrefix("yt:") || (!track.isLocal && onSpotify)
     }
     private func copySpotify() {
         if let id = track.uri.split(separator: ":").last {
@@ -632,42 +638,69 @@ struct PlaylistMenu: View, Equatable {
     var inLibrary: Bool = true
     var onOpen: (() -> Void)? = nil
     var onDeleted: (() -> Void)? = nil
+    /// Nur auf der Playlist-Seite: Abo-Stand und Teilen (brauchen deren Zustand)
+    var subscribed: Bool? = nil
+    var onToggleSub: (() -> Void)? = nil
+    var onShare: (() -> Void)? = nil
     static func == (lhs: PlaylistMenu, rhs: PlaylistMenu) -> Bool {
         lhs.uri == rhs.uri &&
         lhs.name == rhs.name &&
         lhs.isAlbum == rhs.isAlbum &&
         lhs.inLibrary == rhs.inLibrary &&
+        lhs.subscribed == rhs.subscribed &&
         (lhs.onOpen != nil) == (rhs.onOpen != nil) &&
-        (lhs.onDeleted != nil) == (rhs.onDeleted != nil)
+        (lhs.onDeleted != nil) == (rhs.onDeleted != nil) &&
+        (lhs.onToggleSub != nil) == (rhs.onToggleSub != nil) &&
+        (lhs.onShare != nil) == (rhs.onShare != nil)
     }
     private var app: AppState? { DiscoverServices.app }
     private var isRadio: Bool { uri.hasPrefix("radio-name:") || uri.hasPrefix("radio-id:") || uri.hasPrefix("radio:") }
     private var isSpotifyPlaylist: Bool { uri.hasPrefix("spotify:playlist:") }
+    // Gruppen wie im Web: Öffnen/Radio · Verwalten · Links · Löschen (rot) zuletzt
     var body: some View {
-        if let onOpen {
-            Button { onOpen() } label: { Label("Öffnen", systemImage: "play.fill") }
-        }
-        if isRadio {
-            Button { saveRadioAsPlaylist() } label: { Label("Als Spotify-Playlist speichern", systemImage: "square.and.arrow.down") }
-            Button(role: .destructive) { deleteRadio() } label: { Label("Radio löschen", systemImage: "trash") }
-        } else {
-            Button { downloadAll() } label: { Label("Alle herunterladen", systemImage: "arrow.down.circle") }
-            if uri.hasPrefix("navialbum:") {
-                Button { saveAlbum() } label: { Label("Als Playlist speichern", systemImage: "plus.square.on.square") }
+        Section {
+            if let onOpen {
+                Button { onOpen() } label: { Label("Öffnen", systemImage: "play.fill") }
             }
-            if !isAlbum {
-                if isSpotifyPlaylist {
-                    Button { startRadio() } label: { Label("Playlist-Radio starten", systemImage: "dot.radiowaves.left.and.right") }
+            if !isRadio, !isAlbum, isSpotifyPlaylist {
+                Button { startRadio() } label: { Label("Playlist-Radio starten", systemImage: "dot.radiowaves.left.and.right") }
+            }
+        }
+        Section {
+            if isRadio {
+                Button { saveRadioAsPlaylist() } label: { Label("Als Spotify-Playlist speichern", systemImage: "square.and.arrow.down") }
+            } else {
+                if !isAlbum, let onToggleSub, let subscribed {
+                    Button { onToggleSub() } label: {
+                        Label(subscribed ? "Abo beenden" : "Abonnieren", systemImage: subscribed ? "bell.slash" : "bell")
+                    }
                 }
-                Button { copyAsOwn() } label: { Label("Als eigene Playlist kopieren", systemImage: "plus.square.on.square") }
-                if isSpotifyPlaylist {
-                    Button { copyLink() } label: { Label("Link kopieren", systemImage: "link") }
-                    Button { openInSpotify() } label: { Label("Auf Spotify öffnen", systemImage: "arrow.up.forward.app") }
+                if !isAlbum, isSpotifyPlaylist {
                     Button { syncNow() } label: { Label("Jetzt synchronisieren", systemImage: "arrow.triangle.2.circlepath") }
                 }
-                if inLibrary, isSpotifyPlaylist || uri.hasPrefix("ytpl:") {
-                    Button(role: .destructive) { confirmDelete() } label: { Label("Playlist löschen", systemImage: "trash") }
+                Button { downloadAll() } label: { Label("Alle herunterladen", systemImage: "arrow.down.circle") }
+                if uri.hasPrefix("navialbum:") {
+                    Button { saveAlbum() } label: { Label("Als Playlist speichern", systemImage: "plus.square.on.square") }
                 }
+                if !isAlbum {
+                    Button { copyAsOwn() } label: { Label("Als eigene Playlist kopieren", systemImage: "plus.square.on.square") }
+                }
+            }
+        }
+        Section {
+            if let onShare {
+                Button { onShare() } label: { Label("Playlist teilen", systemImage: "square.and.arrow.up") }
+            }
+            if !isRadio, !isAlbum, isSpotifyPlaylist {
+                Button { copyLink() } label: { Label("Link kopieren", systemImage: "link") }
+                Button { openInSpotify() } label: { Label("Auf Spotify öffnen", systemImage: "arrow.up.forward.app") }
+            }
+        }
+        Section {
+            if isRadio {
+                Button(role: .destructive) { deleteRadio() } label: { Label("Radio löschen", systemImage: "trash") }
+            } else if !isAlbum, inLibrary, isSpotifyPlaylist || uri.hasPrefix("ytpl:") {
+                Button(role: .destructive) { confirmDelete() } label: { Label("Playlist löschen", systemImage: "trash") }
             }
         }
     }
@@ -2958,10 +2991,9 @@ struct TrackListView: View {
                             }
                         }
                         Menu {
-                            Button { showYouTubeShare = true } label: {
-                                Label("Playlist teilen", systemImage: "square.and.arrow.up")
-                            }
-                            PlaylistMenu(uri: uri, name: title, isAlbum: isAlbum, onDeleted: { dismiss() }).equatable()
+                            PlaylistMenu(uri: uri, name: title, isAlbum: isAlbum, onDeleted: { dismiss() },
+                                         subscribed: isAlbum ? nil : isSubscribed, onToggleSub: { toggleSub() },
+                                         onShare: { showYouTubeShare = true }).equatable()
                         } label: {
                             Image(systemName: "ellipsis")
                                 .font(.system(size: 20, weight: .semibold))
@@ -3995,17 +4027,21 @@ struct PlayerView: View {
                     GlassCluster(on: glass, spacing: 6) {
                       HStack(spacing: 6) {
                         Menu {
-                            if p.sleepRemaining > 0 || p.sleepAtEnd {
-                                Button("Sleep-Timer aus", role: .destructive) { p.cancelSleep() }
+                            Section("Sleep-Timer") {
+                                Button("15 Minuten") { p.setSleep(minutes: 15) }
+                                Button("30 Minuten") { p.setSleep(minutes: 30) }
+                                Button("45 Minuten") { p.setSleep(minutes: 45) }
+                                Button("60 Minuten") { p.setSleep(minutes: 60) }
+                                Button("2 Stunden") { p.setSleep(minutes: 120) }
+                                Button("3 Stunden") { p.setSleep(minutes: 180) }
+                                Button("4 Stunden") { p.setSleep(minutes: 240) }
+                                Button("Ende des Songs") { p.setSleepEndOfTrack() }
                             }
-                            Button("15 Minuten") { p.setSleep(minutes: 15) }
-                            Button("30 Minuten") { p.setSleep(minutes: 30) }
-                            Button("45 Minuten") { p.setSleep(minutes: 45) }
-                            Button("60 Minuten") { p.setSleep(minutes: 60) }
-                            Button("2 Stunden") { p.setSleep(minutes: 120) }
-                            Button("3 Stunden") { p.setSleep(minutes: 180) }
-                            Button("4 Stunden") { p.setSleep(minutes: 240) }
-                            Button("Ende des Songs") { p.setSleepEndOfTrack() }
+                            if p.sleepRemaining > 0 || p.sleepAtEnd {
+                                Section {
+                                    Button(role: .destructive) { p.cancelSleep() } label: { Label("Sleep-Timer aus", systemImage: "moon.zzz") }
+                                }
+                            }
                         } label: {
                             Image(systemName: (p.sleepRemaining > 0 || p.sleepAtEnd) ? "moon.fill" : "moon")
                                 .font(.system(size: 16, weight: .semibold))

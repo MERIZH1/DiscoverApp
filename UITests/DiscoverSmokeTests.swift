@@ -292,8 +292,7 @@ final class DiscoverSmokeTests: XCTestCase {
 
         song.press(forDuration: 1.2)
         shot("40-song-menue")
-        app.buttons["Gehe zu"].firstMatch.tap()
-        app.buttons["Künstler"].firstMatch.tap()
+        app.buttons["Künstler*in anzeigen"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Kuenstler 2"].firstMatch.waitForExistence(timeout: 10))
         // Echte Seite im Such-Tab, die Tab-Leiste bleibt sichtbar
         XCTAssertTrue(app.tabBars.firstMatch.exists)
@@ -303,8 +302,7 @@ final class DiscoverSmokeTests: XCTestCase {
 
         XCTAssertTrue(song.waitForExistence(timeout: 10))
         song.press(forDuration: 1.2)
-        app.buttons["Gehe zu"].firstMatch.tap()
-        app.buttons["Album"].firstMatch.tap()
+        app.buttons["Album anzeigen"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Song 1"].firstMatch.waitForExistence(timeout: 10))
         shot("42-album-lokal")
     }
