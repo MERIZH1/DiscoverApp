@@ -138,7 +138,7 @@ struct SplashView: View {
         ZStack {
             Color(hex6: 0x121212).ignoresSafeArea()
             VStack(spacing: 16) {
-                Image("AppLogo")
+                Image(AppLogo.imageName(AppLogo.current))
                     .resizable().scaledToFit()
                     .frame(width: 104, height: 104)
                     .clipShape(RoundedRectangle(cornerRadius: 22))

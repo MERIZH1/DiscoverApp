@@ -105,6 +105,13 @@ final class AppState: ObservableObject {
         player.restoreLast()   // letzten Song in den Mini-Player laden
         sync.start()   // Cross-Device-Sync starten
         Task { await self.loadPlaylists() }   // Playlists vorladen -> Add-to-Playlist-Sheet ist nie leer
+        Task { await self.syncAppLogo() }
+    }
+
+    /// App-Logo des Profils vom Server übernehmen (in PWA oder Programm geändert → gilt auch hier).
+    func syncAppLogo() async {
+        guard let id = (try? await api.settings())?.app_logo else { return }
+        AppLogo.apply(id)
     }
 
     /// Playlists zentral holen + cachen. Ueberschreibt den Cache nur bei ERFOLG

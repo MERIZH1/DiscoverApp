@@ -396,4 +396,5 @@ struct UserSettings: Codable {
     var prebuffer_count: Int?
     var smart_cache: SmartCache?
     var multi_device: Bool?
+    var app_logo: String?
 }

@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.24 — Neues App-Logo zum Auswählen
+- **Neu:** Das App-Symbol ist jetzt ein Equalizer in Regenbogenfarben. Unter Einstellungen → Darstellung → „App-Logo“ wählst du aus 13 Varianten (z.B. Pastell, Grün, Sonnenuntergang). Die Wahl gilt für dein Profil, also auch in der PWA und im Programm am PC. Beim Wechsel zeigt iOS kurz einen Hinweis.
+
 ## v1.1.23 — Gerätewechsel
 - **Bugfix:** Spielt ein anderes Gerät, leuchtet in den Listen dessen Song grün und wechselt mit. Vorher blieb die Markierung auf dem Song stehen, der zuletzt auf dem iPhone lief.
 - **Bugfix:** Holst du die Wiedergabe aufs iPhone, geht es an der richtigen Stelle weiter (vorher fehlten bis zu drei Sekunden), und die Hörstatistik zählt für dieselbe Playlist statt für „Wiedergabe“.

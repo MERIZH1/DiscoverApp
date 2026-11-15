@@ -1332,6 +1332,7 @@ struct SettingsView: View {
         ("#5b8db8", "Hellblau"), ("#c47a55", "Orange"), ("#b85555", "Rot"), ("#b89e55", "Gelb"),
     ]
     @State private var normalize = false
+    @State private var appLogo = AppLogo.current
     @State private var bgKeepalive = false
     @State private var scEnabled = true
     @State private var scSec = 45
@@ -1403,6 +1404,12 @@ struct SettingsView: View {
                             }
                         }.tint(Theme.accent)
                         .onChange(of: app.liquidGlass) { _ in configureAppearance(glass: app.liquidGlass) }
+                        // App-Logo: je Profil, dieselbe Auswahl wie in der PWA und im Programm
+                        AppLogoPicker(selected: $appLogo) { id in
+                            appLogo = id
+                            AppLogo.apply(id)
+                            Task { await app.api.saveSettings(["app_logo": id]) }
+                        }
                     }
                     // Sync / Geraete-Name
                     SettingsGroup("GERÄT (SYNC)") {
@@ -1552,6 +1559,7 @@ struct SettingsView: View {
             if let s = try? await app.api.settings() {
                 prebuffer = s.prebuffer_count ?? 5; player.prebufferCount = prebuffer; UserDefaults.standard.set(prebuffer, forKey: "prebufferCount")
                 normalize = s.normalize_volume ?? false
+                if let l = s.app_logo, AppLogo.valid(l) { appLogo = l }
                 bgKeepalive = s.bg_keepalive ?? false
                 if let sc = s.smart_cache {
                     scEnabled = sc.enabled ?? true
