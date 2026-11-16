@@ -34,6 +34,7 @@ struct ContentView: View {
                 .zIndex(8)
             }
             if booting { SplashView().transition(.opacity).zIndex(10) }
+            if app.connected, app.profile != nil { LaufBehaltenHost() }
         }
         .scrollDismissesKeyboard(.interactively)
         .environmentObject(app)

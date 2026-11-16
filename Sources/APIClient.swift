@@ -842,6 +842,38 @@ final class APIClient: ObservableObject {
     }
 
     /// Suche + Shuffle: naechste Songs aus Spotifys Station. nil bei Fehler.
+    // MARK: Einfach hören (Knopf „Keine Ahnung, was du hören sollst?“, Server-Wiki `einfach-hoeren`)
+    struct LaufStatus: Decodable { let ok: Bool; let frei: Bool?; let name: String? }
+    struct LaufAntwort: Decodable {
+        let ok: Bool; let sitzung: String?; let tracks: [Track]?; let error: String?
+        let behalten: [String]?; let ersetzen: Bool?
+    }
+    /// Grund je Song („weil du Adele oft hörst“), steht neben dem Track im Feld „lauf“.
+    private struct LaufGruende: Decodable {
+        struct Item: Decodable { let uri: String; let lauf: Meta?; struct Meta: Decodable { let grund: String? } }
+        let tracks: [Item]?
+    }
+    func laufStatus() async -> LaufStatus? {
+        guard let d = try? await data("/api/lauf/status") else { return nil }
+        return try? JSONDecoder().decode(LaufStatus.self, from: d)
+    }
+    /// start / next / feedback. 409 bei start = Geschmacksprofil wird gerade zum ersten Mal gebaut.
+    func lauf(_ was: String, _ body: [String: Any]) async -> (antwort: LaufAntwort?, gruende: [String: String], status: Int) {
+        do {
+            let d = try await data("/api/lauf/" + was, method: "POST", json: body)
+            let a = try? JSONDecoder().decode(LaufAntwort.self, from: d)
+            var g: [String: String] = [:]
+            for i in (try? JSONDecoder().decode(LaufGruende.self, from: d))?.tracks ?? [] {
+                if let x = i.lauf?.grund, !x.isEmpty { g[i.uri] = x }
+            }
+            return (a, g, 200)
+        } catch APIError.http(let code) {
+            return (nil, [:], code)
+        } catch {
+            return (nil, [:], 0)
+        }
+    }
+
     func autoplayNext(seed: String, played: [String]) async -> [Track]? {
         let body: [String: Any] = ["seed": seed, "played": played]
         guard let d = try? await data("/api/autoplay/next", method: "POST", json: body),

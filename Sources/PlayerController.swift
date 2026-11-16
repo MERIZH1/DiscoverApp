@@ -7,7 +7,8 @@ import UIKit
 enum RepeatMode { case off, all, one }
 
 /// Gesamter Player-Zustand fuer Session-Persistenz (ganze Queue + Position).
-struct PlayerSnapshot: Codable { let tracks: [Track]; let index: Int; let original: [Track]?; var autoplaySeed: String? = nil }
+struct PlayerSnapshot: Codable { let tracks: [Track]; let index: Int; let original: [Track]?; var autoplaySeed: String? = nil
+    var laufSitzung: String? = nil; var laufGruende: [String: String]? = nil }
 
 /// Hochfrequente Wiedergabe-Position. Bewusst SEPARAT vom PlayerController,
 /// damit die Sekunden-Ticks NICHT alle Views (Listen, offene Menues) neu
@@ -585,6 +586,8 @@ final class PlayerController: ObservableObject {
         }
     }
     private func stopAutoplay() {
+        laufSitzung = nil
+        laufGruende = [:]
         autoplaySeed = nil
         autoplayFallback = []
         autoplayRetryAt = .distantPast
@@ -595,8 +598,8 @@ final class PlayerController: ObservableObject {
     /// Laufendes Nachladen oder neu gestartetes; nil in der Wartezeit nach einem Fehlschlag.
     private func startAutoplayFill() -> Task<Void, Never>? {
         if let running = autoplayTask { return running }
-        guard autoplaySeed != nil, Date() >= autoplayRetryAt else { return nil }
-        let t = Task { await fillAutoplay() }
+        guard autoplaySeed != nil || laufSitzung != nil, Date() >= autoplayRetryAt else { return nil }
+        let t = Task { if laufSitzung != nil { await fillLauf() } else { await fillAutoplay() } }
         autoplayTask = t
         return t
     }
@@ -627,6 +630,75 @@ final class PlayerController: ObservableObject {
             }
         }
     }
+    // MARK: - Einfach hören (Knopf „Keine Ahnung, was du hören sollst?“, Server-Wiki `einfach-hoeren`)
+    // Der Server plant Blöcke von 10 Songs und lernt aus dem Hörprotokoll (Kontext „lauf“).
+    // Nachschub läuft über denselben Weg wie Suche+Shuffle (startAutoplayFill).
+    private static let laufRefillAt = 2
+    static let laufName = "Einfach hören"
+    @Published private(set) var laufSitzung: String?
+    @Published private(set) var laufGruende: [String: String] = [:]
+    /// Neuer Song im Lauf zu Ende gehört: „Behalten?“ anbieten
+    @Published var laufBehalten: Track?
+    var laufGrund: String? {
+        guard laufSitzung != nil, let c = current else { return nil }
+        return laufGruende[c.uri]
+    }
+
+    /// Startet Einfach hören. Gibt eine Fehlermeldung zurück oder nil.
+    func startLauf() async -> String? {
+        let r = await api.lauf("start", [:])
+        guard let a = r.antwort, a.ok, let s = a.sitzung, let tr = a.tracks, !tr.isEmpty else {
+            if r.status == 409 { return "Dein Geschmack wird gerade zum ersten Mal ausgewertet. Gleich nochmal versuchen." }
+            return r.antwort?.error ?? (r.status == 0 ? "Server nicht erreichbar" : "Gerade nichts gefunden")
+        }
+        stopAutoplay()
+        isRadio = false; radioNowPlaying = ""
+        ctxName = Self.laufName; ctxURI = "lauf"
+        original = tr
+        manualQueue = []
+        queue = tr          // Reihenfolge plant der Server, Shuffle ändert daran nichts
+        index = 0
+        laufSitzung = s
+        laufGruende = r.gruende
+        loadCurrent(autoplay: true)
+        return nil
+    }
+    private func fillLauf() async {
+        guard let s = laufSitzung else { return }
+        let gen = autoplayGen
+        let r = await api.lauf("next", ["sitzung": s])
+        guard gen == autoplayGen else { return }
+        autoplayTask = nil
+        guard let a = r.antwort, a.ok else {
+            autoplayRetryAt = Date().addingTimeInterval(30)
+            return
+        }
+        laufAnhaengen(a.tracks ?? [], gruende: r.gruende, ersetzen: false)
+        if let b = a.behalten, let t = queue.first(where: { b.contains($0.uri) }), !LikeStore.shared.isLiked(t) {
+            laufBehalten = t
+        }
+    }
+    private func laufAnhaengen(_ tr: [Track], gruende: [String: String], ersetzen: Bool) {
+        laufGruende.merge(gruende) { _, neu in neu }
+        if ersetzen, queue.indices.contains(index) { queue = Array(queue[...index]) }
+        let seen = Set(queue.map { $0.uri })
+        let fresh = tr.filter { !$0.uri.isEmpty && !seen.contains($0.uri) }
+        guard !fresh.isEmpty else { return }
+        queue.append(contentsOf: fresh)
+        original = queue
+        persistSnapshot()
+        prefetchUpcoming()
+    }
+    /// „mehr“, „weniger“ oder „nie_zeit“ für den laufenden Song
+    func laufFeedback(_ aktion: String) async {
+        guard let s = laufSitzung, let c = current, c.uri.hasPrefix("spotify:track:") else { return }
+        let gen = autoplayGen
+        let r = await api.lauf("feedback", ["sitzung": s, "uri": c.uri, "aktion": aktion, "aktuell": c.uri])
+        guard gen == autoplayGen, let a = r.antwort, a.ok else { return }
+        if a.ersetzen == true { laufAnhaengen(a.tracks ?? [], gruende: r.gruende, ersetzen: true) }
+        if aktion != "mehr", current?.uri == c.uri { next() }
+    }
+
     /// Spotify liefert gar nichts: wie bisher mit den gemischten Suchtreffern weiter.
     private func fallBackToSearchShuffle() {
         let list = autoplayFallback
@@ -682,6 +754,9 @@ final class PlayerController: ObservableObject {
         manualQueue = []
         index = min(max(0, snap.index), snap.tracks.count - 1)
         autoplaySeed = snap.autoplaySeed
+        laufSitzung = snap.laufSitzung
+        laufGruende = snap.laufGruende ?? [:]
+        if laufSitzung != nil { ctxName = Self.laufName; ctxURI = "lauf" }
         let t = queue[index]
         currentTime = 0; duration = t.durationSec; source = ""; isPlaying = false
         primedNotLoaded = true
@@ -694,7 +769,8 @@ final class PlayerController: ObservableObject {
         flushPlayStats(completed: false)
         pause()
         guard !isRadio, !queue.isEmpty else { return }
-        let snap = PlayerSnapshot(tracks: queue, index: index, original: original, autoplaySeed: autoplaySeed)
+        let snap = PlayerSnapshot(tracks: queue, index: index, original: original, autoplaySeed: autoplaySeed,
+                                  laufSitzung: laufSitzung, laufGruende: laufSitzung == nil ? nil : laufGruende)
         if let d = try? JSONEncoder().encode(snap) {
             UserDefaults.standard.set(d, forKey: "playerSnap_\(profileScope)")
         }
@@ -703,7 +779,8 @@ final class PlayerController: ObservableObject {
     private func persistSnapshot() {
         guard !isRadio, !queue.isEmpty else { return }
         // Grosse Warteschlangen zu kodieren kostet Zeit: nicht beim Knopfdruck im Main-Thread
-        let snap = PlayerSnapshot(tracks: queue, index: index, original: original, autoplaySeed: autoplaySeed)
+        let snap = PlayerSnapshot(tracks: queue, index: index, original: original, autoplaySeed: autoplaySeed,
+                                  laufSitzung: laufSitzung, laufGruende: laufSitzung == nil ? nil : laufGruende)
         let key = "playerSnap_\(profileScope)"
         Self.snapshotQueue.async {
             if let d = try? JSONEncoder().encode(snap) { UserDefaults.standard.set(d, forKey: key) }
@@ -842,6 +919,7 @@ final class PlayerController: ObservableObject {
     private func prefetchUpcoming() {
         guard !isRadio else { return }
         if autoplaySeed != nil, queue.count - 1 - index <= Self.autoplayRefillAt { _ = startAutoplayFill() }
+        if laufSitzung != nil, queue.count - 1 - index <= Self.laufRefillAt { _ = startAutoplayFill() }
         let warmCount = max(prebufferCount, 2)
         let upcomingForWarmup = Array(upNext.prefix(warmCount)).filter { !$0.uri.isEmpty }
         warmupServer(upcomingForWarmup, current: current)
@@ -1122,7 +1200,7 @@ final class PlayerController: ObservableObject {
         }
         guard !queue.isEmpty else { return }
         // 2) Ende der Queue
-        if index >= queue.count - 1, autoplaySeed != nil, let fill = startAutoplayFill() {
+        if index >= queue.count - 1, autoplaySeed != nil || laufSitzung != nil, let fill = startAutoplayFill() {
             // Weiter gedrueckt, bevor der Nachschub da ist: kurz warten, statt
             // die bisherigen Songs neu zu mischen.
             guard !autoplayWaiting else { return }
@@ -1223,7 +1301,7 @@ final class PlayerController: ObservableObject {
         shuffle.toggle()
         saveMode()
         // Spotify graut Shuffle in diesem Modus aus: die Folge bleibt, wie sie ist.
-        guard queue.count > 1, autoplaySeed == nil else { return }
+        guard queue.count > 1, autoplaySeed == nil, laufSitzung == nil else { return }
         let cur = current
         if wasOff {
             if original.isEmpty || original.count != queue.count { original = queue }  // pre-Shuffle-Reihenfolge sichern

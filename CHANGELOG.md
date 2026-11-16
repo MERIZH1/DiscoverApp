@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.29 — Einfach hören
+- **Neu:** Der Knopf „Keine Ahnung, was du hören sollst?“ oben auf der Startseite: Ein Tipp, und es läuft die Musik, die du sonst hörst, passend zur Tageszeit, ab und zu mit etwas Neuem dazwischen. Oben im Player steht, warum ein Song kommt; im Menü gibt es „Mehr davon“, „Weniger davon“ und „Nie um diese Zeit“. Der Knopf erscheint, sobald der Modus auf dem Server freigeschaltet ist.
+
 ## v1.1.28 — Update schließt die App, Hörstatistik vollständig
 - **Bugfix:** Nach „Installieren“ eines Updates geht die App wieder von selbst zu und die Installation startet sofort. Vorher wartete sie, bis du die App im App-Umschalter weggewischt hast. Die Wiedergabe hält dabei an, die Warteschlange bleibt erhalten.
 - **Bugfix:** Songs aus dem Vorpuffer, offline gespeicherte Songs, Songs von Navidrome und Songs nach einer Überblendung zählen jetzt in der Hörstatistik. Vorher fehlten sie dort.

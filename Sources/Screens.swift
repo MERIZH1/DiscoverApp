@@ -956,6 +956,9 @@ struct HomeView: View {
     @State private var recents: [HomeItem] = []
     @State private var filter = "all"
     @State private var showAccount = false
+    @State private var laufFrei = false
+    @State private var laufBusy = false
+    @State private var laufFehler: String?
     @ObservedObject private var special = SpecialTheme.shared
 
     private var greetingText: String {
@@ -991,6 +994,18 @@ struct HomeView: View {
                         HStack(spacing: 8) {
                             ForEach([("all","Alle"),("playlist","Playlists"),("artist","Künstler*innen"),("album","Alben")], id: \.0) { f in
                                 Pill(text: f.1, active: filter == f.0) { filter = f.0 }
+                            }
+                        }.padding(.horizontal)
+                    }
+
+                    // Einfach hören: groß und ganz oben (Server-Wiki `einfach-hoeren`)
+                    if laufFrei {
+                        LaufKnopf(busy: laufBusy) {
+                            guard !laufBusy else { return }
+                            laufBusy = true
+                            Task {
+                                laufFehler = await app.player.startLauf()
+                                laufBusy = false
                             }
                         }.padding(.horizontal)
                     }
@@ -1063,10 +1078,14 @@ struct HomeView: View {
             }
         }
         .sheet(isPresented: $showAccount) { AccountSheet() }
+        .alert(PlayerController.laufName, isPresented: Binding(get: { laufFehler != nil }, set: { if !$0 { laufFehler = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(laufFehler ?? "") }
         .task { await loadHome() }
         .refreshable { await loadHome() }
     }
     private func loadHome() async {
+        Task { @MainActor in laufFrei = (await app.api.laufStatus())?.frei ?? false }
         // 1) Cache sofort zeigen
         if home == nil { home = app.cacheGet("home", HomeResponse.self) }
         if recents.isEmpty { recents = app.cacheGet("recents", [HomeItem].self) ?? [] }
@@ -1098,6 +1117,61 @@ struct HomeView: View {
             if out.count >= 15 { break }
         }
         return out
+    }
+}
+
+/// Der große Knopf „Keine Ahnung, was du hören sollst?“ oben auf der Startseite.
+struct LaufKnopf: View {
+    let busy: Bool
+    let action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle().fill(Theme.accent).frame(width: 52, height: 52)
+                        .shadow(color: Theme.accent.opacity(0.35), radius: 12, y: 6)
+                    if busy {
+                        ProgressView().tint(.black)
+                    } else {
+                        Image(systemName: "play.fill").font(.system(size: 22, weight: .bold)).foregroundStyle(.black).offset(x: 2)
+                    }
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Keine Ahnung, was du hören sollst?").font(.system(size: 18, weight: .heavy))
+                        .foregroundStyle(Theme.text).multilineTextAlignment(.leading)
+                    Text("Ein Tipp, und es läuft, was du magst, mit ein paar Neuen dazwischen.")
+                        .font(.system(size: 13)).foregroundStyle(Theme.sub).multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.vertical, 16).padding(.horizontal, 18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                LinearGradient(colors: [Theme.accent.opacity(0.28), Theme.accent.opacity(0.08)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    .overlay(Color.white.opacity(0.05))
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        }
+        .buttonStyle(.pressable)
+        .accessibilityIdentifier("home.lauf")
+    }
+}
+
+/// Fragt nach, ob ein neuer Song aus „Einfach hören“, der zu Ende gehört wurde, ins Herz soll.
+struct LaufBehaltenHost: View {
+    @EnvironmentObject var player: PlayerController
+    var body: some View {
+        Color.clear.frame(width: 0, height: 0)
+            .alert("Neu für dich", isPresented: Binding(get: { player.laufBehalten != nil }, set: { if !$0 { player.laufBehalten = nil } })) {
+                Button("♥ Behalten") {
+                    if let t = player.laufBehalten { Task { await LikeStore.shared.toggle(t) } }
+                    player.laufBehalten = nil
+                }
+                Button("Nein", role: .cancel) { player.laufBehalten = nil }
+            } message: {
+                Text("„\(player.laufBehalten?.name ?? "")“ von \(player.laufBehalten?.artist ?? "") hast du bis zum Ende gehört. In deine Lieblingssongs?")
+            }
     }
 }
 
@@ -4018,8 +4092,9 @@ struct PlayerView: View {
                     .accessibilityIdentifier("player.close")
                     Spacer()
                     VStack(spacing: 2) {
-                        Text("WIEDERGABE").font(.system(size: 11, weight: .bold)).foregroundStyle(Theme.sub).tracking(1)
-                        Text(p.displayTitle).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
+                        // Einfach hören: Modus und der Grund, warum dieser Song kommt
+                        Text(p.laufSitzung != nil ? "EINFACH HÖREN" : "WIEDERGABE").font(.system(size: 11, weight: .bold)).foregroundStyle(Theme.sub).tracking(1)
+                        Text(p.laufGrund ?? p.displayTitle).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
                     }
                     Spacer()
                     // Rechte Icon-Gruppe: auf iOS 26 verschmelzen die Glas-Kreise
@@ -4060,6 +4135,13 @@ struct PlayerView: View {
                                 .glassIconCircle(glass)
                         }
                         Menu {
+                            if p.laufSitzung != nil, let t = p.current, t.uri.hasPrefix("spotify:track:") {
+                                Section(PlayerController.laufName) {
+                                    Button { Task { await p.laufFeedback("mehr") } } label: { Label("Mehr davon", systemImage: "plus.circle") }
+                                    Button { Task { await p.laufFeedback("weniger") } } label: { Label("Weniger davon", systemImage: "minus.circle") }
+                                    Button { Task { await p.laufFeedback("nie_zeit") } } label: { Label("Nie um diese Zeit", systemImage: "clock.badge.xmark") }
+                                }
+                            }
                             if let t = p.current {
                                 TrackMenu(track: t, onShowArtist: { goTo(t, artist: true) }, onShowAlbum: { goTo(t, artist: false) }, onAddToPlaylist: { showAddPlaylist = true }, onSendToUser: { showSendUser = true }, onFixYTMatch: { showFixYT = true }).equatable()
                             }
