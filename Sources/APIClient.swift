@@ -800,6 +800,7 @@ final class APIClient: ObservableObject {
                        completed: Bool, contextName: String = "", contextURI: String = "",
                        source: String = "", partial: Bool = false) async {
         guard !videoId.isEmpty, listened > 2 else { return }
+        // Kennung: videoId, "navi-<id>" (Navidrome) oder "-" (unbekannt, der Server schlaegt nach)
         _ = try? await data("/api/yt/stats/\(videoId)", method: "POST", json: [
             "listened_sec": listened, "duration_sec": duration,
             "completed": completed, "partial": partial,
@@ -808,6 +809,8 @@ final class APIClient: ObservableObject {
             "image": track.image ?? "",
             "context_uri": contextURI, "context_name": contextName,
             "source": source,
+            "client": "ios",
+            "device_id": UserDefaults.standard.string(forKey: "syncDeviceID") ?? "",
         ])
     }
 

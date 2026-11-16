@@ -36,6 +36,8 @@ final class AppUpdater: ObservableObject {
     @Published var versions: [AppVersionInfo] = []
     @Published var loaded = false
     private var api: APIClient?   // fuer das Install-Signal-Polling in open()
+    /// Wird vor dem Beenden fuer ein Update aufgerufen (Wiedergabe anhalten, Stand sichern).
+    static var beforeExit: (() -> Void)?
 
     static var installedBuild: Int {
         Int(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0") ?? 0
@@ -100,8 +102,17 @@ final class AppUpdater: ObservableObject {
                 guard let sig = await api.installSignal() else { continue }
                 let slotOk = sig.slot.isEmpty || sig.slot == mySlot
                 if sig.ts > baseTs + 0.001 && sig.build == targetBuild && slotOk {
+                    // iOS ersetzt die App erst, wenn ihr Prozess beendet ist. Nur in den Hintergrund
+                    // schicken reicht nicht mehr, sobald Musik oder der stumme KeepAlive-Ton laeuft:
+                    // dann wartete die Installation, bis man die App von Hand wegwischte (Max, 16.11.2026).
+                    // Darum: Wiedergabe und KeepAlive stoppen, Stand sichern, Homescreen, beenden.
+                    await api.bgLog("ota_signal", "build=\(targetBuild) slot=\(mySlot) state=\(UIApplication.shared.applicationState.rawValue)")
+                    AppUpdater.beforeExit?()
+                    ConnectKeepAlive.shared.stop()
                     AppUpdater.suspendToHomeScreen()
-                    return
+                    try? await Task.sleep(nanoseconds: 1_000_000_000)
+                    await api.bgLog("ota_exit", "state=\(UIApplication.shared.applicationState.rawValue)")
+                    exit(0)
                 }
             }
         }

@@ -3,6 +3,10 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.28 — Update schließt die App, Hörstatistik vollständig
+- **Bugfix:** Nach „Installieren“ eines Updates geht die App wieder von selbst zu und die Installation startet sofort. Vorher wartete sie, bis du die App im App-Umschalter weggewischt hast. Die Wiedergabe hält dabei an, die Warteschlange bleibt erhalten.
+- **Bugfix:** Songs aus dem Vorpuffer, offline gespeicherte Songs, Songs von Navidrome und Songs nach einer Überblendung zählen jetzt in der Hörstatistik. Vorher fehlten sie dort.
+
 ## v1.1.27 — Aufgeräumte Menüs, Logo ohne Kachel
 - **Neu:** Song- und Playlist-Menüs sind wie am PC geordnet: oben Einreihen, dann Radio und „Künstler*in/Album anzeigen“ direkt (kein Untermenü „Gehe zu“ mehr), Seltenes unter „Mehr“, Löschen rot ganz unten. „Senden an Profil“ steckt jetzt in „Teilen“.
 - **Neu:** Im Playlist-Menü kannst du abonnieren bzw. das Abo beenden.

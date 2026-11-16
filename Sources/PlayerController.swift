@@ -423,6 +423,24 @@ final class PlayerController: ObservableObject {
     private var statVid = ""
     private var statTrack: Track?
     private var statSent = false
+    private var statCtxName = "", statCtxURI = "", statSource = ""   // Stand beim Start des Songs
+    /// Kennung fuer vorgepufferte Songs: videoId, "navi-<id>" oder "-" (Server schlaegt nach)
+    private var prebufKeyFor: [String: String] = [:]
+
+    /// Hoerprotokoll (16.11.2026, AUFTRAG K0): Beim Start eines Songs festhalten, was laeuft —
+    /// fuer JEDE Quelle. Vorher wurde nur der Stream-Weg erfasst; Songs aus dem Vorpuffer, offline
+    /// und von Navidrome fehlten im Protokoll.
+    private func statBegin(_ track: Track, key: String) {
+        statVid = key.isEmpty ? "-" : key
+        statTrack = track
+        statSent = false
+        statCtxName = ctxName; statCtxURI = ctxURI; statSource = source
+    }
+    private static func statKey(videoId: String?, navidromeId: String?) -> String {
+        if let v = videoId, !v.isEmpty { return v }
+        if let n = navidromeId, !n.isEmpty { return "navi-" + n }
+        return "-"
+    }
 
     private func diag(_ ev: String, _ info: String) {
         Task { await api.bgLog(ev, info) }
@@ -671,6 +689,17 @@ final class PlayerController: ObservableObject {
         source = UserDefaults.standard.string(forKey: "lastSource_\(profileScope)") ?? ""
     }
     private static let snapshotQueue = DispatchQueue(label: "discover.snapshot", qos: .utility)
+    /// Vor dem Beenden fuer ein App-Update: Song melden, anhalten, Warteschlange sofort sichern.
+    func prepareForExit() {
+        flushPlayStats(completed: false)
+        pause()
+        guard !isRadio, !queue.isEmpty else { return }
+        let snap = PlayerSnapshot(tracks: queue, index: index, original: original, autoplaySeed: autoplaySeed)
+        if let d = try? JSONEncoder().encode(snap) {
+            UserDefaults.standard.set(d, forKey: "playerSnap_\(profileScope)")
+        }
+        UserDefaults.standard.synchronize()
+    }
     private func persistSnapshot() {
         guard !isRadio, !queue.isEmpty else { return }
         // Grosse Warteschlangen zu kodieren kostet Zeit: nicht beim Knopfdruck im Main-Thread
@@ -758,6 +787,7 @@ final class PlayerController: ObservableObject {
                 guard crossfading, xfTarget?.uri == nt.uri,
                       r.ok, let rel = r.url, let url = api.absoluteURL(rel) else { abortCrossfade(); return }
                 if let d = r.duration, d > 0 { streamDurations[nt.uri] = Double(d) }
+                prebufKeyFor[nt.uri] = Self.statKey(videoId: r.videoId, navidromeId: r.navidromeId)
                 b.replaceCurrentItem(with: makeItem(url)); b.play()
             } catch { abortCrossfade() }
         }
@@ -835,6 +865,7 @@ final class PlayerController: ObservableObject {
               let url = api.absoluteURL(rel) else { return }
         guard !Task.isCancelled else { return }
         if let d = r.duration, d > 0 { streamDurations[t.uri] = Double(d) }
+        prebufKeyFor[t.uri] = Self.statKey(videoId: r.videoId, navidromeId: r.navidromeId)
         var req = URLRequest(url: url)
         if let pid = api.profileId { req.setValue(pid, forHTTPHeaderField: "X-Profile-Id") }
         req.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15",
@@ -901,6 +932,7 @@ final class PlayerController: ObservableObject {
         // UI/State auf den neuen Track ziehen
         primedNotLoaded = false
         source = wasOffline ? "offline" : ""
+        if let t = current { statBegin(t, key: prebufKeyFor[t.uri] ?? "-") }   // Hoerprotokoll: neuer Song
         let pos = CMTimeGetSeconds(player.currentTime())
         currentTime = pos.isFinite ? pos : 0
         if let t = current {
@@ -1058,7 +1090,7 @@ final class PlayerController: ObservableObject {
         let dur = Int(duration.isFinite && duration > 0 ? duration : metaDur)
         let done = completed || (dur > 0 && listened >= dur - 3)
         if !partial { statSent = true }
-        let vid = statVid, cn = ctxName, cu = ctxURI, src = source
+        let vid = statVid, cn = statCtxName, cu = statCtxURI, src = statSource
         Task { await api.postPlayStats(videoId: vid, track: t, listened: listened,
                                        duration: dur, completed: done,
                                        contextName: cn, contextURI: cu, source: src,
@@ -1257,6 +1289,9 @@ final class PlayerController: ObservableObject {
 
     private func loadCurrent(autoplay: Bool) {
         guard let track = current else { return }
+        // Bisherigen Song melden, bevor ein ANDERER startet (Tippen auf einen Song, Springen in
+        // der Warteschlange, Senden an …). next()/prev() melden schon vorher, dann ist statSent gesetzt.
+        if let prev = statTrack, !statSent, prev.uri != track.uri { flushPlayStats(completed: false) }
         if crossfading { abortCrossfade() }
         if let r = track.liveRange, live?.vid == r.vid, player.currentItem != nil, !primedNotLoaded {
             jumpInConcert(r, autoplay: autoplay)
@@ -1283,6 +1318,7 @@ final class PlayerController: ObservableObject {
         // Offline vorhanden (und diese Session nicht als fehlerhaft markiert)? -> lokal abspielen
         if track.liveRange == nil, let local = downloads?.localURL(for: track.uri), !failedOffline.contains(track.uri) {
             source = "offline"
+            statBegin(track, key: "-")
             let item = makeItem(local)
             attachItemObservers(item)
             player.replaceCurrentItem(with: item)
@@ -1296,6 +1332,7 @@ final class PlayerController: ObservableObject {
         // Vorgepuffert (Offline-Buffer)? -> lokale Temp-Datei sofort spielen.
         if let pre = prebuf[track.uri], FileManager.default.fileExists(atPath: pre.path) {
             source = "buffer"
+            statBegin(track, key: prebufKeyFor[track.uri] ?? "-")
             let item = makeItem(pre)
             attachItemObservers(item)
             player.replaceCurrentItem(with: item)
@@ -1325,9 +1362,7 @@ final class PlayerController: ObservableObject {
                 }
                 source = r.source ?? ""
                 streamCache = r.stream_cache ?? ""
-                statVid = r.videoId ?? ""
-                statTrack = track
-                statSent = false
+                statBegin(track, key: Self.statKey(videoId: r.videoId, navidromeId: r.navidromeId))
                 metaDur = Double(r.duration ?? 0)
                 if metaDur > 0 { streamDurations[track.uri] = metaDur }
                 applyLive(r.live, tracks: r.live_tracks)

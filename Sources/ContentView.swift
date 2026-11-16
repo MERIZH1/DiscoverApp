@@ -55,6 +55,7 @@ struct ContentView: View {
             withAnimation(.easeOut(duration: 0.4)) { booting = false }
             await checkGallienReachability()
             // Nach dem Start pruefen, ob eine neuere signierte Version bereitsteht.
+            AppUpdater.beforeExit = { app.player.prepareForExit() }
             if app.connected { await updater.check(api: app.api) }
         }
         .onChange(of: scenePhase) { phase in
