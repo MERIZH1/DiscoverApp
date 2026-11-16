@@ -650,6 +650,16 @@ final class APIClient: ObservableObject {
               let r = try? JSONDecoder().decode(YTCandidatesResponse.self, from: d) else { return [] }
         return r.candidates ?? []
     }
+    /// Alles fürs Fenster „Match von Hand fixen“: ohne q/link die Suche wie beim Abspielen,
+    /// mit q eine eigene Suche, mit link genau dieses Video.
+    func ytFixKandidaten(_ t: Track, q: String? = nil, link: String? = nil) async -> YTFixResponse? {
+        var body: [String: Any] = ["spotify_uri": t.uri, "name": t.name, "artist": t.artist,
+                                   "album": t.album ?? "", "duration": Int(t.durationSec)]
+        if let q, !q.isEmpty { body["q"] = q }
+        if let link, !link.isEmpty { body["link"] = link }
+        guard let d = try? await data("/api/yt/fix-kandidaten", method: "POST", json: body) else { return nil }
+        return try? JSONDecoder().decode(YTFixResponse.self, from: d)
+    }
     func ytSearch(_ query: String, uri: String?, manual: Bool = false) async -> [YTCandidate] {
         var path = "/api/yt/search?q=" + enc(query)
         if manual { path += "&manual=1" }
@@ -658,14 +668,15 @@ final class APIClient: ObservableObject {
               let r = try? JSONDecoder().decode(YTSearchResponse.self, from: d) else { return [] }
         return r.results ?? []
     }
-    @discardableResult
-    func ytAutoFix(_ t: Track) async -> Bool {
+    /// Autofix: das bisherige Video kommt auf die Negativliste des Songs, es wird ein anderes gesucht.
+    /// → (geklappt, Meldung des Servers bei Misserfolg, z. B. „Kein anderer Treffer …“)
+    func ytAutoFix(_ t: Track) async -> (ok: Bool, fehler: String?, keinAnderer: Bool) {
         let body: [String: Any] = ["spotify_uri": t.uri, "name": t.name,
                                    "artist": t.artist, "album": t.album ?? "",
                                    "duration": Int(t.durationSec)]
         guard let d = try? await data("/api/yt/autofix", method: "POST", json: body),
-              let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return false }
-        return (obj["ok"] as? Bool) ?? false
+              let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return (false, nil, false) }
+        return ((obj["ok"] as? Bool) ?? false, obj["error"] as? String, (obj["kein_anderer"] as? Bool) ?? false)
     }
     @discardableResult
     func ytOverride(uri: String, videoId: String) async -> Bool {

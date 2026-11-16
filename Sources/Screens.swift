@@ -506,12 +506,13 @@ struct TrackMenu: View, Equatable {
         guard let app else { return }
         Haptics.tap()
         Task {
-            let ok = await app.api.ytAutoFix(track)
-            if ok {
+            let r = await app.api.ytAutoFix(track)
+            if r.ok {
                 if app.player.current?.uri == track.uri { app.player.reloadCurrent() }
                 app.flash("Match geändert ✓")
             } else {
-                app.flash("Automatischer Fix fehlgeschlagen")
+                app.flash(r.fehler ?? "Automatischer Fix fehlgeschlagen")
+                if r.keinAnderer { onFixYTMatch?() }     // kein anderer Treffer: gleich von Hand wählen
             }
         }
     }
@@ -841,42 +842,117 @@ struct PlaylistMenu: View, Equatable {
     }
 }
 
-// MARK: - YouTube-Match fixen (andere Version waehlen)
+// MARK: - YouTube-Match fixen von Hand
+/// Vorhören im Fenster „Match von Hand fixen“: eigener kleiner AVPlayer, startet bei ~45 s.
+@MainActor
+final class YTVorhoerer: ObservableObject {
+    @Published private(set) var vid: String?
+    private var player: AVPlayer?
+    private var statusObs: NSKeyValueObservation?
+    private var endObs: NSObjectProtocol?
+
+    func toggle(_ vid: String, url: URL?) {
+        if self.vid == vid { stop(); return }
+        stop()
+        guard let url else { return }
+        let item = AVPlayerItem(url: url)
+        let p = AVPlayer(playerItem: item)
+        // Sobald bereit: in die Mitte springen und spielen (vorher nichts abspielen, sonst knackt der Anfang)
+        statusObs = item.observe(\.status, options: [.new]) { [weak self] it, _ in
+            let bereit = it.status == .readyToPlay
+            let fehler = it.status == .failed
+            let d = it.duration.seconds
+            Task { @MainActor in
+                guard let self, self.player === p else { return }
+                if fehler { self.stop(); return }
+                guard bereit else { return }
+                self.statusObs = nil
+                if d.isFinite, d > 60 {
+                    p.seek(to: CMTime(seconds: min(45, d * 0.3), preferredTimescale: 600)) { _ in
+                        Task { @MainActor in if self.player === p { p.play() } }
+                    }
+                } else {
+                    p.play()
+                }
+            }
+        }
+        endObs = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.stop() }
+        }
+        player = p
+        self.vid = vid
+    }
+
+    func stop() {
+        player?.pause()
+        player = nil
+        statusObs = nil
+        if let e = endObs { NotificationCenter.default.removeObserver(e) }
+        endObs = nil
+        vid = nil
+    }
+}
+
+/// Oben das jetzt zugeordnete Video, darunter andere Treffer mit Kanal, Länge, Art (Song/Video/Live)
+/// und Vorhören. Ins Suchfeld passt auch ein YouTube-Link. Auswahl = fester Override auf dem Server,
+/// das alte Video kommt dort auf die Negativliste des Songs; läuft der Song gerade, startet er neu.
 struct YTMatchSheet: View {
     let track: Track
     @EnvironmentObject var app: AppState
     @EnvironmentObject var player: PlayerController
     @Environment(\.dismiss) private var dismiss
-    @State private var cands: [YTCandidate] = []
+    @StateObject private var hoer = YTVorhoerer()
+    @State private var aktuell: YTFixKandidat?
+    @State private var cands: [YTFixKandidat] = []
+    @State private var titel = "Andere Treffer"
+    @State private var fehler: String?
     @State private var query = ""
     @State private var loading = true
     @State private var busy = false
-    @State private var msg = ""
     @State private var searchTask: Task<Void, Never>?
+    @State private var hauptPausiert = false
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 10) {
                 VStack(spacing: 2) {
                     Text(track.name).font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.text).lineLimit(1)
-                    Text(track.artist).font(.system(size: 13)).foregroundStyle(Theme.sub).lineLimit(1)
+                    Text(track.artist + (track.durationSec > 0 ? " · " + durStr(Int(track.durationSec)) : ""))
+                        .font(.system(size: 13)).foregroundStyle(Theme.sub).lineLimit(1)
                 }.padding(.top, 6)
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass").foregroundStyle(Theme.sub)
-                    TextField("YouTube durchsuchen…", text: $query)
+                    TextField("Anders suchen oder YouTube-Link einfügen…", text: $query)
                         .foregroundStyle(Theme.text)
-                        .onChange(of: query) { _ in scheduleSearch() }
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                        .submitLabel(.search)
+                        .onSubmit { laden(sofort: true) }
+                        .onChange(of: query) { _ in laden(sofort: false) }
+                    if !query.isEmpty {
+                        Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.sub) }
+                    }
                 }.padding(10).background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8)).padding(.horizontal)
 
                 if loading {
                     Spacer(); LoadingView(); Spacer()
-                } else if cands.isEmpty {
-                    Spacer(); Text("Keine Treffer").foregroundStyle(Theme.mute); Spacer()
+                } else if let fehler {
+                    Spacer(); Text(fehler).foregroundStyle(Theme.mute).multilineTextAlignment(.center).padding(); Spacer()
                 } else {
                     ScrollView {
-                        VStack(spacing: 0) {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            if let a = aktuell {
+                                kopf("Jetzt zugeordnet")
+                                row(a, istAktuell: true)
+                            } else if query.isEmpty {
+                                kopf("Noch nichts zugeordnet")
+                            }
+                            kopf(titel)
+                            if cands.isEmpty {
+                                Text("Keine Treffer").foregroundStyle(Theme.mute).padding()
+                            }
                             ForEach(cands) { c in
-                                Button { setMatch(c) } label: { row(c) }.buttonStyle(.pressable)
+                                Button { setMatch(c.videoId) } label: { row(c, istAktuell: false) }
+                                    .buttonStyle(.pressable)
                                 Divider().background(Theme.input)
                             }
                         }
@@ -884,69 +960,107 @@ struct YTMatchSheet: View {
                 }
             }
             .background(Theme.bg)
-            .navigationTitle("YouTube-Match fixen").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("Match von Hand fixen").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Fertig") { dismiss() }.foregroundStyle(Theme.accent) } }
-            .overlay(alignment: .bottom) {
-                if !msg.isEmpty {
-                    Text(msg).font(.system(size: 14, weight: .semibold)).foregroundStyle(.black)
-                        .padding(.horizontal, 18).padding(.vertical, 10)
-                        .background(Theme.accent).clipShape(Capsule()).padding(.bottom, 24)
-                }
-            }
         }
-        .task {
-            query = track.name + " " + track.artist
-            cands = await app.api.ytLookup(track)
-            loading = false
+        .task { laden(sofort: true) }
+        .onDisappear {
+            hoer.stop()
+            if hauptPausiert { hauptPausiert = false; player.resume() }
         }
     }
 
-    @ViewBuilder private func row(_ c: YTCandidate) -> some View {
+    @ViewBuilder private func kopf(_ s: String) -> some View {
+        Text(s.uppercased()).font(.system(size: 11, weight: .bold)).tracking(0.6)
+            .foregroundStyle(Theme.sub).padding(.horizontal).padding(.top, 14).padding(.bottom, 4)
+    }
+
+    @ViewBuilder private func tag(_ s: String, hell: Bool = false) -> some View {
+        Text(s).font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(hell ? Color.black : Theme.sub)
+            .padding(.horizontal, 5).padding(.vertical, 1)
+            .background(hell ? Theme.accent : Theme.input).clipShape(Capsule())
+    }
+
+    @ViewBuilder private func row(_ c: YTFixKandidat, istAktuell: Bool) -> some View {
         HStack(spacing: 10) {
-            Artwork(url: c.thumbURL, size: 48, corner: 4)
+            Artwork(url: c.thumb, size: 48, corner: 4).opacity(c.schwach ? 0.55 : 1)
             VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text(c.title ?? "—").font(.system(size: 15)).foregroundStyle(Theme.text).lineLimit(1)
-                    if c.isrc_hit == true {
-                        Text("★ ISRC").font(.system(size: 10, weight: .bold)).foregroundStyle(.black)
-                            .padding(.horizontal, 5).padding(.vertical, 1).background(Theme.accent).clipShape(Capsule())
-                    }
-                    Text(c.isSong ? "Song" : "Video").font(.system(size: 10)).foregroundStyle(Theme.sub)
-                        .padding(.horizontal, 5).padding(.vertical, 1).background(Theme.input).clipShape(Capsule())
-                }
-                Text(c.artistsLine + (c.duration != nil ? " · " + durStr(c.duration!) : ""))
+                Text(c.title ?? c.videoId).font(.system(size: 15)).foregroundStyle(Theme.text).lineLimit(1)
+                Text([c.kanal ?? "", (c.dauer ?? 0) > 0 ? durStr(c.dauer ?? 0) : ""].filter { !$0.isEmpty }.joined(separator: " · "))
                     .font(.system(size: 12)).foregroundStyle(Theme.sub).lineLimit(1)
-            }
-            Spacer()
-        }.padding(.vertical, 8).padding(.horizontal).contentShape(Rectangle())
+                HStack(spacing: 4) {
+                    tag(c.art ?? "Video", hell: c.art == "Song")
+                    if c.isrc_hit == true { tag("Gleiche Aufnahme", hell: true) }
+                    if istAktuell && c.override == true { tag("von Hand") }
+                    if c.abgelehnt == true { tag("abgelehnt") }
+                    if c.dauer_passt == false { tag("Länge passt nicht") }
+                }
+            }.opacity(c.schwach ? 0.55 : 1)
+            Spacer(minLength: 4)
+            Button { vorhoeren(c.videoId) } label: {
+                Image(systemName: hoer.vid == c.videoId ? "stop.fill" : "play.fill")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(hoer.vid == c.videoId ? Color.black : Theme.text)
+                    .frame(width: 34, height: 34)
+                    .background(hoer.vid == c.videoId ? Theme.accent : Theme.input)
+                    .clipShape(Circle())
+            }.buttonStyle(.plain).accessibilityLabel("Vorhören")
+        }
+        .padding(.vertical, 8).padding(.horizontal)
+        .background(istAktuell ? Theme.accent.opacity(0.10) : Color.clear)
+        .contentShape(Rectangle())
     }
 
     private func durStr(_ s: Int) -> String { String(format: "%d:%02d", s / 60, s % 60) }
-    private func scheduleSearch() {
+
+    private func istLink(_ q: String) -> Bool {
+        q.contains("youtu") || q.range(of: "^[A-Za-z0-9_-]{11}$", options: .regularExpression) != nil
+    }
+
+    private func laden(sofort: Bool) {
         searchTask?.cancel()
-        let q = query.trimmingCharacters(in: .whitespaces)
-        guard !q.isEmpty else { return }
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         searchTask = Task {
-            try? await Task.sleep(nanoseconds: 350_000_000)
+            if !sofort { try? await Task.sleep(nanoseconds: 450_000_000) }
             if Task.isCancelled { return }
-            let res = await app.api.ytSearch(q, uri: track.uri, manual: true)
+            hoer.stop()
+            loading = true
+            let r: YTFixResponse?
+            if q.isEmpty { r = await app.api.ytFixKandidaten(track) }
+            else if istLink(q) { r = await app.api.ytFixKandidaten(track, link: q) }
+            else { r = await app.api.ytFixKandidaten(track, q: q) }
             if Task.isCancelled { return }
-            cands = res; loading = false
+            loading = false
+            guard let r, r.ok == true else { fehler = r?.error ?? "Suche fehlgeschlagen"; return }
+            fehler = nil
+            aktuell = q.isEmpty ? r.aktuell : aktuell
+            cands = r.kandidaten ?? []
+            titel = r.link == true ? "Video aus dem Link" : (q.isEmpty ? "Andere Treffer" : "Suchergebnisse")
         }
     }
-    private func setMatch(_ c: YTCandidate) {
-        guard let vid = c.videoId, !busy else { return }
+
+    private func vorhoeren(_ vid: String) {
+        Haptics.tap()
+        if hoer.vid != vid, player.isPlaying { hauptPausiert = true; player.pause() }
+        hoer.toggle(vid, url: app.api.absoluteURL("/api/yt/stream/" + vid))
+    }
+
+    private func setMatch(_ vid: String) {
+        guard !busy else { return }
         busy = true; Haptics.tap()
         Task {
             let ok = await app.api.ytOverride(uri: track.uri, videoId: vid)
             busy = false
             if ok {
-                if player.current?.uri == track.uri { player.reloadCurrent() }
-                app.flash("Match geändert ✓")
+                hoer.stop()
+                hauptPausiert = false
+                let laeuft = player.current?.uri == track.uri
+                if laeuft { player.reloadCurrent() }
+                app.flash(laeuft ? "Zugeordnet, spielt jetzt ✓" : "Zugeordnet ✓")
                 dismiss()
             } else {
-                msg = "Fehlgeschlagen"
-                try? await Task.sleep(nanoseconds: 1_500_000_000); msg = ""
+                app.flash("Zuordnen fehlgeschlagen")
             }
         }
     }

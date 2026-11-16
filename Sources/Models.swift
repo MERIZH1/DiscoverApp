@@ -175,6 +175,29 @@ struct YTCandidate: Codable, Identifiable {
     var isSong: Bool { resultType == "song" }
 }
 struct YTCandidatesResponse: Codable { let candidates: [YTCandidate]? }
+
+/// Fixen von Hand (Server /api/yt/fix-kandidaten): aktuelles Video + Kandidaten mit Kanal, Länge, Art.
+struct YTFixKandidat: Codable, Identifiable {
+    let videoId: String
+    let title: String?
+    let kanal: String?
+    let dauer: Int?
+    let art: String?          // "Song" | "Video" | "Live"
+    let isrc_hit: Bool?
+    let thumb: String?
+    let abgelehnt: Bool?
+    let dauer_passt: Bool?
+    let override: Bool?
+    var id: String { videoId }
+    var schwach: Bool { abgelehnt == true || dauer_passt == false }
+}
+struct YTFixResponse: Codable {
+    let ok: Bool?
+    let error: String?
+    let link: Bool?
+    let aktuell: YTFixKandidat?
+    let kandidaten: [YTFixKandidat]?
+}
 struct YTSearchResponse: Codable { let results: [YTCandidate]? }
 
 struct PlaylistTracksResponse: Codable {

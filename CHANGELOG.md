@@ -3,6 +3,10 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.31 — Match fixen, das wirklich fixt
+- **Besser:** „Match von Hand fixen“ zeigt oben das Video, das gerade zugeordnet ist, darunter die anderen Treffer mit Kanal, Länge und Art (Song, Video, Live). Mit ▶ hörst du jeden Treffer kurz vor, ins Suchfeld kannst du auch einen YouTube-Link einfügen. Vorher war die Liste bei schon zugeordneten Songs leer.
+- **Behoben:** „Match automatisch fixen“ fand oft wieder dasselbe falsche Video. Jetzt merkt sich der Server jedes abgelehnte Video und nimmt es für diesen Song nie wieder. Gibt es keinen anderen Treffer, steht das da und das Fenster zum Fixen von Hand geht auf.
+
 ## v1.1.30 — Mitwachsendes Cover
 - **Neu:** Tippst du auf eine Playlist, ein Album oder den Mini-Player, wächst das Cover in die neue Seite bzw. in den Player hinein und beim Zurückgehen wieder an seinen Platz (Startseite, Suche, Bibliothek). Mit „Bewegung reduzieren“ in den iPhone-Einstellungen wird stattdessen nur überblendet.
 
