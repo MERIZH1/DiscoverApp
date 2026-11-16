@@ -502,6 +502,15 @@ struct TrackMenu: View, Equatable {
         Haptics.tap()
         Task { _ = await api.pushToProfile(p.id, track: track); app?.flash("Gesendet an \(p.name) ✓") }
     }
+    private func falscheFassung() {
+        guard let app else { return }
+        Haptics.tap()
+        Task {
+            let r = await app.player.falscheFassung(track)
+            app.flash(r.meldung)
+            if r.keinAnderer { onFixYTMatch?() }
+        }
+    }
     private func autoFixYTMatch() {
         guard let app else { return }
         Haptics.tap()
@@ -563,6 +572,9 @@ struct TrackMenu: View, Equatable {
         if hasMore {
             Section {
                 Menu {
+                    if !track.isLocal, onSpotify {
+                        Button { falscheFassung() } label: { Label("Falsche Fassung, andere spielen", systemImage: "arrow.left.arrow.right") }
+                    }
                     if !track.isLocal, !track.uri.isEmpty {
                         Button { Task { await forgetCache() } } label: { Label("Falscher Song? Neu suchen", systemImage: "arrow.counterclockwise") }
                     }
@@ -4348,7 +4360,18 @@ struct PlayerView: View {
                         if p.isEpisode {
                             SourceBadge(source: "podcast").padding(.top, 4)
                         } else if !p.isRadio && !p.source.isEmpty {
-                            SourceBadge(source: p.source, cache: p.streamCache).padding(.top, 4)
+                            HStack(spacing: 8) {
+                                SourceBadge(source: p.source, cache: p.streamCache)
+                                if p.fassungMoeglich, let t = p.current {
+                                    FassungKnopf(unsicher: !p.ytSicher) {
+                                        Task {
+                                            let r = await p.falscheFassung(t)
+                                            DiscoverServices.app?.flash(r.meldung)
+                                            if r.keinAnderer { showFixYT = true }
+                                        }
+                                    }
+                                }
+                            }.padding(.top, 4)
                         }
                     }
                     Spacer(minLength: 8)
@@ -4756,6 +4779,26 @@ struct LyricsSheet: View {
 }
 
 // MARK: - Quellen-Pille (woher kommt der Stream)
+/// „Falsche Fassung“ im Player (AUFTRAG 4.2): kleiner runder Knopf neben dem Quellen-Symbol,
+/// orange mit Fragezeichen, wenn die Zuordnung unsicher ist (wie im Web).
+struct FassungKnopf: View {
+    let unsicher: Bool
+    let action: () -> Void
+    var body: some View {
+        Button { Haptics.tap(); action() } label: {
+            Image(systemName: unsicher ? "questionmark" : "arrow.left.arrow.right")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(unsicher ? Color.black : Theme.sub)
+                .frame(width: 26, height: 26)
+                .background(unsicher ? Color(hex6: 0xFFB340) : Theme.input)
+                .clipShape(Circle())
+                .contentShape(Circle().inset(by: -8))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(unsicher ? "Unsichere Zuordnung, andere Fassung spielen" : "Falsche Fassung, andere spielen")
+    }
+}
+
 struct SourceBadge: View {
     let source: String
     var cache: String = ""

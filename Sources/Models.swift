@@ -394,6 +394,7 @@ struct StreamURLResponse: Codable {
     let live: LiveInfo?          // Konzert: Songgrenzen innerhalb der Audiodatei
     let live_tracks: [Track]?    // ganzes Konzert -> seine einzelnen Songs fuer die Queue
     let error: String?
+    let sicher: Bool?            // false = Zuordnung unter der Speicherschwelle (Hinweis + „Andere Fassung“)
 }
 struct LiveChapter: Codable, Hashable {
     let start: Int

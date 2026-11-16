@@ -678,6 +678,16 @@ final class APIClient: ObservableObject {
               let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return (false, nil, false) }
         return ((obj["ok"] as? Bool) ?? false, obj["error"] as? String, (obj["kein_anderer"] as? Bool) ?? false)
     }
+    /// „Falsche Fassung“: laufendes Video ablehnen, Server wählt die nächstbeste Fassung desselben Songs.
+    func ytFalscheFassung(_ t: Track, currentVideoId: String) async -> (ok: Bool, titel: String, fehler: String?, keinAnderer: Bool) {
+        let body: [String: Any] = ["spotify_uri": t.uri, "name": t.name, "artist": t.artist,
+                                   "album": t.album ?? "", "duration": Int(t.durationSec),
+                                   "current_video_id": currentVideoId]
+        guard let d = try? await data("/api/yt/falsche-fassung", method: "POST", json: body),
+              let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return (false, "", nil, false) }
+        let titel = [(obj["title"] as? String) ?? "", (obj["kanal"] as? String) ?? ""].filter { !$0.isEmpty }.joined(separator: " · ")
+        return ((obj["ok"] as? Bool) ?? false, titel, obj["error"] as? String, (obj["kein_anderer"] as? Bool) ?? false)
+    }
     @discardableResult
     func ytOverride(uri: String, videoId: String) async -> Bool {
         let body: [String: Any] = ["spotify_uri": uri, "videoId": videoId]

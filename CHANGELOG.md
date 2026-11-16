@@ -3,6 +3,10 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.32 — Falsche Fassung mit einem Tipp
+- **Neu:** Im Player steht neben „YouTube“ ein kleiner Knopf ⇄: Läuft die falsche Fassung (Studio statt Live, Cover statt Original), spielt ein Tipp sofort die nächstbeste Fassung desselben Songs. Die abgelehnte kommt für diesen Song nie wieder, die neue Wahl bleibt gespeichert. Auch im Song-Menü unter „Mehr“.
+- **Neu:** Ist eine Zuordnung unsicher, ist der Knopf orange mit Fragezeichen.
+
 ## v1.1.31 — Match fixen, das wirklich fixt
 - **Besser:** „Match von Hand fixen“ zeigt oben das Video, das gerade zugeordnet ist, darunter die anderen Treffer mit Kanal, Länge und Art (Song, Video, Live). Mit ▶ hörst du jeden Treffer kurz vor, ins Suchfeld kannst du auch einen YouTube-Link einfügen. Vorher war die Liste bei schon zugeordneten Songs leer.
 - **Behoben:** „Match automatisch fixen“ fand oft wieder dasselbe falsche Video. Jetzt merkt sich der Server jedes abgelehnte Video und nimmt es für diesen Song nie wieder. Gibt es keinen anderen Treffer, steht das da und das Fenster zum Fixen von Hand geht auf.

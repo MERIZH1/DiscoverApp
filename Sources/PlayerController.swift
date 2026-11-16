@@ -182,6 +182,8 @@ final class PlayerController: ObservableObject {
     private var radioRetries = 0
     @Published private(set) var source = ""   // "youtube" | "navidrome"
     @Published private(set) var streamCache = ""   // "file" = spielt aus lokaler Datei
+    @Published private(set) var videoId = ""       // laufendes YouTube-Video (für „Falsche Fassung“)
+    @Published private(set) var ytSicher = true    // false = unsichere Zuordnung (Server: unter 150 Punkten)
     private var radioTitle = ""
     private var radioFavicon: String?
     @Published private(set) var radioNowPlaying = ""   // ICY-StreamTitle (laufender Song im Radio)
@@ -1245,6 +1247,23 @@ final class PlayerController: ObservableObject {
         guard queue.indices.contains(i) else { return }
         index = i; loadCurrent(autoplay: true)
     }
+    /// Läuft der Song von YouTube (gestreamt oder vorgepuffert) und kommt er von Spotify?
+    /// Dann gibt es „Andere Fassung“ im Player.
+    var fassungMoeglich: Bool {
+        guard !isRadio, let t = current, t.uri.hasPrefix("spotify:track:"), t.liveRange == nil else { return false }
+        return source == "youtube" || (source == "buffer" && !videoId.isEmpty)
+    }
+
+    /// „Falsche Fassung“ (AUFTRAG 4.2): laufendes Video auf die Negativliste, sofort die
+    /// nächstbeste Fassung desselben Songs spielen. Läuft der Song nicht, gilt die Wahl fürs nächste Mal.
+    func falscheFassung(_ t: Track) async -> (ok: Bool, meldung: String, keinAnderer: Bool) {
+        let laeuft = current?.uri == t.uri
+        let r = await api.ytFalscheFassung(t, currentVideoId: laeuft ? videoId : "")
+        guard r.ok else { return (false, r.fehler ?? "Keine andere Fassung gefunden", r.keinAnderer) }
+        if laeuft { reloadCurrent() }
+        return (true, (laeuft ? "Spielt jetzt: " : "Nächstes Mal: ") + (r.titel.isEmpty ? "andere Fassung" : r.titel), false)
+    }
+
     /// Aktuellen Track neu laden (z.B. nach YT-Match-Override) — Prebuffer/Fail-Cache
     /// fuer diesen Track verwerfen, damit die neue Version frisch gestreamt wird.
     func reloadCurrent() {
@@ -1383,6 +1402,7 @@ final class PlayerController: ObservableObject {
         persistSnapshot()
         updateRemoteForContent()
         loading = true; currentTime = 0; duration = track.durationSec; source = ""; streamCache = ""; metaDur = knownDuration(for: track)
+        videoId = ""; ytSicher = true
         // Podcast: gespeicherten Hoerstand vormerken -> Seek passiert, sobald der
         // Player bereit ist (siehe readyToPlay-Observer).
         pendingSeek = track.uri.hasPrefix("spotify:episode:") ? PodcastProgress.get(track.uri) : handoffPosition
@@ -1410,6 +1430,8 @@ final class PlayerController: ObservableObject {
         // Vorgepuffert (Offline-Buffer)? -> lokale Temp-Datei sofort spielen.
         if let pre = prebuf[track.uri], FileManager.default.fileExists(atPath: pre.path) {
             source = "buffer"
+            let k = prebufKeyFor[track.uri] ?? ""
+            videoId = (k.count == 11 && !k.hasPrefix("navi-")) ? k : ""
             statBegin(track, key: prebufKeyFor[track.uri] ?? "-")
             let item = makeItem(pre)
             attachItemObservers(item)
@@ -1440,6 +1462,8 @@ final class PlayerController: ObservableObject {
                 }
                 source = r.source ?? ""
                 streamCache = r.stream_cache ?? ""
+                videoId = r.source == "youtube" ? (r.videoId ?? "") : ""
+                ytSicher = r.sicher ?? true
                 statBegin(track, key: Self.statKey(videoId: r.videoId, navidromeId: r.navidromeId))
                 metaDur = Double(r.duration ?? 0)
                 if metaDur > 0 { streamDurations[track.uri] = metaDur }
