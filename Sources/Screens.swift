@@ -171,6 +171,36 @@ struct TrackTarget: Hashable {
     }
 }
 
+// MARK: - Mitwachsendes Cover (AUFTRAG Phase 2)
+// Das angetippte Cover zoomt in die neue Seite bzw. den Player und beim Zurückgehen wieder hinein.
+// Der Namespace kommt aus der Umgebung des jeweiligen NavigationStack. „Bewegung reduzieren“
+// behandelt iOS bei Zoom-Übergängen selbst (dann Überblenden).
+private struct ZoomNSKey: EnvironmentKey { static let defaultValue: Namespace.ID? = nil }
+extension EnvironmentValues {
+    var zoomNS: Namespace.ID? {
+        get { self[ZoomNSKey.self] }
+        set { self[ZoomNSKey.self] = newValue }
+    }
+}
+private struct ZoomQuelle: ViewModifier {
+    @Environment(\.zoomNS) private var ns
+    let id: String
+    func body(content: Content) -> some View {
+        if let ns { content.matchedTransitionSource(id: id, in: ns) } else { content }
+    }
+}
+private struct ZoomZiel: ViewModifier {
+    @Environment(\.zoomNS) private var ns
+    let id: String
+    func body(content: Content) -> some View {
+        if let ns { content.navigationTransition(.zoom(sourceID: id, in: ns)) } else { content }
+    }
+}
+extension View {
+    func zoomQuelle(_ id: String) -> some View { modifier(ZoomQuelle(id: id)) }
+    func zoomZiel(_ id: String) -> some View { modifier(ZoomZiel(id: id)) }
+}
+
 private struct TabRouterKey: EnvironmentKey { static let defaultValue: TabRouter? = nil }
 extension EnvironmentValues {
     /// Fehlt außerhalb der Tabs (z. B. in Vorschauen). Dann gehen die Ziele wie früher als Blatt auf.
@@ -199,6 +229,7 @@ struct MainView: View {
     @Environment(\.scenePhase) private var scenePhase
     @ObservedObject private var special = SpecialTheme.shared
     @State private var resumeAfterVideo = false
+    @Namespace private var playerZoom
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -213,6 +244,7 @@ struct MainView: View {
                 // EIN Player — zeigt lokal ODER das Remote-Geraet (kein doppelter Banner mehr)
                 if (now.hasContent || sync.remote?.track != nil) && !keyboardVisible {
                     NowPlayingBar(showPlayer: $router.playerOpen)
+                        .environment(\.zoomNS, playerZoom)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
@@ -312,7 +344,10 @@ struct MainView: View {
             }
             keyboardVisible = false
         }
-        .sheet(isPresented: $router.playerOpen) { PlayerView().environmentObject(router).environment(\.tabRouter, router) }
+        .sheet(isPresented: $router.playerOpen) {
+            PlayerView().environmentObject(router).environment(\.tabRouter, router)
+                .navigationTransition(.zoom(sourceID: "player", in: playerZoom))
+        }
         .environmentObject(router)
         .environment(\.tabRouter, router)
     }
@@ -956,6 +991,7 @@ struct HomeView: View {
     @State private var recents: [HomeItem] = []
     @State private var filter = "all"
     @State private var showAccount = false
+    @Namespace private var zoom
     @State private var laufFrei = false
     @State private var laufBusy = false
     @State private var laufFehler: String?
@@ -1023,11 +1059,13 @@ struct HomeView: View {
                             ForEach(quick) { item in
                                 NavigationLink(value: item) {
                                     HStack(spacing: 12) {
-                                        if let m = item.mosaic, m.count == 4 {
-                                            MosaicArtwork(urls: m, size: 56, corner: 0)
-                                        } else {
-                                            Artwork(url: item.image, size: 56, corner: 0)
-                                        }
+                                        Group {
+                                            if let m = item.mosaic, m.count == 4 {
+                                                MosaicArtwork(urls: m, size: 56, corner: 0)
+                                            } else {
+                                                Artwork(url: item.image, size: 56, corner: 0)
+                                            }
+                                        }.zoomQuelle(item.uri)
                                         Text(item.name).font(.system(size: 14, weight: .bold))
                                             .foregroundStyle(Theme.text).lineLimit(2)
                                             .multilineTextAlignment(.leading).padding(.trailing, 12)
@@ -1068,15 +1106,18 @@ struct HomeView: View {
             .navigationBarHidden(true)
             .trackTargetDestination()
             .navigationDestination(for: HomeItem.self) { item in
-                if (item.type ?? "") == "show" || item.uri.contains(":show:") {
-                    PodcastView(uri: item.uri, title: item.name, image: item.image)
-                } else if (item.type ?? "") == "artist" || item.uri.contains(":artist:") {
-                    ArtistView(uri: item.uri, name: item.name, image: item.image)
-                } else {
-                    TrackListView(uri: item.uri, title: item.name, image: item.image, isAlbum: item.type == "album")
-                }
+                Group {
+                    if (item.type ?? "") == "show" || item.uri.contains(":show:") {
+                        PodcastView(uri: item.uri, title: item.name, image: item.image)
+                    } else if (item.type ?? "") == "artist" || item.uri.contains(":artist:") {
+                        ArtistView(uri: item.uri, name: item.name, image: item.image)
+                    } else {
+                        TrackListView(uri: item.uri, title: item.name, image: item.image, isAlbum: item.type == "album")
+                    }
+                }.zoomZiel(item.uri)
             }
         }
+        .environment(\.zoomNS, zoom)
         .sheet(isPresented: $showAccount) { AccountSheet() }
         .alert(PlayerController.laufName, isPresented: Binding(get: { laufFehler != nil }, set: { if !$0 { laufFehler = nil } })) {
             Button("OK", role: .cancel) {}
@@ -1191,7 +1232,7 @@ struct HomeRow: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 14) {
                     ForEach(items) { it in
-                        NavigationLink(value: it) { BigCard(item: it) }.buttonStyle(.pressable)
+                        NavigationLink(value: it) { BigCard(item: it).zoomQuelle(it.uri) }.buttonStyle(.pressable)
                             .contextMenu {
                                 if it.uri.hasPrefix("spotify:playlist:") || it.uri.hasPrefix("spotify:album:") {
                                     PlaylistMenu(uri: it.uri, name: it.name, isAlbum: it.type == "album", inLibrary: false).equatable()
@@ -1776,6 +1817,7 @@ struct RecentSearchItem: Codable, Identifiable {
 struct SearchView: View {
     @EnvironmentObject var app: AppState
     @EnvironmentObject private var router: TabRouter
+    @Namespace private var zoom
     @Environment(\.playerRef) private var playerRef
     private var player: PlayerController { playerRef! }
     @EnvironmentObject var now: NowPlayingState
@@ -1961,12 +2003,14 @@ struct SearchView: View {
                         TrackListView(uri: c.uri, title: c.name, image: c.image, isAlbum: c.uri.contains(":album:") || c.uri.hasPrefix("navialbum:"))
                     }
                 }
+                .zoomZiel(c.uri)
                 .onAppear {
                     dismissSearchKeyboard()
                     pushRecentItem(RecentSearchItem(uri: c.uri, name: c.name, image: c.image ?? "", sub: cardSub(c.uri)))
                 }
             }
         }
+        .environment(\.zoomNS, zoom)
     }
     /// Komplette Ergebnis-Liste — ausgelagert, damit die body-ViewBuilder
     /// nicht ueber die Compiler-Komplexitaetsgrenze rutscht.
@@ -2166,7 +2210,7 @@ struct TopHitCard: View {
                 } label: { card }.buttonStyle(.pressable)
             } else {
                 NavigationLink(value: Card(uri: hit.realURI, name: hit.name ?? "", image: hit.image, artist: hit.artist, owner: nil, desc: nil)) {
-                    card
+                    card.zoomQuelle(hit.realURI)
                 }.buttonStyle(.pressable)
             }
         }
@@ -2193,6 +2237,7 @@ struct CardRows: View {
             NavigationLink(value: c) {
                 HStack(spacing: 12) {
                     Artwork(url: c.image, size: 50, corner: isAlbum || c.uri.contains(":artist:") ? 25 : 4)
+                        .zoomQuelle(c.uri)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(c.name).font(.system(size: 15)).foregroundStyle(Theme.text).lineLimit(1)
                         Text(c.artist ?? c.owner ?? "").font(.caption).foregroundStyle(Theme.sub).lineLimit(1)
@@ -2502,6 +2547,7 @@ struct AddToPlaylistSheet: View {
 struct LibraryView: View {
     @EnvironmentObject var app: AppState
     @EnvironmentObject private var router: TabRouter
+    @Namespace private var zoom
     @Environment(\.playerRef) private var playerRef
     private var player: PlayerController { playerRef! }
     @EnvironmentObject var now: NowPlayingState
@@ -2626,21 +2672,25 @@ struct LibraryView: View {
             .trackTargetDestination()
             .navigationDestination(for: Playlist.self) { pl in
                 TrackListView(uri: pl.uri, title: pl.name, image: pl.image, isAlbum: false)
+                    .zoomZiel(pl.uri)
             }
             .navigationDestination(for: OfflineCollection.self) { c in
                 OfflineCollectionView(collection: c)
             }
             .navigationDestination(for: HomeItem.self) { it in
-                if (it.type ?? "") == "show" || it.uri.contains(":show:") {
-                    PodcastView(uri: it.uri, title: it.name, image: it.image)
-                } else if (it.type ?? "") == "artist" || it.uri.contains(":artist:") {
-                    ArtistView(uri: it.uri, name: it.name, image: it.image)
-                } else {
-                    TrackListView(uri: it.uri, title: it.name, image: it.image, isAlbum: it.type == "album")
-                }
+                Group {
+                    if (it.type ?? "") == "show" || it.uri.contains(":show:") {
+                        PodcastView(uri: it.uri, title: it.name, image: it.image)
+                    } else if (it.type ?? "") == "artist" || it.uri.contains(":artist:") {
+                        ArtistView(uri: it.uri, name: it.name, image: it.image)
+                    } else {
+                        TrackListView(uri: it.uri, title: it.name, image: it.image, isAlbum: it.type == "album")
+                    }
+                }.zoomZiel(it.uri)
             }
             .refreshable { await load() }
         }
+        .environment(\.zoomNS, zoom)
         .refreshable { await load() }
         .task(id: app.profile?.id) { await load() }
         .task(id: tab) {
@@ -2690,6 +2740,7 @@ struct LibraryRow: View {
         HStack(spacing: 12) {
             ZStack(alignment: .bottomLeading) {
                 Artwork(url: pl.image, size: 56, corner: 4)
+                    .zoomQuelle(pl.uri)
                 if subscribed {
                     Image(systemName: "bell.fill").font(.system(size: 10)).foregroundStyle(.black)
                         .padding(5).background(Circle().fill(Theme.accent)).offset(x: -3, y: 3)
@@ -3917,6 +3968,7 @@ struct NowPlayingBar: View {
         if showRemote || player.hasContent {
             HStack(spacing: 12) {
                 Artwork(url: showRemote ? remote?.track?.image : player.displayImage, size: 44, corner: 9)
+                    .zoomQuelle("player")
                 VStack(alignment: .leading, spacing: 1) {
                     Text(showRemote ? (remote?.track?.name ?? "") : player.displayTitle)
                         .font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.text).lineLimit(1)

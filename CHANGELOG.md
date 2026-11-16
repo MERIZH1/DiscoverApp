@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.30 — Mitwachsendes Cover
+- **Neu:** Tippst du auf eine Playlist, ein Album oder den Mini-Player, wächst das Cover in die neue Seite bzw. in den Player hinein und beim Zurückgehen wieder an seinen Platz (Startseite, Suche, Bibliothek). Mit „Bewegung reduzieren“ in den iPhone-Einstellungen wird stattdessen nur überblendet.
+
 ## v1.1.29 — Einfach hören
 - **Neu:** Der Knopf „Keine Ahnung, was du hören sollst?“ oben auf der Startseite: Ein Tipp, und es läuft die Musik, die du sonst hörst, passend zur Tageszeit, ab und zu mit etwas Neuem dazwischen. Oben im Player steht, warum ein Song kommt; im Menü gibt es „Mehr davon“, „Weniger davon“ und „Nie um diese Zeit“. Der Knopf erscheint, sobald der Modus auf dem Server freigeschaltet ist.
 
