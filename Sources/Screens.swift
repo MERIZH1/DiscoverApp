@@ -1960,6 +1960,8 @@ struct SearchView: View {
     @State private var selecting = false
     @State private var selected: Set<String> = []
     @State private var showMultiAdd = false
+    @State private var ytFassungen: [Track] = []     // Abschnitt „Auf YouTube“ (lädt nach der Suche nach)
+    @State private var ytArten: [String] = []
     private var allResultTracks: [Track] { (res?.tracks ?? []) + (res?.local ?? []) }
     private var selectedTracks: [Track] { allResultTracks.filter { selected.contains($0.uri) } }
     private func toggleSel(_ uri: String) {
@@ -2150,6 +2152,10 @@ struct SearchView: View {
                 SectionHeader("Songs")
                 songRows(tracks, context: "Suche", limit: scope == "tracks" ? 50 : 6)
             }
+            if scope == "all" || scope == "tracks", !ytFassungen.isEmpty {
+                SectionHeader("Auf YouTube")
+                ytRows(ytFassungen, arten: ytArten)
+            }
             if scope == "all" || scope == "playlists", let pls = r.playlists, !pls.isEmpty {
                 SectionHeader("Playlists"); CardRows(cards: pls, isAlbum: false)
             }
@@ -2177,6 +2183,31 @@ struct SearchView: View {
                      selecting: selecting, selected: selected.contains(t.uri)) {
                 tapTrack(t, in: list, at: i, context: context)
             }
+        }
+    }
+    /// Weitere Fassungen von YouTube: Art (Live, Remix, Akustik …) und Länge sichtbar, spielt genau dieses Video.
+    @ViewBuilder private func ytRows(_ list: [Track], arten: [String]) -> some View {
+        ForEach(Array(list.enumerated()), id: \.offset) { i, t in
+            Button { tapTrack(t, in: list, at: i, context: "Suche") } label: {
+                HStack(spacing: 12) {
+                    Artwork(url: t.image, size: 48, corner: 4)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(t.name).font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(now.track?.id == t.id ? Theme.accent : Theme.text).lineLimit(1)
+                        HStack(spacing: 6) {
+                            Text((i < arten.count ? arten[i] : "Video").uppercased())
+                                .font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.sub)
+                                .padding(.horizontal, 5).padding(.vertical, 1)
+                                .background(Theme.input).clipShape(Capsule())
+                            Text(t.artist + (t.durationSec > 0 ? " · " + String(format: "%d:%02d", Int(t.durationSec) / 60, Int(t.durationSec) % 60) : ""))
+                                .font(.system(size: 13)).foregroundStyle(Theme.sub).lineLimit(1)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }.padding(.vertical, 4).padding(.horizontal).contentShape(Rectangle())
+            }
+            .buttonStyle(.pressable)
+            .contextMenu { TrackMenu(track: t).equatable() }
         }
     }
     /// Tap auf eine Song-Zeile: im Auswahl-Modus toggeln, sonst abspielen.
@@ -2234,10 +2265,16 @@ struct SearchView: View {
         if isYouTubeURL(q) { addYTFind(q); return }
         if isSpotifyURL(q) { handleSpotifyLink(q); return }
         busy = true
+        ytFassungen = []; ytArten = []
         Task {
             let r = try? await app.api.search(q)
             if let r { res = r }
             searchFailed = r == nil; busy = false
+            guard r != nil else { return }
+            // „Auf YouTube“ lädt nach, damit die Suche selbst nicht wartet
+            let yt = await app.api.searchYouTube(q)
+            guard query.trimmingCharacters(in: .whitespaces) == q else { return }
+            ytFassungen = yt.tracks; ytArten = yt.arten
         }
     }
     private func isYouTubeURL(_ s: String) -> Bool {

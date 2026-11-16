@@ -604,6 +604,18 @@ final class APIClient: ObservableObject {
         try await get("/api/search?q=\(enc(query))")
     }
 
+    /// Abschnitt „Auf YouTube“ unter den Songs: weitere Fassungen (Remix, Live, Akustik …).
+    /// Leer, wenn die Suche nicht nach einem Song aussieht (z. B. nur Künstlername).
+    func searchYouTube(_ query: String) async -> (tracks: [Track], arten: [String]) {
+        struct R: Decodable { let zeigen: Bool?; let tracks: [Track]? }
+        struct A: Decodable { struct Art: Decodable { let art: String? }; let tracks: [Art]? }
+        guard let d = try? await data("/api/search/youtube?q=" + enc(query)),
+              let r = try? JSONDecoder().decode(R.self, from: d), r.zeigen == true,
+              let ts = r.tracks, !ts.isEmpty else { return ([], []) }
+        let a = (try? JSONDecoder().decode(A.self, from: d))?.tracks?.map { $0.art ?? "Video" } ?? []
+        return (ts, ts.indices.map { $0 < a.count ? a[$0] : "Video" })
+    }
+
     func lyrics(title: String, artist: String, duration: Int) async throws -> Lyrics {
         try await get("/api/lyrics?title=\(enc(title))&artist=\(enc(artist))&duration=\(duration)")
     }

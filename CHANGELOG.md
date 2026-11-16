@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.33 — Weitere Fassungen in der Suche
+- **Neu:** Suchst du nach einem Song (z. B. „klingande jubel“), steht unter den Songs der Abschnitt „Auf YouTube“ mit weiteren Fassungen: Remixe, Live-Auftritte, Akustik, offizielle Videos, auch von fremden Kanälen. Jede Zeile zeigt Art und Länge und spielt genau dieses Video. Bei einer reinen Künstlersuche erscheint der Abschnitt nicht.
+
 ## v1.1.32 — Falsche Fassung mit einem Tipp
 - **Neu:** Im Player steht neben „YouTube“ ein kleiner Knopf ⇄: Läuft die falsche Fassung (Studio statt Live, Cover statt Original), spielt ein Tipp sofort die nächstbeste Fassung desselben Songs. Die abgelehnte kommt für diesen Song nie wieder, die neue Wahl bleibt gespeichert. Auch im Song-Menü unter „Mehr“.
 - **Neu:** Ist eine Zuordnung unsicher, ist der Knopf orange mit Fragezeichen.
