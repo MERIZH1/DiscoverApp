@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.41 — Aufgeräumt
+- Die Karte „Dein Jahr“ zeigt unter der Hörzeit nur noch die Zahl der Songs.
+
 ## v1.1.40 — Begrüßung
 - Spät abends und nachts heißt es auf der Startseite jetzt „Guten Abend“ statt „Gute Nacht“.
 

@@ -66,12 +66,7 @@ struct RueckblickKarte: View {
     private var bild: String? {
         d.top_songs.first?.image.flatMap { $0.isEmpty ? nil : $0 } ?? d.top_kuenstler.first?.image
     }
-    private var unterzeile: String {
-        var s = "\(d.songs) Songs"
-        if let k = d.top_kuenstler.first { s += " · am meisten: \(k.name)" }
-        if let seit = d.seit, !seit.isEmpty { s += " · Daten seit \(seit.prefix(6))" }
-        return s
-    }
+    private var unterzeile: String { "\(d.songs) Songs" }      // nur die Zahl (Max 26.11.2026)
 
     var body: some View {
         Button(action: oeffnen) {
