@@ -212,6 +212,7 @@ struct PlaylistTracksResponse: Codable {
     let name: String?
     let tracks: [Track]
     var anhang: PlaylistAnhang? = nil
+    var sortierbar: Bool? = nil      // eigene lokale Liste: Songs verschiebbar
     // Nur bei Alben
     var release_date: String? = nil
     var release_precision: String? = nil

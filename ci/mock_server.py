@@ -11,6 +11,7 @@ LIKED = set()   # Herz im Player: gelikte Songs
 REMOTE = {}     # Test „anderes Gerät spielt“: Stand, den /api/sync/wait meldet
 SPECIAL = {}    # Test Sonderdesign: was /api/special meldet
 ANHANG = {}     # Test Sonderdesign: Anhang der Playlist (Nachricht, Video)
+REIHENFOLGE = {}  # Test Ziehen und Ablegen: Playlist-URI -> Song-Nummern in der aktuellen Reihenfolge
 
 
 def special_look():
@@ -125,7 +126,8 @@ def route(path, q):
             d["anhang"] = ANHANG
         return d
     if path.startswith("/api/playlist/"):
-        return {"name": "Playlist", "tracks": [track(i) for i in range(1, 101)]}
+        uri = unquote(path[len("/api/playlist/"):])
+        return {"name": "Playlist", "tracks": [track(i) for i in REIHENFOLGE.get(uri, range(1, 101))]}
     if path == "/api/search":
         if q.get("q", [""])[0].startswith("Buch"):
             return {"tracks": [], "artists": [], "albums": [], "playlists": [],
@@ -259,6 +261,21 @@ class H(BaseHTTPRequestHandler):
             REMOTE.clear()
             REMOTE.update(json.loads(body or b"{}"))
             print("REMOTE", REMOTE.get("device_name"), flush=True)
+            return self.send(b'{"ok": true}')
+        if urlparse(self.path).path == "/api/playlist/move":
+            # wie der Server: Song vor den ersten vorhandenen aus „vor“, sonst ans Ende
+            d = json.loads(body or b"{}")
+            uri = d.get("playlist_uri", "")
+            liste = list(REIHENFOLGE.get(uri, range(1, 101)))
+            nr = lambda u: int(u.rsplit("test", 1)[1]) if "test" in u else None
+            song = nr(d.get("track_uri", ""))
+            if song not in liste:
+                return self.send(json.dumps({"ok": False, "error": "Song nicht in der Playlist"}).encode())
+            liste.remove(song)
+            ziel = next((liste.index(nr(u)) for u in d.get("vor") or [] if nr(u) in liste), len(liste))
+            liste.insert(ziel, song)
+            REIHENFOLGE[uri] = liste
+            print("MOVE", uri, song, "->", ziel, flush=True)
             return self.send(b'{"ok": true}')
         if urlparse(self.path).path == "/api/liked":
             d = json.loads(body or b"{}")

@@ -490,6 +490,17 @@ final class PlayerController: ObservableObject {
         loadCurrent(autoplay: true)
     }
 
+    /// Playlist umsortiert (Ziehen und Ablegen): Läuft sie gerade ohne Shuffle, kommt als Nächstes der Song,
+    /// der jetzt darunter steht. Mit Shuffle bleibt die gemischte Reihenfolge.
+    func playlistUmsortiert(uri: String, tracks: [Track]) {
+        guard !uri.isEmpty, ctxURI == uri, !isRadio, original.count == tracks.count else { return }
+        original = tracks
+        guard !shuffle, queue.count == tracks.count, queue.indices.contains(index) else { return }
+        let cur = queue[index]
+        queue = tracks
+        if let ni = tracks.firstIndex(where: { $0.id == cur.id }) { index = ni }
+    }
+
     // MARK: - Live-Konzerte
     // Ein Konzert ist eine Audiodatei, jeder Song darin ein eigener Queue-Eintrag
     // (Track.liveRange). Liegen mehrere Songs desselben Konzerts in der Queue, zeigt

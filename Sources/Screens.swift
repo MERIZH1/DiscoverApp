@@ -3217,6 +3217,13 @@ struct TrackListView: View {
     }
 
     // Track aus Playlist entfernen — nur Spotify-Playlists + YouTube-Funde, keine Alben.
+    @State private var sortierbar = false
+    @State private var showSortieren = false
+    /// Songs verschiebbar: eigene Spotify-Playlists (Listen von Spotify selbst nicht) und eigene lokale Listen
+    private var canSortTracks: Bool {
+        !isAlbum && tracks.count > 1 && ((uri.hasPrefix("spotify:playlist:") && !uri.hasPrefix("spotify:playlist:37i9"))
+                                         || (uri.hasPrefix("ytpl:") && sortierbar))
+    }
     private var canRemoveTracks: Bool {
         !isAlbum && (uri.hasPrefix("spotify:playlist:") || uri == "yt:finds")
     }
@@ -3516,6 +3523,16 @@ struct TrackListView: View {
                     }
                 }
             }
+            if canSortTracks && !selecting {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showSortieren = true } label: {
+                        Image(systemName: "arrow.up.arrow.down")
+                            .font(.system(size: 16, weight: .semibold)).foregroundStyle(hero.isLight ? .black : Theme.text)
+                    }
+                    .accessibilityLabel("Reihenfolge ändern")
+                    .accessibilityIdentifier("playlist.sortieren")
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { selecting.toggle(); if !selecting { selected = [] } } label: {
                     Image(systemName: selecting ? "xmark.circle" : "checklist")
@@ -3536,6 +3553,10 @@ struct TrackListView: View {
         }
         .sheet(isPresented: $showMultiAdd, onDismiss: { selecting = false; selected = [] }) {
             AddToPlaylistSheet(tracks: selectedTracks).environmentObject(app)
+        }
+        .sheet(isPresented: $showSortieren) {
+            PlaylistSortierenSheet(uri: uri, title: title, tracks: $tracks)
+                .environmentObject(app).environmentObject(player)
         }
         .sheet(isPresented: $showYouTubeShare) {
             YouTubePlaylistExportSheet(uri: uri, name: title).environmentObject(app)
@@ -3566,6 +3587,7 @@ struct TrackListView: View {
             let first = isAlbum ? try? await app.api.albumTracks(uri) : try? await app.api.playlistTracks(uri, check: true)
             if isAlbum { albumInfo = first }
             anhang = isAlbum ? nil : first?.anhang
+            sortierbar = first?.sortierbar ?? false
             var answered = first != nil
             var t = first?.tracks ?? []
             // Fallback: History-Items sind manchmal falsch klassifiziert (Album<->Playlist)
@@ -5122,6 +5144,88 @@ struct Artwork: View {
             let img = await ImageLoader.shared.load(u, pixels: pixels)
             guard !Task.isCancelled, u == resolved else { return }
             withAnimation(.easeOut(duration: 0.22)) { image = img }
+        }
+    }
+}
+
+
+// MARK: - Reihenfolge ändern (Ziehen und Ablegen, Wunsch von Max 26.11.2026)
+/// Die Songs der Playlist mit den Ziehgriffen von iOS. Jede Verschiebung wird sofort gespeichert
+/// (/api/playlist/move, nacheinander); lehnt der Server ab, springt die Liste zurück und ein Hinweis erscheint.
+struct PlaylistSortierenSheet: View {
+    let uri: String
+    let title: String
+    @Binding var tracks: [Track]
+    @EnvironmentObject var app: AppState
+    @EnvironmentObject var player: PlayerController
+    @Environment(\.dismiss) private var dismiss
+    @State private var fehler: String?
+    @State private var kette: Task<Void, Never>?
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(tracks) { t in
+                    HStack(spacing: 12) {
+                        Artwork(url: t.image, size: 44, corner: 4)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(t.name).font(.system(size: 16)).foregroundStyle(Theme.text).lineLimit(1)
+                            Text(t.artist).font(.system(size: 14)).foregroundStyle(Theme.sub).lineLimit(1)
+                        }
+                    }
+                    .listRowBackground(Theme.bg)
+                    .accessibilityElement(children: .combine)
+                }
+                .onMove(perform: verschieben)
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Theme.bg)
+            .environment(\.editMode, .constant(.active))
+            .navigationTitle("Reihenfolge ändern")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Fertig") { dismiss() }.accessibilityIdentifier("sortieren.fertig")
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                if let f = fehler {
+                    Text(f).font(.system(size: 14, weight: .semibold)).foregroundStyle(.white)
+                        .padding(.horizontal, 16).padding(.vertical, 10)
+                        .background(Color.red.opacity(0.85), in: Capsule())
+                        .padding(.bottom, 8)
+                        .onTapGesture { fehler = nil }
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private func verschieben(_ src: IndexSet, _ dst: Int) {
+        guard src.count == 1, let von = src.first, tracks.indices.contains(von) else { return }
+        let alt = tracks
+        var neu = tracks
+        neu.move(fromOffsets: src, toOffset: dst)
+        let pos = dst > von ? dst - 1 : dst
+        guard pos != von else { return }
+        let song = alt[von]
+        let vor = neu.dropFirst(pos + 1).prefix(5).map(\.uri)
+        let vorIdx: Int? = pos + 1 < neu.count ? alt.firstIndex(where: { $0.id == neu[pos + 1].id }) : nil
+        tracks = neu
+        player.playlistUmsortiert(uri: uri, tracks: neu)
+        Haptics.tap(.medium)
+        let vorher = kette
+        kette = Task {
+            await vorher?.value
+            let err = await app.api.movePlaylistTrack(playlistUri: uri, trackUri: song.uri, von: von,
+                                                      vor: Array(vor), vorIdx: vorIdx)
+            guard let err else { return }
+            if tracks.map(\.id) == neu.map(\.id) {
+                tracks = alt
+                player.playlistUmsortiert(uri: uri, tracks: alt)
+            }
+            fehler = "Verschieben ging nicht: " + err
         }
     }
 }

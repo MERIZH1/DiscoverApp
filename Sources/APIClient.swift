@@ -762,6 +762,24 @@ final class APIClient: ObservableObject {
         return (obj["ok"] as? Bool) ?? false
     }
 
+    /// Song in einer Playlist verschieben (Ziehen und Ablegen). `vor`: die URIs der nächsten Songs in der neuen
+    /// Reihenfolge (leer = ans Ende), `vorIdx`: Index des direkten Nachfolgers vorher. nil = gespeichert, sonst Fehlertext.
+    func movePlaylistTrack(playlistUri: String, trackUri: String, von: Int, vor: [String], vorIdx: Int?) async -> String? {
+        guard let url = URL(string: base + "/api/playlist/move") else { return "Verschieben ging nicht" }
+        var body: [String: Any] = ["playlist_uri": playlistUri, "track_uri": trackUri, "von": von, "vor": vor]
+        if let v = vorIdx { body["vor_idx"] = v }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        if let pid = profileId { req.setValue(pid, forHTTPHeaderField: "X-Profile-Id") }
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        guard let r = try? await session.data(for: req) else { return "Keine Verbindung zum Server" }
+        let (d, resp) = r
+        let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any]
+        if (o?["ok"] as? Bool) == true { return nil }
+        return (o?["error"] as? String) ?? "Verschieben ging nicht (\((resp as? HTTPURLResponse)?.statusCode ?? 0))"
+    }
+
     /// „Mehr davon / Weniger davon“ (AUFTRAG 5.6): Stand für einen Song lesen bzw. setzen
     /// (aktion: mehr | weniger | neutral). → (Song −1/0/1, Künstler −3…3) oder nil bei Fehler.
     func vorliebe(uri: String, artist: String) async -> (song: Int, kuenstler: Int)? {

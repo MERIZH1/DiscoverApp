@@ -177,6 +177,42 @@ final class DiscoverSmokeTests: XCTestCase {
 
     /// Sonderdesign vom Server: Symbole schweben, die Akzentfarbe wechselt, Play und Liken
     /// lösen einen kleinen Ausbruch aus. Ohne Sonderdesign ist alles wie immer.
+    /// Ziehen und Ablegen: In „Reihenfolge ändern“ Song 3 an Song 1 vorbei nach oben ziehen; der Testserver
+    /// speichert die neue Reihenfolge, die Playlist zeigt sie nach „Fertig“.
+    func testReihenfolge() {
+        tab("Bibliothek")
+        let liste = app.staticTexts["Playlist 5"].firstMatch
+        XCTAssertTrue(liste.waitForExistence(timeout: 20))
+        liste.tap()
+        XCTAssertTrue(app.staticTexts["Song 3"].firstMatch.waitForExistence(timeout: 10))
+        let knopf = app.buttons["playlist.sortieren"].firstMatch
+        XCTAssertTrue(knopf.waitForExistence(timeout: 8), "Knopf Reihenfolge ändern fehlt")
+        knopf.tap()
+        let griff = { (name: String) -> XCUIElement in
+            self.app.buttons.matching(NSPredicate(format: "label CONTAINS %@ AND (label BEGINSWITH 'Reorder' OR label CONTAINS[c] 'anordnen' OR label CONTAINS[c] 'reorder')", name)).firstMatch
+        }
+        let g3 = griff("Song 3,"), g1 = griff("Song 1,")
+        let zeile = { (name: String) in self.app.cells.containing(NSPredicate(format: "label CONTAINS %@", name)).firstMatch }
+        XCTAssertTrue(g3.waitForExistence(timeout: 8) || zeile("Song 3,").waitForExistence(timeout: 2), "Liste fehlt")
+        shot("50-reihenfolge")
+        if g3.exists && g1.exists {
+            g3.press(forDuration: 0.6, thenDragTo: g1)
+        } else {
+            // Griff ohne eigenen Namen: rechts in der Zeile anfassen
+            let von = zeile("Song 3,").coordinate(withNormalizedOffset: CGVector(dx: 0.94, dy: 0.5))
+            let nach = zeile("Song 1,").coordinate(withNormalizedOffset: CGVector(dx: 0.94, dy: 0.3))
+            von.press(forDuration: 0.6, thenDragTo: nach)
+        }
+        sleep(1)
+        shot("51-reihenfolge-gezogen")
+        app.buttons["sortieren.fertig"].firstMatch.tap()
+        sleep(1)
+        let s3 = app.staticTexts["Song 3"].firstMatch, s2 = app.staticTexts["Song 2"].firstMatch
+        XCTAssertTrue(s3.waitForExistence(timeout: 5) && s2.exists)
+        XCTAssertLessThan(s3.frame.minY, s2.frame.minY, "Song 3 steht nicht über Song 2")
+        shot("52-reihenfolge-playlist")
+    }
+
     func testSonderdesign() {
         defer { setSpecial(false) }
         setSpecial(true)
