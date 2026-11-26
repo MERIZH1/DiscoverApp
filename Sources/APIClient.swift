@@ -886,6 +886,11 @@ final class APIClient: ObservableObject {
         struct Item: Decodable { let uri: String; let lauf: Meta?; struct Meta: Decodable { let grund: String? } }
         let tracks: [Item]?
     }
+    /// Jahresrückblick (nil bei Fehler). Ob er gezeigt wird, sagt `aktiv` (Server: Dezember/Januar).
+    func rueckblick() async -> Rueckblick? {
+        guard let d = try? await data("/api/rueckblick") else { return nil }
+        return try? JSONDecoder().decode(Rueckblick.self, from: d)
+    }
     func laufStatus() async -> LaufStatus? {
         guard let d = try? await data("/api/lauf/status") else { return nil }
         return try? JSONDecoder().decode(LaufStatus.self, from: d)

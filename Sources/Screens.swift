@@ -1121,6 +1121,8 @@ struct HomeView: View {
     @State private var laufFrei = false
     @State private var laufBusy = false
     @State private var laufFehler: String?
+    @State private var rueckblick: Rueckblick?
+    @State private var zeigeRueckblick = false
     @ObservedObject private var special = SpecialTheme.shared
 
     private var greetingText: String {
@@ -1204,6 +1206,13 @@ struct HomeView: View {
                         }.padding(.horizontal)
                     }
 
+                    // Jahresrückblick (Dezember/Januar, Server-Wiki `statistik`)
+                    if let rb = rueckblick, rb.zeigen {
+                        RueckblickKarte(d: rb, oeffnen: { zeigeRueckblick = true },
+                                        abspielen: { rbAbspielen(rb.playlist, "Dein \(rb.jahrText)") })
+                            .padding(.horizontal)
+                    }
+
                     // Zuletzt (aus eigenem Verlauf — zuverlaessig)
                     if !recents.isEmpty {
                         HomeRow(title: "Zuletzt", subtitle: nil, items: recents)
@@ -1245,6 +1254,20 @@ struct HomeView: View {
         }
         .environment(\.zoomNS, zoom)
         .sheet(isPresented: $showAccount) { AccountSheet() }
+        .sheet(isPresented: $zeigeRueckblick) {
+            if let rb = rueckblick {
+                RueckblickSheet(d: rb, oeffne: { uri, name in
+                    zeigeRueckblick = false
+                    // Erst nach dem Schließen schieben, sonst verschluckt SwiftUI den Schritt
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                        router.home.append(HomeItem(uri: uri, name: name, image: nil, sub: nil, type: "playlist"))
+                    }
+                }, abspielen: {
+                    zeigeRueckblick = false
+                    rbAbspielen(rb.playlist, "Dein \(rb.jahrText)")
+                })
+            }
+        }
         .alert(PlayerController.laufName, isPresented: Binding(get: { laufFehler != nil }, set: { if !$0 { laufFehler = nil } })) {
             Button("OK", role: .cancel) {}
         } message: { Text(laufFehler ?? "") }
@@ -1253,6 +1276,9 @@ struct HomeView: View {
     }
     private func loadHome() async {
         Task { @MainActor in laufFrei = (await app.api.laufStatus())?.frei ?? false }
+        Task { @MainActor in
+            if let rb = await app.api.rueckblick() { rueckblick = rb }
+        }
         // 1) Cache sofort zeigen
         if home == nil { home = app.cacheGet("home", HomeResponse.self) }
         if recents.isEmpty { recents = app.cacheGet("recents", [HomeItem].self) ?? [] }
@@ -1265,6 +1291,14 @@ struct HomeView: View {
             recents = r; app.cacheSet("recents", r)
         } else if let hist = try? await app.api.history(), !hist.isEmpty {
             recents = recentsFromHistory(hist); app.cacheSet("recents", recents)
+        }
+    }
+
+    private func rbAbspielen(_ uri: String, _ name: String) {
+        Task {
+            if let r = try? await app.api.playlistTracks(uri), !r.tracks.isEmpty {
+                app.player.play(tracks: r.tracks, startAt: 0, contextName: r.name ?? name, contextURI: uri)
+            }
         }
     }
 
@@ -1303,12 +1337,8 @@ struct LaufKnopf: View {
                         Image(systemName: "play.fill").font(.system(size: 22, weight: .bold)).foregroundStyle(.black).offset(x: 2)
                     }
                 }
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Keine Ahnung, was du hören sollst?").font(.system(size: 18, weight: .heavy))
-                        .foregroundStyle(Theme.text).multilineTextAlignment(.leading)
-                    Text("Ein Tipp, und es läuft, was du magst, mit ein paar Neuen dazwischen.")
-                        .font(.system(size: 13)).foregroundStyle(Theme.sub).multilineTextAlignment(.leading)
-                }
+                Text("Keine Ahnung, was du hören sollst?").font(.system(size: 18, weight: .heavy))
+                    .foregroundStyle(Theme.text).multilineTextAlignment(.leading)
                 Spacer(minLength: 0)
             }
             .padding(.vertical, 16).padding(.horizontal, 18)
