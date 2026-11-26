@@ -3,6 +3,10 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.35 — Neues entdecken
+- **Neu:** Unter den Empfehlungen einer Playlist gibt es den Schalter „Nur Unbekanntes“: Dann stehen dort nur Songs, die du noch nie gehört hast und die in keiner deiner Playlists stehen. Die Einstellung gilt auch in der Weboberfläche und im Programm.
+- **Neu auf der Startseite:** „Entdecken“ (30 Songs, die du noch nie gehört hast, jeden Montag neu) vorne bei „Aus deinem Hörverhalten“, und ab Montag „Neues in deinen Richtungen“ mit einem Mix je Musikrichtung, die du hörst.
+
 ## v1.1.34 — Dein Jahr
 - **Neu:** Ab 1. Dezember steht auf der Startseite eine goldene Karte „Dein Jahr 2026“: wie viele Stunden du gehört hast, wie viele Songs, wen am meisten. Ein Tipp öffnet die Übersicht mit Top-Songs, Top-Künstler*innen und Monat für Monat, ▶ spielt deine Playlist „Dein 2026“. Ganze Konzerte zählen bei der Hörzeit mit, aber nicht als Song.
 - **Einfacher:** Der Knopf „Keine Ahnung, was du hören sollst?“ hat keine Unterzeile mehr.

@@ -421,4 +421,5 @@ struct UserSettings: Codable {
     var smart_cache: SmartCache?
     var multi_device: Bool?
     var app_logo: String?
+    var recs_unbekannt: Bool?
 }

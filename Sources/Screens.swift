@@ -3134,6 +3134,8 @@ struct TrackListView: View {
     let uri: String; let title: String; let image: String?; let isAlbum: Bool
     @State private var tracks: [Track] = []
     @State private var recs: [Track] = []
+    @AppStorage("recsUnbekannt") private var recsUnbekannt = false   // „Nur Unbekanntes“ (AUFTRAG 5.3)
+    @State private var unbLaedt = false
     @State private var loading = true
     @State private var hero: Color = Theme.elev
     @State private var reload = 0
@@ -3272,9 +3274,25 @@ struct TrackListView: View {
         Task {
             // Alte ueberspringen + komplett durch neue ersetzen (wie PWA-Refresh)
             let skip = recs.compactMap { $0.uri.split(separator: ":").last.map(String.init) }
-            let fresh = (try? await app.api.recommendations(uri, n: 15, skip: skip)) ?? []
-            recs = fresh.isEmpty ? ((try? await app.api.recommendations(uri, n: 15)) ?? recs) : fresh
+            let fresh = (try? await app.api.recommendations(uri, n: 15, skip: skip, unbekannt: recsUnbekannt)) ?? []
+            recs = fresh.isEmpty ? ((try? await app.api.recommendations(uri, n: 15, unbekannt: recsUnbekannt)) ?? recs) : fresh
             moreLoading = false
+        }
+    }
+
+    /// „Nur Unbekanntes“ umschalten: je Profil am Server gespeichert (gilt auch in Web und Programm).
+    private func toggleUnbekannt() {
+        recsUnbekannt.toggle()
+        let an = recsUnbekannt
+        unbLaedt = true
+        Task {
+            await app.api.saveSettings(["recs_unbekannt": an])
+            let fresh = (try? await app.api.recommendations(uri, unbekannt: an)) ?? []
+            await MainActor.run {
+                recs = fresh
+                app.cacheSet("recs_\(uri)_\(an ? 1 : 0)", fresh)
+                unbLaedt = false
+            }
         }
     }
 
@@ -3384,11 +3402,22 @@ struct TrackListView: View {
                 }
 
                 // Empfehlungen ("Discover") — wie PWA: Refresh-Icon + "+"-Reihen
-                if !recs.isEmpty {
+                if !recs.isEmpty || recsUnbekannt {
                     VStack(alignment: .leading, spacing: 2) {
                         HStack {
                             Text("Empfehlungen").font(.title3.bold()).foregroundStyle(Theme.text)
                             Spacer()
+                            Button { toggleUnbekannt() } label: {
+                                Text("Nur Unbekanntes")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(recsUnbekannt ? Color.black : Theme.sub)
+                                    .padding(.horizontal, 12).frame(height: 30)
+                                    .background(Capsule().fill(recsUnbekannt ? Theme.accent : Color.clear))
+                                    .overlay(Capsule().stroke(recsUnbekannt ? Theme.accent : Theme.sub.opacity(0.5), lineWidth: 1))
+                                    .contentShape(Capsule())
+                            }.buttonStyle(.pressable).disabled(unbLaedt)
+                            .accessibilityLabel("Nur Unbekanntes")
+                            .accessibilityValue(recsUnbekannt ? "an" : "aus")
                             // 42 pt breit wie die Plus-Knöpfe darunter, so stehen alle auf einer Linie
                             if moreLoading { ProgressView().tint(Theme.accent).frame(width: 42, height: 42) }
                             else {
@@ -3399,9 +3428,15 @@ struct TrackListView: View {
                                 }.buttonStyle(.pressable).accessibilityLabel("Neue Empfehlungen")
                             }
                         }.padding(.horizontal).padding(.top, 8)
-                        Text(isAlbum ? "Ähnliche Songs" : "Basierend auf den Songs deiner Playlist")
+                        Text(recsUnbekannt ? "Nur Songs, die du noch nie gehört hast und die in keiner deiner Playlists stehen"
+                             : (isAlbum ? "Ähnliche Songs" : "Basierend auf den Songs deiner Playlist"))
                             .font(.system(size: 13)).foregroundStyle(Theme.sub)
                             .padding(.horizontal).padding(.bottom, 4)
+                        if recs.isEmpty && !unbLaedt {
+                            Text("Hier ist gerade nichts dabei, das du noch nicht kennst.")
+                                .font(.system(size: 14)).foregroundStyle(Theme.sub)
+                                .padding(.horizontal).padding(.vertical, 12)
+                        }
                         ForEach(Array(recs.enumerated()), id: \.offset) { i, t in
                             RecRow(track: t, playing: now.track?.id == t.id,
                                    added: addedRecs.contains(t.uri),
@@ -3517,9 +3552,9 @@ struct TrackListView: View {
         .task(id: reload) {
             guard recsReload != reload else { return }
             // Cache-first: sofort die letzten Empfehlungen zeigen, dann im Hintergrund auffrischen
-            let ckey = "recs_\(uri)"
+            let ckey = "recs_\(uri)_\(recsUnbekannt ? 1 : 0)"
             if recs.isEmpty, let cached = app.cacheGet(ckey, [Track].self) { recs = cached }
-            if let fresh = try? await app.api.recommendations(uri), !fresh.isEmpty {
+            if let fresh = try? await app.api.recommendations(uri, unbekannt: recsUnbekannt), !fresh.isEmpty {
                 recs = fresh
                 app.cacheSet(ckey, fresh)
                 recsReload = reload
@@ -3532,8 +3567,8 @@ struct TrackListView: View {
            !r.tracks.isEmpty {
             await MainActor.run { tracks = r.tracks }
         }
-        if let fresh = try? await app.api.recommendations(uri, nocache: true), !fresh.isEmpty {
-            await MainActor.run { recs = fresh; app.cacheSet("recs_\(uri)", fresh) }
+        if let fresh = try? await app.api.recommendations(uri, nocache: true, unbekannt: recsUnbekannt), !fresh.isEmpty {
+            await MainActor.run { recs = fresh; app.cacheSet("recs_\(uri)_\(recsUnbekannt ? 1 : 0)", fresh) }
         }
     }
 }

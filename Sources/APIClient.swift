@@ -474,10 +474,13 @@ final class APIClient: ObservableObject {
 
     /// "Discover": Empfehlungen basierend auf einer Playlist/einem Album.
     /// skip = bereits gezeigte Track-IDs (fuer "Mehr laden").
-    func recommendations(_ uri: String, n: Int = 15, skip: [String] = [], nocache: Bool = false) async throws -> [Track] {
+    /// unbekannt: „Nur Unbekanntes“ (nil = Einstellung des Profils, die der Server selbst anwendet).
+    func recommendations(_ uri: String, n: Int = 15, skip: [String] = [], nocache: Bool = false,
+                         unbekannt: Bool? = nil) async throws -> [Track] {
         let s = skip.isEmpty ? "" : "&skip=" + skip.joined(separator: ",")
         let nc = nocache ? "&nocache=1" : ""
-        return try await get("/api/recommendations/\(enc(uri))?n=\(n)\(s)\(nc)")
+        let u = unbekannt.map { $0 ? "&unbekannt=1" : "&unbekannt=0" } ?? ""
+        return try await get("/api/recommendations/\(enc(uri))?n=\(n)\(s)\(nc)\(u)")
     }
 
     /// Podcast: Episoden einer Show.

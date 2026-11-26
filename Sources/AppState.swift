@@ -108,9 +108,11 @@ final class AppState: ObservableObject {
         Task { await self.syncAppLogo() }
     }
 
-    /// App-Logo des Profils vom Server übernehmen (in PWA oder Programm geändert → gilt auch hier).
+    /// App-Logo und „Nur Unbekanntes“ des Profils vom Server übernehmen (in PWA oder Programm geändert → gilt auch hier).
     func syncAppLogo() async {
-        guard let id = (try? await api.settings())?.app_logo else { return }
+        guard let s = try? await api.settings() else { return }
+        UserDefaults.standard.set(s.recs_unbekannt ?? false, forKey: "recsUnbekannt")
+        guard let id = s.app_logo else { return }
         AppLogo.apply(id)
     }
 
