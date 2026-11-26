@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.38 — Übergänge
+- **Neu:** In den Einstellungen heißt „Crossfade“ jetzt „Übergang zwischen Songs“: **Lückenlos** (der nächste Song beginnt genau, wenn der alte endet, Stille am Ende und Anfang fällt weg), **Weich überblenden** (2–12 Sekunden) oder **Automix** (blendet so lange, wie der alte Song ausklingt, sonst nach Tempo kürzer oder länger). Die Einstellung gilt je Profil, auch am PC. Wer Crossfade schon an hatte, behält es als „Weich überblenden“.
+
 ## v1.1.37 — Kleinigkeiten
 - Kleinere Verbesserungen im Hintergrund.
 

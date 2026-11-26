@@ -112,6 +112,22 @@ final class AppState: ObservableObject {
     func syncAppLogo() async {
         guard let s = try? await api.settings() else { return }
         UserDefaults.standard.set(s.recs_unbekannt ?? false, forKey: "recsUnbekannt")
+        // Übergänge (6.2) gelten je Profil. Einmalig: Hatte dieses Gerät schon Crossfade an und der Server
+        // kennt nichts, zieht die Einstellung des Geräts auf den Server um.
+        if var u = s.uebergang {
+            let d = UserDefaults.standard
+            var n = s.blende_sek ?? 0
+            if !d.bool(forKey: "uebergangUmgezogen") {
+                d.set(true, forKey: "uebergangUmgezogen")
+                let alt = d.integer(forKey: "crossfadeSeconds")
+                if u == "aus", alt > 0 {
+                    await api.saveSettings(["uebergang": "blende", "blende_sek": alt])
+                    u = "blende"; n = alt
+                }
+            }
+            if player.uebergang != u { player.uebergang = u }
+            if n > 0, player.crossfadeSeconds != n { player.crossfadeSeconds = n }
+        }
         guard let id = s.app_logo else { return }
         AppLogo.apply(id)
     }

@@ -431,4 +431,6 @@ struct UserSettings: Codable {
     var multi_device: Bool?
     var app_logo: String?
     var recs_unbekannt: Bool?
+    var uebergang: String?      // aus | lueckenlos | blende | automix (AUFTRAG 6.2)
+    var blende_sek: Int?
 }

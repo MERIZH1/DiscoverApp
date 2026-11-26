@@ -204,15 +204,32 @@ final class PlayerController: ObservableObject {
     @Published var sleepRemaining = 0     // Sekunden, 0 = aus
     @Published var sleepAtEnd = false     // bis Songende
     private var sleepDeadline: Date?      // absolute Deadline -> im Time-Observer geprueft (laeuft auch im Hintergrund)
-    // Crossfade (Sekunden, 0 = aus). v2: echtes ueberlappendes Crossfade ueber zwei
-    // Player (siehe applyFade/beginCrossfade/completeCrossfade). Bei 0 komplett
-    // inaktiv -> Normalpfad unberuehrt.
-    @Published var crossfadeSeconds: Int = UserDefaults.standard.integer(forKey: "crossfadeSeconds") {
+    // Übergänge (AUFTRAG 6.2), je Profil am Server: aus | lueckenlos | blende | automix. Technik: zwei Player
+    // (applyFade/beginCrossfade/completeCrossfade). Je Wechsel kommt ein Plan vom Server (/api/uebergang):
+    // Überlappung, Stille am Ende von A (wird abgeschnitten), Stille am Anfang von B (wird übersprungen).
+    // Bei „aus“ komplett inaktiv -> Normalpfad unberührt.
+    struct UebergangPlan { let key: String; let ueberlapp: Double; let aStill: Double; let bAb: Double; let grund: String }
+    @Published var uebergang: String = UserDefaults.standard.string(forKey: "uebergang")
+        ?? (UserDefaults.standard.integer(forKey: "crossfadeSeconds") > 0 ? "blende" : "aus") {
         didSet {
-            UserDefaults.standard.set(crossfadeSeconds, forKey: "crossfadeSeconds")
-            if crossfadeSeconds == 0 { player.volume = 1 }
+            UserDefaults.standard.set(uebergang, forKey: "uebergang")
+            if uebergang == "aus" { player.volume = 1 }
+            xfPlan = nil
         }
     }
+    /// Länge beim Überblenden (und bei Automix ohne Messung), 1–12 s.
+    @Published var crossfadeSeconds: Int = max(1, UserDefaults.standard.integer(forKey: "crossfadeSeconds") == 0 ? 6
+                                               : UserDefaults.standard.integer(forKey: "crossfadeSeconds")) {
+        didSet {
+            UserDefaults.standard.set(crossfadeSeconds, forKey: "crossfadeSeconds")
+            xfPlan = nil
+        }
+    }
+    private var xfPlan: UebergangPlan?
+    private var xfPlanLaedt = ""
+    private var xfDauer: Double = 0        // Überlappung des laufenden Übergangs
+    private var xfEnde: Double = 0         // wo der ausgehende Song endet (Dauer minus Stille am Ende)
+    private var xfStartTask: Task<Void, Never>?
     // Wiedergabe-Tempo (1.0 = normal). AVPlayer haelt die Tonhoehe konstant.
     @Published var playbackRate: Double = {
         let v = UserDefaults.standard.double(forKey: "playbackRate"); return v > 0 ? v : 1.0
@@ -826,26 +843,59 @@ final class PlayerController: ObservableObject {
     /// Time-Observer aufgerufen, laeuft so auch bei gesperrtem Bildschirm.
     /// Laeuft VOR checkSleep -> der Sleep-Fade behaelt im Zweifel die Oberhand.
     private func applyFade() {
-        guard crossfadeSeconds > 0, !isRadio, live == nil else { return }
-        let cf = Double(crossfadeSeconds)
+        guard uebergang != "aus", !isRadio, live == nil else { return }
         if crossfading {
-            // Ueberblende laeuft: Lautstaerken aus der Restzeit des AUSGEHENDEN
-            // (aktiven) Tracks ableiten -> funktioniert auch im Hintergrund.
-            let remaining = max(0, duration - currentTime)
-            let out = max(0, min(1, duration > 0 ? remaining / cf : 0))
-            player.volume = Float(out)
-            idlePlayer.volume = Float(1 - out)
+            // Übergang läuft: Lautstärken aus der Restzeit des AUSGEHENDEN (aktiven) Tracks ableiten
+            // -> funktioniert auch im Hintergrund. Gleich laut gemischt (sin/cos).
+            let remaining = max(0, xfEnde - currentTime)
+            if xfDauer < 0.5 {
+                player.volume = 0; idlePlayer.volume = 1          // lückenlos: sofort ganz umschalten
+            } else {
+                let k = max(0, min(1, 1 - remaining / xfDauer))
+                player.volume = Float(cos(k * .pi / 2))
+                idlePlayer.volume = Float(sin(k * .pi / 2))
+            }
+            if remaining <= 0.05 { next(auto: true) }            // Stille am Ende nicht abwarten
             return
         }
         // Nicht am Ueberblenden -> aktiver Track immer voll (KEIN Fade-in beim Start;
         // das verhinderte sonst bei duration-losen Tracks das Hochziehen -> stumm).
         if player.volume < 1 { player.volume = 1 }
-        // Ueberblende ausloesen, wenn das Ende naht (nur einfache Faelle: manuelle
-        // Queue oder naechster Queue-Track; am Playlist-Ende normaler Schnitt).
-        guard isPlaying, duration > 0 else { return }
-        let remaining = duration - currentTime
-        if remaining <= cf, remaining > 0.4, repeatMode != .one, let nt = peekNext(), nt.liveRange == nil {
-            beginCrossfade(to: nt)
+        // Übergang vorbereiten und auslösen, wenn das Ende naht (nur einfache Fälle: manuelle Queue oder
+        // nächster Queue-Track; am Playlist-Ende normaler Schnitt).
+        guard isPlaying, duration > 0, repeatMode != .one, let nt = peekNext(), nt.liveRange == nil,
+              let cur = current, !nt.uri.isEmpty else { return }
+        let key = cur.uri + ">" + nt.uri
+        if duration - currentTime <= 25, xfPlan?.key != key, xfPlanLaedt != key {
+            xfPlanLaedt = key
+            let art = uebergang, sek = Double(crossfadeSeconds)
+            Task {
+                let r = await api.uebergang(a: cur.uri, b: nt.uri)
+                guard self.xfPlanLaedt == key else { return }
+                self.xfPlanLaedt = ""
+                // Ohne Server: Überblenden nach Einstellung, lückenlos kurz
+                self.xfPlan = r?.plan ?? (r == nil && art != "aus"
+                    ? UebergangPlan(key: key, ueberlapp: art == "lueckenlos" ? 0.15 : sek, aStill: 0, bAb: 0, grund: "ohne Server")
+                    : nil)
+            }
+            return
+        }
+        guard let plan = xfPlan, plan.key == key, xfStartTask == nil else { return }
+        let ende = max(1, duration - plan.aStill)
+        let cf = max(0.1, min(plan.ueberlapp, ende * 0.4))
+        let remaining = ende - currentTime
+        // Der Takt hier ist 0,5 s: Start genau auf die Sekunde per Wecker
+        guard remaining > 0.1, remaining <= cf + 0.6 else { return }
+        let warte = max(0, (remaining - cf) / max(0.25, playbackRate))
+        xfStartTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(warte * 1_000_000_000))
+            guard let self else { return }
+            self.xfStartTask = nil
+            guard !Task.isCancelled, !self.crossfading, self.isPlaying, self.current?.uri == cur.uri,
+                  self.peekNext()?.uri == nt.uri else { return }
+            self.xfDauer = cf; self.xfEnde = ende
+            self.diag("uebergang", "\(plan.grund) überlappung=\(String(format: "%.2f", cf)) b_ab=\(plan.bAb)")
+            self.beginCrossfade(to: nt, bAb: plan.bAb)
         }
     }
 
@@ -856,14 +906,22 @@ final class PlayerController: ObservableObject {
     }
 
     /// Startet den eingehenden Track leise auf dem Idle-Player; applyFade blendet dann ueber.
-    private func beginCrossfade(to nt: Track) {
+    /// `bAb`: Stille am Anfang überspringen. Lückenlos (xfDauer < 0,5): sofort voll, der alte stumm.
+    private func beginCrossfade(to nt: Track, bAb: Double = 0) {
         crossfading = true
         xfTarget = nt
         let b = idlePlayer
-        b.volume = 0
+        let sofort = xfDauer < 0.5
+        b.volume = sofort ? 1 : 0
+        if sofort { player.volume = 0 }
+        let starte: (AVPlayerItem) -> Void = { item in
+            b.replaceCurrentItem(with: item)
+            if bAb > 0.3 { b.seek(to: CMTime(seconds: bAb, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) }
+            b.play()
+        }
         // Lokal vorhanden (offline oder vorgepuffert)? -> sofort, kein Streamen.
         if let local = localOrPrebuffered(nt) {
-            b.replaceCurrentItem(with: makeItem(local)); b.play()
+            starte(makeItem(local))
             return
         }
         Task {
@@ -873,12 +931,13 @@ final class PlayerController: ObservableObject {
                       r.ok, let rel = r.url, let url = api.absoluteURL(rel) else { abortCrossfade(); return }
                 if let d = r.duration, d > 0 { streamDurations[nt.uri] = Double(d) }
                 prebufKeyFor[nt.uri] = Self.statKey(videoId: r.videoId, navidromeId: r.navidromeId)
-                b.replaceCurrentItem(with: makeItem(url)); b.play()
+                starte(makeItem(url))
             } catch { abortCrossfade() }
         }
     }
 
     private func abortCrossfade() {
+        xfStartTask?.cancel(); xfStartTask = nil
         crossfading = false; xfTarget = nil
         idlePlayer.pause(); idlePlayer.replaceCurrentItem(with: nil); idlePlayer.volume = 1
         player.volume = 1

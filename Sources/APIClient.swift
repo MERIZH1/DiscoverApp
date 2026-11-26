@@ -778,6 +778,18 @@ final class APIClient: ObservableObject {
         return ((o["song"] as? Int) ?? 0, (o["kuenstler"] as? Int) ?? 0)
     }
 
+    /// Übergang A → B nach der Einstellung des Profils (AUFTRAG 6.2). nil bei Fehler; plan nil = Schnitt.
+    func uebergang(a: String, b: String) async -> (art: String, plan: PlayerController.UebergangPlan?)? {
+        guard let d = try? await data("/api/uebergang?a=\(enc(a))&b=\(enc(b))"),
+              let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return nil }
+        let art = (o["art"] as? String) ?? "aus"
+        guard let p = o["plan"] as? [String: Any] else { return (art, nil) }
+        func zahl(_ k: String) -> Double { (p[k] as? NSNumber)?.doubleValue ?? 0 }
+        return (art, PlayerController.UebergangPlan(key: a + ">" + b, ueberlapp: zahl("ueberlapp"),
+                                                    aStill: zahl("a_still"), bAb: zahl("b_ab"),
+                                                    grund: (p["grund"] as? String) ?? art))
+    }
+
     func settings() async throws -> UserSettings {
         try await get("/api/me/settings")
     }

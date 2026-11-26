@@ -1652,9 +1652,15 @@ struct SettingsView: View {
     ]
     private func bufferLabel(_ n: Int) -> String { bufferOptions.first { $0.0 == n }?.1 ?? "\(n) Songs" }
     private let crossfadeOptions: [(Int, String)] = [
-        (0, "Aus"), (2, "2 Sekunden"), (4, "4 Sekunden"),
-        (6, "6 Sekunden"), (8, "8 Sekunden"), (12, "12 Sekunden"),
+        (2, "2 Sekunden"), (4, "4 Sekunden"), (6, "6 Sekunden"),
+        (8, "8 Sekunden"), (10, "10 Sekunden"), (12, "12 Sekunden"),
     ]
+    // Übergänge (AUFTRAG 6.2), je Profil am Server
+    private let uebergangOptions: [(String, String)] = [
+        ("aus", "Schnitt (wie bisher)"), ("lueckenlos", "Lückenlos"),
+        ("blende", "Weich überblenden"), ("automix", "Automix"),
+    ]
+    private func uebergangLabel(_ u: String) -> String { uebergangOptions.first { $0.0 == u }?.1 ?? u }
     private func crossfadeLabel(_ n: Int) -> String { crossfadeOptions.first { $0.0 == n }?.1 ?? "\(n) s" }
     private let rateOptions: [(Double, String)] = [
         (1.0, "Normal (1x)"), (1.25, "1.25x"), (1.5, "1.5x"), (1.75, "1.75x"), (2.0, "2x"),
@@ -1761,18 +1767,41 @@ struct SettingsView: View {
                             }
                         }
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Crossfade").font(.system(size: 15)).foregroundStyle(Theme.text)
-                            Text("Sanftes Aus-/Einblenden zwischen Titeln").font(.caption2).foregroundStyle(Theme.mute)
+                            Text("Übergang zwischen Songs").font(.system(size: 15)).foregroundStyle(Theme.text)
+                            Text("Lückenlos lässt die Stille am Ende und Anfang weg, Automix blendet nach Ausklang und Tempo. Gilt auch am PC.")
+                                .font(.caption2).foregroundStyle(Theme.mute)
                             Menu {
-                                ForEach(crossfadeOptions, id: \.0) { opt in
-                                    Button(opt.1) { player.crossfadeSeconds = opt.0 }
+                                ForEach(uebergangOptions, id: \.0) { opt in
+                                    Button(opt.1) {
+                                        player.uebergang = opt.0
+                                        Task { await app.api.saveSettings(["uebergang": opt.0]) }
+                                    }
                                 }
                             } label: {
                                 HStack {
-                                    Text(crossfadeLabel(player.crossfadeSeconds)).foregroundStyle(Theme.text)
+                                    Text(uebergangLabel(player.uebergang)).foregroundStyle(Theme.text)
                                     Spacer()
                                     Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(Theme.sub)
                                 }.padding(10).background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            .accessibilityIdentifier("settings.uebergang")
+                            if player.uebergang == "blende" || player.uebergang == "automix" {
+                                Text(player.uebergang == "automix" ? "Überblenden, wenn ein Song nicht gemessen ist" : "Überblenden")
+                                    .font(.caption2).foregroundStyle(Theme.mute).padding(.top, 4)
+                                Menu {
+                                    ForEach(crossfadeOptions, id: \.0) { opt in
+                                        Button(opt.1) {
+                                            player.crossfadeSeconds = opt.0
+                                            Task { await app.api.saveSettings(["blende_sek": opt.0]) }
+                                        }
+                                    }
+                                } label: {
+                                    HStack {
+                                        Text(crossfadeLabel(player.crossfadeSeconds)).foregroundStyle(Theme.text)
+                                        Spacer()
+                                        Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(Theme.sub)
+                                    }.padding(10).background(Theme.input).clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
                             }
                         }
                         VStack(alignment: .leading, spacing: 6) {
