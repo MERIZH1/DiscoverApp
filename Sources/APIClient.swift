@@ -411,8 +411,8 @@ final class APIClient: ObservableObject {
         if uri.hasPrefix("radio:") {
             return try await get("/api/radio-playlist/\(enc(String(uri.dropFirst(6))))")
         }
-        var q = check ? "?check=1" : ""
-        if force { q += (q.isEmpty ? "?" : "&") + "force=1" }   // Cache umgehen (Pull-to-Refresh)
+        var q = "?client=ios" + (check ? "&check=1" : "")
+        if force { q += "&force=1" }   // Cache umgehen (Pull-to-Refresh)
         return try await get("/api/playlist/\(enc(uri))\(q)")
     }
 
@@ -520,7 +520,8 @@ final class APIClient: ObservableObject {
 
     /// Sonderdesign für besondere Tage (Special.swift). nil bei Netzfehler, leer wenn keins gilt.
     func special() async -> SpecialResponse? {
-        guard let d = try? await data("/api/special?client=ios") else { return nil }
+        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+        guard let d = try? await data("/api/special?client=ios&v=\(enc(v))") else { return nil }
         return try? JSONDecoder().decode(SpecialResponse.self, from: d)
     }
 

@@ -23,10 +23,11 @@ final class DiscoverSmokeTests: XCTestCase {
     }
 
     /// Testserver: Sonderdesign an oder aus.
-    private func setSpecial(_ on: Bool, extras: Bool = false) {
+    private func setSpecial(_ on: Bool, extras: Bool = false, autoplay: Bool = false, anhang: Bool = false) {
         var req = URLRequest(url: URL(string: "http://127.0.0.1:8765/test/special")!)
         req.httpMethod = "POST"
-        req.httpBody = try? JSONSerialization.data(withJSONObject: ["on": on, "extras": extras])
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["on": on, "extras": extras,
+                                                                    "autoplay": autoplay, "anhang": anhang])
         let done = DispatchSemaphore(value: 0)
         URLSession.shared.dataTask(with: req) { _, _, _ in done.signal() }.resume()
         _ = done.wait(timeout: .now() + 5)
@@ -224,6 +225,42 @@ final class DiscoverSmokeTests: XCTestCase {
         app.activate()
         sleep(4)
         shotNow("45-sonderdesign-vorbei")
+    }
+
+    /// Sonderkarte mit „autoplay“: Antippen öffnet die Playlist und spielt ab Song 1. Die Playlist zeigt ihren
+    /// Anhang (Nachricht, Video) über den Songs.
+    func testSonderkarteSpielt() {
+        defer { setSpecial(false) }
+        setSpecial(true, autoplay: true, anhang: true)
+        app.terminate()
+        app.launch()
+        tab("Home")
+        let karte = app.descendants(matching: .any).matching(identifier: "home.specialCard").firstMatch
+        XCTAssertTrue(karte.waitForExistence(timeout: 15), "Sonderkarte fehlt")
+        karte.tap()
+        XCTAssertTrue(app.staticTexts["Kapitel 2"].firstMatch.waitForExistence(timeout: 10), "Playlist geht nicht auf")
+        // Song 1 steht in der Liste und im Mini-Player, sobald er spielt
+        let song1 = app.staticTexts.matching(NSPredicate(format: "label == %@", "Song 1"))
+        let ende = Date().addingTimeInterval(12)
+        while song1.count < 2 && Date() < ende { usleep(300_000) }
+        XCTAssertGreaterThanOrEqual(song1.count, 2, "Antippen der Karte spielt nicht ab")
+        shot("49-sonderkarte-spielt")
+        let nachricht = app.descendants(matching: .any).matching(identifier: "playlist.anhang.message").firstMatch
+        XCTAssertTrue(nachricht.waitForExistence(timeout: 8), "Anhang: Nachricht fehlt")
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "playlist.anhang.video").firstMatch.exists,
+                      "Anhang: Video fehlt")
+        nachricht.tap()
+        let zu = app.buttons["special.message.close"].firstMatch
+        XCTAssertTrue(zu.waitForExistence(timeout: 8), "Nachricht geht nicht auf")
+        XCTAssertTrue(app.staticTexts["Bleibt in der Playlist."].firstMatch.exists)
+        shotNow("49b-anhang-nachricht")
+        zu.tap()
+        app.descendants(matching: .any).matching(identifier: "playlist.anhang.video").firstMatch.tap()
+        let vzu = app.buttons["special.video.close"].firstMatch
+        XCTAssertTrue(vzu.waitForExistence(timeout: 10), "Video geht nicht auf")
+        sleep(2)
+        shotNow("49c-anhang-video")
+        vzu.tap()
     }
 
     /// Sonderdesign mit Nachricht beim Öffnen und Einblendung mit Video.

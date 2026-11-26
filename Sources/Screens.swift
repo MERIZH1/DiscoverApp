@@ -3152,6 +3152,7 @@ struct TrackListView: View {
     @State private var showMultiAdd = false
     @State private var showYouTubeShare = false
     @State private var albumInfo: PlaylistTracksResponse?
+    @State private var anhang: PlaylistAnhang?
     private var selectedTracks: [Track] { (tracks + recs).filter { selected.contains($0.uri) } }
     private func toggleSel(_ uri: String) {
         if selected.contains(uri) { selected.remove(uri) } else { selected.insert(uri) }
@@ -3354,6 +3355,7 @@ struct TrackListView: View {
                     }.padding(.horizontal).padding(.top, 8)
                 }
                 .padding(.bottom, 16)
+                if let a = anhang { PlaylistAnhangView(anhang: a) }
                 // Tracks (nummeriert)
                 if loading && tracks.isEmpty { SkeletonRows().transition(.opacity) }
                 if loadFailed && tracks.isEmpty { LoadFailedView { reload += 1 } }
@@ -3534,6 +3536,7 @@ struct TrackListView: View {
             }
             let first = isAlbum ? try? await app.api.albumTracks(uri) : try? await app.api.playlistTracks(uri, check: true)
             if isAlbum { albumInfo = first }
+            anhang = isAlbum ? nil : first?.anhang
             var answered = first != nil
             var t = first?.tracks ?? []
             // Fallback: History-Items sind manchmal falsch klassifiziert (Album<->Playlist)

@@ -200,9 +200,18 @@ struct YTFixResponse: Codable {
 }
 struct YTSearchResponse: Codable { let results: [YTCandidate]? }
 
+/// Anhang einer Playlist, die ein Sonderdesign mitgebracht hat: Nachricht und Video bleiben nach dem Tag.
+struct PlaylistAnhang: Codable, Equatable {
+    struct Nachricht: Codable, Equatable { var title: String?; var text: String? }
+    struct Video: Codable, Equatable { var title: String?; var text: String?; var url: String? }
+    var message: Nachricht?
+    var video: Video?
+}
+
 struct PlaylistTracksResponse: Codable {
     let name: String?
     let tracks: [Track]
+    var anhang: PlaylistAnhang? = nil
     // Nur bei Alben
     var release_date: String? = nil
     var release_precision: String? = nil

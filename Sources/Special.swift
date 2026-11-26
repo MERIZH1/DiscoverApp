@@ -22,6 +22,7 @@ struct SpecialCard: Codable, Equatable {
     var kicker: String?      // kleine Zeile über dem Titel
     var uri: String?
     var image: String?
+    var autoplay: Bool?      // Antippen öffnet die Playlist und spielt sie ab Song 1
 }
 
 /// Nachricht, die einmal beim Öffnen erscheint.
@@ -43,6 +44,7 @@ struct SpecialNotice: Codable, Equatable {
 struct SpecialResponse: Codable {
     var id: String?
     var end: Double?
+    var probe: Double?       // Probelauf (Admin): „gesehen“ zählt getrennt vom echten Tag
     var app: SpecialLook?
     var greeting: String?    // ersetzt die Begrüßung auf der Startseite
     var card: SpecialCard?
@@ -61,6 +63,7 @@ final class SpecialTheme: ObservableObject {
     static let shared = SpecialTheme()
 
     @Published private(set) var id = ""
+    private var probe: Double = 0
     @Published private(set) var look = SpecialLook()
     @Published private(set) var bursts: [SpecialBurst] = []
     @Published private(set) var card: SpecialCard?
@@ -127,6 +130,7 @@ final class SpecialTheme: ObservableObject {
             return
         }
         end = e
+        probe = r.probe ?? 0
         let l = r.app ?? SpecialLook()
         // Erst die Farbe, dann die ID: Die ID baut die Oberfläche neu auf (siehe ContentView).
         Theme.accentOverride = l.accent.flatMap { Color(hexString: $0) }
@@ -141,13 +145,16 @@ final class SpecialTheme: ObservableObject {
 
     // MARK: Nachricht, Einblendung mit Video
 
+    /// Probelauf: eigener Schlüssel je Einschalten, damit er weder den echten Tag noch den nächsten Probelauf verdeckt
+    private var seenID: String { probe > 0 ? "\(id)~\(Int(probe))" : id }
+
     private func seenHere(_ what: String) -> Bool {
-        (UserDefaults.standard.stringArray(forKey: seenKey) ?? []).contains("\(id):\(what)")
+        (UserDefaults.standard.stringArray(forKey: seenKey) ?? []).contains("\(seenID):\(what)")
     }
 
     private func markSeen(_ what: String) {
         var a = UserDefaults.standard.stringArray(forKey: seenKey) ?? []
-        let k = "\(id):\(what)"
+        let k = "\(seenID):\(what)"
         guard !a.contains(k) else { return }
         a.append(k)
         UserDefaults.standard.set(Array(a.suffix(30)), forKey: seenKey)
@@ -349,6 +356,7 @@ struct SpecialLayer: View {
 }
 
 /// Die Sonderkarte oben auf der Startseite: Antippen öffnet die Playlist, der Knopf spielt sie.
+/// Mit `autoplay` spielt auch das Antippen der Karte ab Song 1.
 struct SpecialCardView: View {
     let card: SpecialCard
     let uri: String
@@ -384,6 +392,7 @@ struct SpecialCardView: View {
                         in: RoundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(.pressable)
+        .simultaneousGesture(TapGesture().onEnded { if card.autoplay == true { play() } })
         .accessibilityIdentifier("home.specialCard")
         .overlay(alignment: .trailing) {
             Button { play() } label: {
@@ -468,6 +477,66 @@ struct SpecialMessageView: View {
         Text(s).font(.system(size: 16)).foregroundStyle(.white.opacity(0.92))
             .frame(maxWidth: .infinity, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// Anhang einer Playlist (bleibt nach dem Tag): Zeilen für Nachricht und Video über den Songs.
+struct PlaylistAnhangView: View {
+    let anhang: PlaylistAnhang
+    @EnvironmentObject var app: AppState
+    @Environment(\.playerRef) private var playerRef
+    @State private var nachrichtOffen = false
+    @State private var videoOffen = false
+    @State private var weiterNachVideo = false
+
+    var body: some View {
+        VStack(spacing: 8) {
+            if let m = anhang.message, m.text?.isEmpty == false {
+                zeile("envelope.fill", m.title?.isEmpty == false ? m.title! : "Nachricht", "Nachricht") { nachrichtOffen = true }
+                    .accessibilityIdentifier("playlist.anhang.message")
+            }
+            if let v = anhang.video, v.url?.isEmpty == false {
+                zeile("play.rectangle.fill", v.title?.isEmpty == false ? v.title! : "Video", "Video") {
+                    if let p = playerRef, p.isPlaying { weiterNachVideo = true; p.pause() }
+                    videoOffen = true
+                }
+                .accessibilityIdentifier("playlist.anhang.video")
+            }
+        }
+        .padding(.horizontal).padding(.bottom, 14)
+        .fullScreenCover(isPresented: $nachrichtOffen) {
+            SpecialMessageView(message: SpecialMessage(title: anhang.message?.title, text: anhang.message?.text),
+                               close: { nachrichtOffen = false }, play: {})
+                .presentationBackground(.clear)
+        }
+        .fullScreenCover(isPresented: $videoOffen, onDismiss: {
+            if weiterNachVideo { playerRef?.resume(); weiterNachVideo = false }
+        }) {
+            if let s = anhang.video?.url, let u = app.api.absoluteURL(s) {
+                SpecialVideoView(url: u) {}
+            } else {
+                Color.black.ignoresSafeArea()
+            }
+        }
+    }
+
+    private func zeile(_ symbol: String, _ titel: String, _ art: String, action: @escaping () -> Void) -> some View {
+        Button { Haptics.tap(); action() } label: {
+            HStack(spacing: 12) {
+                Image(systemName: symbol).font(.system(size: 17, weight: .semibold)).foregroundStyle(.black)
+                    .frame(width: 40, height: 40)
+                    .background(Theme.accent, in: Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(titel).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.text).lineLimit(1)
+                    Text(art).font(.system(size: 13)).foregroundStyle(Theme.sub)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.sub)
+            }
+            .padding(10)
+            .background(Theme.elev, in: RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.pressable)
     }
 }
 

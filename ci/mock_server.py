@@ -10,6 +10,7 @@ BASE = f"http://127.0.0.1:{PORT}"
 LIKED = set()   # Herz im Player: gelikte Songs
 REMOTE = {}     # Test „anderes Gerät spielt“: Stand, den /api/sync/wait meldet
 SPECIAL = {}    # Test Sonderdesign: was /api/special meldet
+ANHANG = {}     # Test Sonderdesign: Anhang der Playlist (Nachricht, Video)
 
 
 def special_look():
@@ -118,8 +119,11 @@ def route(path, q):
                 "copyright": ["(C) 2013 Testlabel", "(P) 2013 Testlabel"]}
     if path.startswith("/api/playlist/") and "probe" in path:
         # Playlist mit Kapiteln (Feld „section“)
-        return {"name": "Sonderkarte",
-                "tracks": [dict(track(i), section=f"Kapitel {(i - 1) // 4 + 1}") for i in range(1, 13)]}
+        d = {"name": "Sonderkarte",
+             "tracks": [dict(track(i), section=f"Kapitel {(i - 1) // 4 + 1}") for i in range(1, 13)]}
+        if ANHANG:
+            d["anhang"] = ANHANG
+        return d
     if path.startswith("/api/playlist/"):
         return {"name": "Playlist", "tracks": [track(i) for i in range(1, 101)]}
     if path == "/api/search":
@@ -224,6 +228,7 @@ class H(BaseHTTPRequestHandler):
             d = json.loads(body or b"{}")
             an = bool(d.get("on"))
             SPECIAL.clear()
+            ANHANG.clear()
             if an:
                 # Eigene ID je Einschalten: Was das Gerät schon gezeigt hat, gilt dann nicht mehr
                 SPECIAL.update({"id": f"test-extras-{int(time.time())}" if d.get("extras") else "test",
@@ -231,6 +236,11 @@ class H(BaseHTTPRequestHandler):
                                 "app": special_look(), "greeting": "Probe-Gruß",
                                 "card": {"kicker": "Probe", "title": "Sonderkarte", "sub": "Nur im Test",
                                          "uri": "ytpl:probe", "image": "/cover/12.png"}})
+            if an and d.get("autoplay"):
+                SPECIAL["card"]["autoplay"] = True
+            if an and d.get("anhang"):
+                ANHANG.update({"message": {"title": "Probe-Nachricht", "text": "Bleibt in der Playlist."},
+                               "video": {"title": "Probe-Video", "text": "", "url": "/special/video.mp4"}})
             if an and d.get("extras"):
                 # Nachricht beim Öffnen, Einblendung in 4 s mit Video
                 SPECIAL.update({

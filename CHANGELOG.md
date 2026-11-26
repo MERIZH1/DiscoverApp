@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.37 — Kleinigkeiten
+- Kleinere Verbesserungen im Hintergrund.
+
 ## v1.1.36 — Mehr davon, weniger davon
 - **Neu:** Läuft ein Song aus „Entdecken“, „Neues wie …“ oder den Empfehlungen, stehen im Player neben dem Quellen-Symbol zwei kleine Knöpfe: **+** heißt „mehr davon“ (dieser Künstler und diese Richtung kommen öfter in deinen Entdecken-Mixen), **−** heißt „weniger davon“ (der Song kommt nicht wieder und wird übersprungen, nach zweimal auch der Künstler nicht). Nochmal tippen nimmt es zurück. Gilt auch am PC.
 
