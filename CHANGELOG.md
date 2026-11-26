@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.40 — Begrüßung
+- Spät abends und nachts heißt es auf der Startseite jetzt „Guten Abend“ statt „Gute Nacht“.
+
 ## v1.1.39 — Reihenfolge ändern
 - **Neu:** In deinen Playlists oben rechts der Knopf mit den zwei Pfeilen: Songs an den Griffen rechts an eine neue Stelle ziehen. Jede Änderung wird sofort gespeichert, auch bei Spotify. Läuft die Playlist gerade (ohne Shuffle), kommt danach der Song, der jetzt darunter steht. Am PC geht es direkt in der Liste: Song mit der Maus greifen und ziehen.
 

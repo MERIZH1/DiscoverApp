@@ -1129,7 +1129,8 @@ struct HomeView: View {
         if let g = special.greeting { return g }
         // Spotifys Gruß hängt an einer fremden Zeitzone, nachts stand dort „Guten Abend“
         let h = Calendar.current.component(.hour, from: Date())
-        let g = h < 5 || h >= 22 ? "Gute Nacht" : h < 11 ? "Guten Morgen" : h < 17 ? "Guten Tag" : "Guten Abend"
+        // Kein „Gute Nacht“ (sagt man beim Schlafengehen): spät und nachts „Guten Abend“
+        let g = (5..<11).contains(h) ? "Guten Morgen" : (11..<17).contains(h) ? "Guten Tag" : "Guten Abend"
         let n = home?.user_name ?? app.profile?.name ?? ""
         return n.isEmpty ? g : "\(g) \(n)"
     }
