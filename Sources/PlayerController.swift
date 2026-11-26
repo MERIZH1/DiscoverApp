@@ -691,6 +691,12 @@ final class PlayerController: ObservableObject {
         persistSnapshot()
         prefetchUpcoming()
     }
+    /// „Mehr/Weniger davon“ (AUFTRAG 5.6) nur bei Songs aus Entdecken-Mixen (mix:…) und Empfehlungen
+    var vorliebenMoeglich: Bool {
+        guard let c = current, !c.uri.isEmpty, !c.artist.isEmpty, !isRadio else { return false }
+        return ctxURI.hasPrefix("mix:") || ctxName == "Empfehlungen"
+    }
+
     /// „mehr“, „weniger“ oder „nie_zeit“ für den laufenden Song
     func laufFeedback(_ aktion: String) async {
         guard let s = laufSitzung, let c = current, c.uri.hasPrefix("spotify:track:") else { return }

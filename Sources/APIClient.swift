@@ -761,6 +761,22 @@ final class APIClient: ObservableObject {
         return (obj["ok"] as? Bool) ?? false
     }
 
+    /// „Mehr davon / Weniger davon“ (AUFTRAG 5.6): Stand für einen Song lesen bzw. setzen
+    /// (aktion: mehr | weniger | neutral). → (Song −1/0/1, Künstler −3…3) oder nil bei Fehler.
+    func vorliebe(uri: String, artist: String) async -> (song: Int, kuenstler: Int)? {
+        let q = "uri=\(enc(uri))&artist=\(enc(artist))"
+        guard let d = try? await data("/api/entdecken/feedback?\(q)"),
+              let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return nil }
+        return ((o["song"] as? Int) ?? 0, (o["kuenstler"] as? Int) ?? 0)
+    }
+    func vorliebeSetzen(uri: String, artist: String, name: String, aktion: String) async -> (song: Int, kuenstler: Int)? {
+        guard let d = try? await data("/api/entdecken/feedback", method: "POST",
+                                      json: ["uri": uri, "artist": artist, "name": name, "aktion": aktion]),
+              let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
+              (o["ok"] as? Bool) == true else { return nil }
+        return ((o["song"] as? Int) ?? 0, (o["kuenstler"] as? Int) ?? 0)
+    }
+
     func settings() async throws -> UserSettings {
         try await get("/api/me/settings")
     }

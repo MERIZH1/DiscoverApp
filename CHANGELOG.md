@@ -3,6 +3,9 @@
 Der oberste Abschnitt wird automatisch in die SideStore-Quelle uebernommen
 (`versionDescription`), damit du im SideStore siehst, was neu ist.
 
+## v1.1.36 — Mehr davon, weniger davon
+- **Neu:** Läuft ein Song aus „Entdecken“, „Neues wie …“ oder den Empfehlungen, stehen im Player neben dem Quellen-Symbol zwei kleine Knöpfe: **+** heißt „mehr davon“ (dieser Künstler und diese Richtung kommen öfter in deinen Entdecken-Mixen), **−** heißt „weniger davon“ (der Song kommt nicht wieder und wird übersprungen, nach zweimal auch der Künstler nicht). Nochmal tippen nimmt es zurück. Gilt auch am PC.
+
 ## v1.1.35 — Neues entdecken
 - **Neu:** Unter den Empfehlungen einer Playlist gibt es den Schalter „Nur Unbekanntes“: Dann stehen dort nur Songs, die du noch nie gehört hast und die in keiner deiner Playlists stehen. Die Einstellung gilt auch in der Weboberfläche und im Programm.
 - **Neu auf der Startseite:** „Entdecken“ (30 Songs, die du noch nie gehört hast, jeden Montag neu) vorne bei „Aus deinem Hörverhalten“, und ab Montag „Neues in deinen Richtungen“ mit einem Mix je Musikrichtung, die du hörst.

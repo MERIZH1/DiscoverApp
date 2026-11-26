@@ -4473,6 +4473,9 @@ struct PlayerView: View {
                                         }
                                     }
                                 }
+                                if p.vorliebenMoeglich, let t = p.current {
+                                    VorliebenKnoepfe(track: t)
+                                }
                             }.padding(.top, 4)
                         }
                     }
@@ -4876,6 +4879,66 @@ struct LyricsSheet: View {
                 text = (ly.lyrics?.isEmpty == false) ? (ly.lyrics ?? "") :
                        (ly.instrumental == true ? "Instrumental" : "Kein Songtext gefunden")
             } else { text = "Kein Songtext gefunden" }
+        }
+    }
+}
+
+// MARK: - Mehr davon / Weniger davon (AUFTRAG 5.6)
+/// Zwei kleine Knöpfe neben dem Quellen-Symbol, nur bei Songs aus Entdecken-Mixen und Empfehlungen.
+/// Je Profil am Server; steuert Entdecken, Richtungs-Mixe und „Nur Unbekanntes“ (auch im Web).
+/// Weniger überspringt den Song, nochmal tippen nimmt zurück.
+struct VorliebenKnoepfe: View {
+    let track: Track
+    @EnvironmentObject var app: AppState
+    @State private var stand = 0
+    @State private var laedt = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            knopf("plus", aktiv: stand > 0, farbe: Theme.accent, label: "Mehr davon") { setzen("mehr") }
+            knopf("minus", aktiv: stand < 0, farbe: Color(hex6: 0xE85D75), label: "Weniger davon") { setzen("weniger") }
+        }
+        .task(id: track.uri) {
+            stand = 0
+            stand = (await app.api.vorliebe(uri: track.uri, artist: track.artist))?.song ?? 0
+        }
+    }
+
+    private func knopf(_ bild: String, aktiv: Bool, farbe: Color, label: String, action: @escaping () -> Void) -> some View {
+        Button { Haptics.tap(); action() } label: {
+            Image(systemName: bild)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(aktiv ? Color.black : Theme.sub)
+                .frame(width: 26, height: 26)
+                .background(aktiv ? farbe : Theme.input)
+                .clipShape(Circle())
+                .contentShape(Circle().inset(by: -8))
+        }
+        .buttonStyle(.plain).disabled(laedt)
+        .accessibilityLabel(label)
+        .accessibilityValue(aktiv ? "an" : "aus")
+    }
+
+    private func setzen(_ aktion: String) {
+        let wert = aktion == "mehr" ? 1 : -1
+        let ziel = stand == wert ? "neutral" : aktion
+        let t = track
+        laedt = true
+        Task {
+            let r = await app.api.vorliebeSetzen(uri: t.uri, artist: t.artist, name: t.name, aktion: ziel)
+            await MainActor.run {
+                laedt = false
+                guard let r else { app.flash("Konnte nicht gespeichert werden"); return }
+                stand = r.song
+                let wer = t.artist.split(separator: ",").first.map { String($0).trimmingCharacters(in: .whitespaces) } ?? t.artist
+                switch ziel {
+                case "neutral": app.flash("Zurückgenommen")
+                case "mehr": app.flash("Mehr davon: \(wer) kommt öfter in deinen Entdecken-Mixen")
+                default:
+                    app.flash("Weniger davon: Song kommt nicht wieder" + (r.kuenstler <= -2 ? ", \(wer) auch nicht" : ""))
+                    if app.player.current?.uri == t.uri { app.player.next() }
+                }
+            }
         }
     }
 }
